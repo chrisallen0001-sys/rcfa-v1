@@ -90,7 +90,6 @@ model AppUser {
   completedActionItems  RcfaActionItem[]      @relation("ActionCompletedBy")
   auditEvents           RcfaAuditEvent[]      @relation("AuditActor")
 
-  @@index([email])
   @@map("app_user")
 }
 
