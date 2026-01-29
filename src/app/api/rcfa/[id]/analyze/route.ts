@@ -50,6 +50,9 @@ interface AnalysisResult {
   }[];
 }
 
+const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["low", "medium", "high"];
+const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
+
 function validateAnalysisResult(parsed: unknown): AnalysisResult {
   const obj = parsed as Record<string, unknown>;
   if (
@@ -59,6 +62,31 @@ function validateAnalysisResult(parsed: unknown): AnalysisResult {
   ) {
     throw new Error("Malformed analysis structure");
   }
+
+  for (const q of obj.followUpQuestions) {
+    if (!q?.questionText || typeof q.questionText !== "string") {
+      throw new Error("Malformed followUpQuestion: missing questionText");
+    }
+  }
+
+  for (const c of obj.rootCauseCandidates) {
+    if (!c?.causeText || typeof c.causeText !== "string") {
+      throw new Error("Malformed rootCauseCandidate: missing causeText");
+    }
+    if (!VALID_CONFIDENCE_LABELS.includes(c.confidenceLabel)) {
+      throw new Error(`Invalid confidenceLabel: ${c.confidenceLabel}`);
+    }
+  }
+
+  for (const a of obj.actionItems) {
+    if (!a?.actionText || typeof a.actionText !== "string") {
+      throw new Error("Malformed actionItem: missing actionText");
+    }
+    if (!VALID_PRIORITIES.includes(a.priority)) {
+      throw new Error(`Invalid priority: ${a.priority}`);
+    }
+  }
+
   return obj as unknown as AnalysisResult;
 }
 
@@ -105,6 +133,7 @@ export async function POST(
 
     const { id } = await params;
 
+    // Read outside transaction for early auth/404 checks
     const rcfa = await prisma.rcfa.findUnique({ where: { id } });
     if (!rcfa) {
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
@@ -139,16 +168,22 @@ export async function POST(
       }
     }
 
-    await prisma.$transaction([
-      prisma.rcfaFollowupQuestion.createMany({
+    // Use interactive transaction with row lock to prevent duplicate writes
+    await prisma.$transaction(async (tx) => {
+      const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
+      if (locked.status !== "draft") {
+        throw new Error("RCFA_ALREADY_ANALYZED");
+      }
+
+      await tx.rcfaFollowupQuestion.createMany({
         data: result.followUpQuestions.map((q) => ({
           rcfaId: id,
           questionText: q.questionText,
-          questionCategory: q.questionCategory,
+          questionCategory: "other" as const,
           generatedBy: "ai" as const,
         })),
-      }),
-      prisma.rcfaRootCauseCandidate.createMany({
+      });
+      await tx.rcfaRootCauseCandidate.createMany({
         data: result.rootCauseCandidates.map((c) => ({
           rcfaId: id,
           causeText: c.causeText,
@@ -156,8 +191,8 @@ export async function POST(
           confidenceLabel: c.confidenceLabel,
           generatedBy: "ai" as const,
         })),
-      }),
-      prisma.rcfaActionItemCandidate.createMany({
+      });
+      await tx.rcfaActionItemCandidate.createMany({
         data: result.actionItems.map((a) => ({
           rcfaId: id,
           actionText: a.actionText,
@@ -167,15 +202,21 @@ export async function POST(
           successCriteria: a.successCriteria,
           generatedBy: "ai" as const,
         })),
-      }),
-      prisma.rcfa.update({
+      });
+      await tx.rcfa.update({
         where: { id },
         data: { status: "investigation" },
-      }),
-    ]);
+      });
+    });
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
+    if (error instanceof Error && error.message === "RCFA_ALREADY_ANALYZED") {
+      return NextResponse.json(
+        { error: "Only draft RCFAs can be analyzed" },
+        { status: 409 }
+      );
+    }
     console.error("POST /api/rcfa/[id]/analyze error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
