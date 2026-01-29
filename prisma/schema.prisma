@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -11,5 +5,307 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+}
+
+// -----------------------------
+// Enums
+// -----------------------------
+
+enum AppUserRole {
+  admin
+  user
+}
+
+enum RcfaStatus {
+  draft
+  investigation
+  actions_open
+  closed
+}
+
+enum OperatingContext {
+  running
+  startup
+  shutdown
+  maintenance
+  unknown
+}
+
+enum QuestionCategory {
+  failure_mode
+  evidence
+  operating_context
+  maintenance_history
+  safety
+  other
+}
+
+enum GeneratedBy {
+  ai
+  human
+}
+
+enum ConfidenceLabel {
+  low
+  medium
+  high
+}
+
+enum Priority {
+  low
+  medium
+  high
+}
+
+enum ActionItemStatus {
+  open
+  in_progress
+  blocked
+  done
+  canceled
+}
+
+// -----------------------------
+// Users
+// -----------------------------
+
+model AppUser {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  displayName  String   @map("display_name")
+  role         AppUserRole @default(user)
+  passwordHash String   @map("password_hash")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  createdRcfas          Rcfa[]                @relation("RcfaCreatedBy")
+  answeredFollowups     RcfaFollowupQuestion[] @relation("FollowupAnsweredBy")
+  selectedRootCauses    RcfaRootCauseFinal[]  @relation("RootCauseSelectedBy")
+  updatedRootCauses     RcfaRootCauseFinal[]  @relation("RootCauseUpdatedBy")
+  ownedActionItems      RcfaActionItem[]      @relation("ActionOwner")
+  createdActionItems    RcfaActionItem[]      @relation("ActionCreatedBy")
+  updatedActionItems    RcfaActionItem[]      @relation("ActionUpdatedBy")
+  completedActionItems  RcfaActionItem[]      @relation("ActionCompletedBy")
+  auditEvents           RcfaAuditEvent[]      @relation("AuditActor")
+
+  @@index([email])
+  @@map("app_user")
+}
+
+// -----------------------------
+// RCFA
+// -----------------------------
+
+model Rcfa {
+  id                   String   @id @default(uuid()) @db.Uuid
+  title                String   @default("")
+  equipmentDescription String   @map("equipment_description")
+
+  equipmentMake         String?  @map("equipment_make")
+  equipmentModel        String?  @map("equipment_model")
+  equipmentSerialNumber String?  @map("equipment_serial_number")
+  equipmentAgeYears     Decimal? @map("equipment_age_years") @db.Decimal(6, 2)
+
+  operatingContext OperatingContext @default(unknown) @map("operating_context")
+
+  preFailureConditions String? @map("pre_failure_conditions")
+  failureDescription   String  @map("failure_description")
+
+  workHistorySummary String? @map("work_history_summary")
+  activePmsSummary   String? @map("active_pms_summary")
+  additionalNotes    String? @map("additional_notes")
+
+  downtimeMinutes    Int?     @map("downtime_minutes")
+  productionCostUsd  Decimal? @map("production_cost_usd") @db.Decimal(12, 2)
+  maintenanceCostUsd Decimal? @map("maintenance_cost_usd") @db.Decimal(12, 2)
+
+  status         RcfaStatus @default(draft)
+  createdByUserId String    @map("created_by_user_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  closedAt  DateTime? @map("closed_at") @db.Timestamptz
+
+  // Relations
+  createdBy            AppUser                  @relation("RcfaCreatedBy", fields: [createdByUserId], references: [id])
+  followupQuestions    RcfaFollowupQuestion[]
+  rootCauseCandidates  RcfaRootCauseCandidate[]
+  rootCauseFinals      RcfaRootCauseFinal[]
+  actionItemCandidates RcfaActionItemCandidate[]
+  actionItems          RcfaActionItem[]
+  auditEvents          RcfaAuditEvent[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("rcfa")
+}
+
+// -----------------------------
+// Follow-up Questions
+// -----------------------------
+
+model RcfaFollowupQuestion {
+  id     String @id @default(uuid()) @db.Uuid
+  rcfaId String @map("rcfa_id") @db.Uuid
+
+  questionText     String           @map("question_text")
+  questionCategory QuestionCategory @default(other) @map("question_category")
+
+  generatedBy GeneratedBy @default(ai) @map("generated_by")
+  generatedAt DateTime    @default(now()) @map("generated_at") @db.Timestamptz
+
+  answerText       String?   @map("answer_text")
+  answeredByUserId String?   @map("answered_by_user_id") @db.Uuid
+  answeredAt       DateTime? @map("answered_at") @db.Timestamptz
+
+  // Relations
+  rcfa       Rcfa     @relation(fields: [rcfaId], references: [id], onDelete: Cascade)
+  answeredBy AppUser? @relation("FollowupAnsweredBy", fields: [answeredByUserId], references: [id])
+
+  @@index([rcfaId])
+  @@map("rcfa_followup_question")
+}
+
+// -----------------------------
+// Root Cause Candidates (AI suggestions)
+// -----------------------------
+
+model RcfaRootCauseCandidate {
+  id     String @id @default(uuid()) @db.Uuid
+  rcfaId String @map("rcfa_id") @db.Uuid
+
+  causeText       String          @map("cause_text")
+  rationaleText   String?         @map("rationale_text")
+  confidenceLabel ConfidenceLabel @default(medium) @map("confidence_label")
+
+  generatedBy GeneratedBy @default(ai) @map("generated_by")
+  generatedAt DateTime    @default(now()) @map("generated_at") @db.Timestamptz
+
+  // Relations
+  rcfa   Rcfa                 @relation(fields: [rcfaId], references: [id], onDelete: Cascade)
+  finals RcfaRootCauseFinal[] @relation("FinalFromCandidate")
+
+  @@index([rcfaId])
+  @@map("rcfa_root_cause_candidate")
+}
+
+// -----------------------------
+// Final Root Causes (user-validated)
+// -----------------------------
+
+model RcfaRootCauseFinal {
+  id     String @id @default(uuid()) @db.Uuid
+  rcfaId String @map("rcfa_id") @db.Uuid
+
+  causeText       String  @map("cause_text")
+  evidenceSummary String? @map("evidence_summary")
+
+  selectedFromCandidateId String? @map("selected_from_candidate_id") @db.Uuid
+
+  selectedByUserId String   @map("selected_by_user_id") @db.Uuid
+  selectedAt       DateTime @default(now()) @map("selected_at") @db.Timestamptz
+
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  rcfa              Rcfa                    @relation(fields: [rcfaId], references: [id], onDelete: Cascade)
+  selectedFromCandidate RcfaRootCauseCandidate? @relation("FinalFromCandidate", fields: [selectedFromCandidateId], references: [id])
+  selectedBy        AppUser                 @relation("RootCauseSelectedBy", fields: [selectedByUserId], references: [id])
+  updatedBy         AppUser?                @relation("RootCauseUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@index([rcfaId])
+  @@map("rcfa_root_cause_final")
+}
+
+// -----------------------------
+// Action Item Candidates (AI suggestions)
+// -----------------------------
+
+model RcfaActionItemCandidate {
+  id     String @id @default(uuid()) @db.Uuid
+  rcfaId String @map("rcfa_id") @db.Uuid
+
+  actionText      String   @map("action_text")
+  rationaleText   String?  @map("rationale_text")
+  priority        Priority @default(medium)
+  timeframeText   String?  @map("timeframe_text")
+  successCriteria String?  @map("success_criteria")
+
+  generatedBy GeneratedBy @default(ai) @map("generated_by")
+  generatedAt DateTime    @default(now()) @map("generated_at") @db.Timestamptz
+
+  // Relations
+  rcfa   Rcfa             @relation(fields: [rcfaId], references: [id], onDelete: Cascade)
+  finals RcfaActionItem[] @relation("ActionFromCandidate")
+
+  @@index([rcfaId])
+  @@map("rcfa_action_item_candidate")
+}
+
+// -----------------------------
+// Action Items (final tracked items)
+// -----------------------------
+
+model RcfaActionItem {
+  id     String @id @default(uuid()) @db.Uuid
+  rcfaId String @map("rcfa_id") @db.Uuid
+
+  actionText      String           @map("action_text")
+  successCriteria String?          @map("success_criteria")
+
+  ownerUserId String?          @map("owner_user_id") @db.Uuid
+  priority    Priority         @default(medium)
+  dueDate     DateTime?        @map("due_date") @db.Date
+  status      ActionItemStatus @default(open)
+
+  selectedFromCandidateId String? @map("selected_from_candidate_id") @db.Uuid
+
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+
+  completedAt       DateTime? @map("completed_at") @db.Timestamptz
+  completedByUserId String?   @map("completed_by_user_id") @db.Uuid
+  completionNotes   String?   @map("completion_notes")
+
+  // Relations
+  rcfa                  Rcfa                     @relation(fields: [rcfaId], references: [id], onDelete: Cascade)
+  owner                 AppUser?                 @relation("ActionOwner", fields: [ownerUserId], references: [id])
+  selectedFromCandidate RcfaActionItemCandidate?  @relation("ActionFromCandidate", fields: [selectedFromCandidateId], references: [id])
+  createdBy             AppUser                  @relation("ActionCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy             AppUser?                 @relation("ActionUpdatedBy", fields: [updatedByUserId], references: [id])
+  completedBy           AppUser?                 @relation("ActionCompletedBy", fields: [completedByUserId], references: [id])
+
+  @@index([rcfaId])
+  @@index([ownerUserId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("rcfa_action_item")
+}
+
+// -----------------------------
+// Audit Events
+// -----------------------------
+
+model RcfaAuditEvent {
+  id     String @id @default(uuid()) @db.Uuid
+  rcfaId String @map("rcfa_id") @db.Uuid
+
+  actorUserId  String? @map("actor_user_id") @db.Uuid
+  eventType    String  @map("event_type")
+  eventPayload Json    @default("{}") @map("event_payload") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  rcfa  Rcfa     @relation(fields: [rcfaId], references: [id], onDelete: Cascade)
+  actor AppUser? @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([rcfaId])
+  @@index([createdAt])
+  @@map("rcfa_audit_event")
 }
