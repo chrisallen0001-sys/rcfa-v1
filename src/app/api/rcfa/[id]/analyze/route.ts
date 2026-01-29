@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
 import { getAuthContext } from "@/lib/auth-context";
+import type {
+  Rcfa,
+  QuestionCategory,
+  ConfidenceLabel,
+  Priority,
+} from "@/generated/prisma/client";
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
@@ -28,35 +34,35 @@ Requirements:
 interface AnalysisResult {
   followUpQuestions: {
     questionText: string;
-    questionCategory: string;
+    questionCategory: QuestionCategory;
   }[];
   rootCauseCandidates: {
     causeText: string;
     rationaleText: string;
-    confidenceLabel: string;
+    confidenceLabel: ConfidenceLabel;
   }[];
   actionItems: {
     actionText: string;
     rationaleText: string;
-    priority: string;
+    priority: Priority;
     timeframeText: string;
     successCriteria: string;
   }[];
 }
 
-function buildUserPrompt(rcfa: {
-  equipmentDescription: string;
-  equipmentMake: string | null;
-  equipmentModel: string | null;
-  equipmentSerialNumber: string | null;
-  equipmentAgeYears: unknown;
-  operatingContext: string;
-  preFailureConditions: string | null;
-  failureDescription: string;
-  workHistorySummary: string | null;
-  activePmsSummary: string | null;
-  additionalNotes: string | null;
-}): string {
+function validateAnalysisResult(parsed: unknown): AnalysisResult {
+  const obj = parsed as Record<string, unknown>;
+  if (
+    !Array.isArray(obj.followUpQuestions) ||
+    !Array.isArray(obj.rootCauseCandidates) ||
+    !Array.isArray(obj.actionItems)
+  ) {
+    throw new Error("Malformed analysis structure");
+  }
+  return obj as unknown as AnalysisResult;
+}
+
+function buildUserPrompt(rcfa: Rcfa): string {
   const lines = [
     `Equipment Description: ${rcfa.equipmentDescription}`,
     rcfa.equipmentMake && `Equipment Make: ${rcfa.equipmentMake}`,
@@ -87,7 +93,7 @@ async function callOpenAI(userPrompt: string): Promise<AnalysisResult> {
   if (!content) {
     throw new Error("Empty response from OpenAI");
   }
-  return JSON.parse(content) as AnalysisResult;
+  return validateAnalysisResult(JSON.parse(content));
 }
 
 export async function POST(
@@ -95,7 +101,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await getAuthContext();
+    const { userId } = await getAuthContext();
 
     const { id } = await params;
 
@@ -104,13 +110,24 @@ export async function POST(
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
     }
 
+    if (rcfa.createdByUserId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (rcfa.status !== "draft") {
+      return NextResponse.json(
+        { error: "Only draft RCFAs can be analyzed" },
+        { status: 409 }
+      );
+    }
+
     const userPrompt = buildUserPrompt(rcfa);
 
     let result: AnalysisResult;
     try {
       result = await callOpenAI(userPrompt);
-    } catch {
-      // Retry once on failure
+    } catch (firstError) {
+      console.warn("OpenAI first attempt failed, retrying:", firstError);
       try {
         result = await callOpenAI(userPrompt);
       } catch (retryError) {
@@ -121,6 +138,37 @@ export async function POST(
         );
       }
     }
+
+    await prisma.$transaction([
+      prisma.rcfaFollowupQuestion.createMany({
+        data: result.followUpQuestions.map((q) => ({
+          rcfaId: id,
+          questionText: q.questionText,
+          questionCategory: q.questionCategory,
+          generatedBy: "ai" as const,
+        })),
+      }),
+      prisma.rcfaRootCauseCandidate.createMany({
+        data: result.rootCauseCandidates.map((c) => ({
+          rcfaId: id,
+          causeText: c.causeText,
+          rationaleText: c.rationaleText,
+          confidenceLabel: c.confidenceLabel,
+          generatedBy: "ai" as const,
+        })),
+      }),
+      prisma.rcfaActionItemCandidate.createMany({
+        data: result.actionItems.map((a) => ({
+          rcfaId: id,
+          actionText: a.actionText,
+          rationaleText: a.rationaleText,
+          priority: a.priority,
+          timeframeText: a.timeframeText,
+          successCriteria: a.successCriteria,
+          generatedBy: "ai" as const,
+        })),
+      }),
+    ]);
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
