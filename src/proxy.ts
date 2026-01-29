@@ -3,7 +3,7 @@ import { verifyToken, TOKEN_COOKIE_NAME } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/api/auth/login", "/api/auth/register", "/login", "/register"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
