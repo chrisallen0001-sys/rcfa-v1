@@ -1,7 +1,14 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import type { RcfaStatus, ConfidenceLabel, Priority } from "@/generated/prisma/client";
+import type {
+  RcfaStatus,
+  ConfidenceLabel,
+  Priority,
+  OperatingContext,
+} from "@/generated/prisma/client";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const STATUS_LABELS: Record<RcfaStatus, string> = {
   draft: "Draft",
@@ -18,9 +25,17 @@ const STATUS_COLORS: Record<RcfaStatus, string> = {
 };
 
 const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
-  low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  low: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  high: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+};
+
+const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
+  running: "Running",
+  startup: "Startup",
+  shutdown: "Shutdown",
+  maintenance: "Maintenance",
+  unknown: "Unknown",
 };
 
 const PRIORITY_COLORS: Record<Priority, string> = {
@@ -78,6 +93,10 @@ export default async function RcfaDetailPage({
   const { userId } = await getAuthContext();
   const { id } = await params;
 
+  if (!UUID_RE.test(id)) {
+    notFound();
+  }
+
   const rcfa = await prisma.rcfa.findUnique({
     where: { id },
     include: {
@@ -97,7 +116,7 @@ export default async function RcfaDetailPage({
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          RCFA Detail
+          {rcfa.title || "RCFA Detail"}
         </h1>
         <Badge
           label={STATUS_LABELS[rcfa.status]}
@@ -110,13 +129,25 @@ export default async function RcfaDetailPage({
         <Section title="Intake Summary">
           <dl className="grid gap-4 sm:grid-cols-2">
             <Field label="Equipment Description" value={rcfa.equipmentDescription} />
-            <Field label="Operating Context" value={rcfa.operatingContext} />
+            <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
             <Field label="Make" value={rcfa.equipmentMake} />
             <Field label="Model" value={rcfa.equipmentModel} />
             <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
             <Field
               label="Equipment Age (years)"
               value={rcfa.equipmentAgeYears?.toString() ?? null}
+            />
+            <Field
+              label="Downtime (minutes)"
+              value={rcfa.downtimeMinutes?.toString() ?? null}
+            />
+            <Field
+              label="Production Cost (USD)"
+              value={rcfa.productionCostUsd?.toString() ?? null}
+            />
+            <Field
+              label="Maintenance Cost (USD)"
+              value={rcfa.maintenanceCostUsd?.toString() ?? null}
             />
           </dl>
           <dl className="mt-4 grid gap-4">
@@ -131,16 +162,25 @@ export default async function RcfaDetailPage({
         {/* Follow-up Questions */}
         {hasAnalysis && rcfa.followupQuestions.length > 0 && (
           <Section title="Follow-up Questions">
-            <ol className="list-inside list-decimal space-y-2">
-              {rcfa.followupQuestions.map((q) => (
-                <li
-                  key={q.id}
-                  className="text-sm text-zinc-900 dark:text-zinc-100"
-                >
-                  {q.questionText}
-                </li>
+            <div className="space-y-3">
+              {rcfa.followupQuestions.map((q, i) => (
+                <div key={q.id} className="text-sm">
+                  <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {i + 1}. {q.questionText}
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {q.questionCategory}
+                    </span>
+                  </div>
+                  {q.answerText && (
+                    <p className="mt-1 whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
+                      {q.answerText}
+                    </p>
+                  )}
+                </div>
               ))}
-            </ol>
+            </div>
           </Section>
         )}
 
