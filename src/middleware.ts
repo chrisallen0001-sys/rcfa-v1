@@ -7,7 +7,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    const headers = new Headers(request.headers);
+    headers.delete("x-user-id");
+    headers.delete("x-user-email");
+    headers.delete("x-user-role");
+    return NextResponse.next({ request: { headers } });
   }
 
   const token = request.cookies.get(TOKEN_COOKIE_NAME)?.value;
