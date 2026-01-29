@@ -39,7 +39,11 @@ export async function POST(request: NextRequest) {
       additionalNotes,
     } = body as Record<string, string | number | undefined>;
 
-    if (!equipmentDescription || !failureDescription || !operatingContext) {
+    const trimmedEquipDesc = equipmentDescription ? String(equipmentDescription).trim() : "";
+    const trimmedFailureDesc = failureDescription ? String(failureDescription).trim() : "";
+    const trimmedContext = operatingContext ? String(operatingContext).trim() : "";
+
+    if (!trimmedEquipDesc || !trimmedFailureDesc || !trimmedContext) {
       return NextResponse.json(
         {
           error:
@@ -50,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (
-      !VALID_OPERATING_CONTEXTS.includes(operatingContext as OperatingContext)
+      !VALID_OPERATING_CONTEXTS.includes(trimmedContext as OperatingContext)
     ) {
       return NextResponse.json(
         { error: `operatingContext must be one of: ${VALID_OPERATING_CONTEXTS.join(", ")}` },
@@ -58,36 +62,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (equipmentAgeYears != null) {
+      const age = Number(equipmentAgeYears);
+      if (isNaN(age) || age < 0 || age > 9999) {
+        return NextResponse.json(
+          { error: "equipmentAgeYears must be a non-negative number" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const trimOpt = (v: string | number | undefined) =>
+      v ? String(v).trim() || undefined : undefined;
+
     const rcfa = await prisma.rcfa.create({
       data: {
-        equipmentDescription: String(equipmentDescription),
-        failureDescription: String(failureDescription),
-        operatingContext: operatingContext as OperatingContext,
-        equipmentMake: equipmentMake ? String(equipmentMake) : undefined,
-        equipmentModel: equipmentModel ? String(equipmentModel) : undefined,
-        equipmentSerialNumber: equipmentSerialNumber
-          ? String(equipmentSerialNumber)
-          : undefined,
+        equipmentDescription: trimmedEquipDesc,
+        failureDescription: trimmedFailureDesc,
+        operatingContext: trimmedContext as OperatingContext,
+        equipmentMake: trimOpt(equipmentMake),
+        equipmentModel: trimOpt(equipmentModel),
+        equipmentSerialNumber: trimOpt(equipmentSerialNumber),
         equipmentAgeYears:
           equipmentAgeYears != null ? Number(equipmentAgeYears) : undefined,
-        preFailureConditions: preFailureConditions
-          ? String(preFailureConditions)
-          : undefined,
-        workHistorySummary: workHistorySummary
-          ? String(workHistorySummary)
-          : undefined,
-        activePmsSummary: activePmsSummary
-          ? String(activePmsSummary)
-          : undefined,
-        additionalNotes: additionalNotes
-          ? String(additionalNotes)
-          : undefined,
+        preFailureConditions: trimOpt(preFailureConditions),
+        workHistorySummary: trimOpt(workHistorySummary),
+        activePmsSummary: trimOpt(activePmsSummary),
+        additionalNotes: trimOpt(additionalNotes),
         status: "draft",
         createdByUserId: userId,
       },
     });
 
-    return NextResponse.json(rcfa, { status: 201 });
+    return NextResponse.json({ id: rcfa.id }, { status: 201 });
   } catch (error) {
     console.error("POST /api/rcfa error:", error);
     return NextResponse.json(
