@@ -57,7 +57,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {registered && (
+          {registered && !error && (
             <div className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
               Account created successfully. Please sign in.
             </div>
