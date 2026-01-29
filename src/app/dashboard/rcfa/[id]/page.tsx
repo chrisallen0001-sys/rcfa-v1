@@ -87,11 +87,14 @@ function Badge({ label, colorClass }: { label: string; colorClass: string }) {
 
 export default async function RcfaDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ analyzeError?: string }>;
 }) {
   const { userId } = await getAuthContext();
   const { id } = await params;
+  const { analyzeError } = await searchParams;
 
   if (!UUID_RE.test(id)) {
     notFound();
@@ -123,6 +126,12 @@ export default async function RcfaDetailPage({
           colorClass={STATUS_COLORS[rcfa.status]}
         />
       </div>
+
+      {analyzeError && (
+        <div className="mb-6 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+          AI analysis could not be completed. Your RCFA has been saved as a draft.
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Intake Summary */}

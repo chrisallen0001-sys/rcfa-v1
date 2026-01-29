@@ -43,8 +43,8 @@ export default function IntakePage() {
   const router = useRouter();
   const [form, setForm] = useState<IntakeFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof IntakeFormData, string>>>({});
-  const [submitting, setSubmitting] = useState(false);
   const [submitPhase, setSubmitPhase] = useState<"idle" | "creating" | "analyzing">("idle");
+  const submitting = submitPhase !== "idle";
   const [submitError, setSubmitError] = useState("");
 
   function updateField(field: keyof IntakeFormData, value: string) {
@@ -84,7 +84,6 @@ export default function IntakePage() {
 
     if (!validate()) return;
 
-    setSubmitting(true);
     setSubmitPhase("creating");
     try {
       const createRes = await fetch("/api/rcfa", {
@@ -119,9 +118,7 @@ export default function IntakePage() {
       });
 
       if (!analyzeRes.ok) {
-        const data = await analyzeRes.json();
-        setSubmitError(data.error || "AI analysis failed. You can retry from the detail page.");
-        router.push(`/dashboard/rcfa/${id}`);
+        router.push(`/dashboard/rcfa/${id}?analyzeError=1`);
         return;
       }
 
@@ -129,7 +126,6 @@ export default function IntakePage() {
     } catch {
       setSubmitError("Something went wrong. Please try again.");
     } finally {
-      setSubmitting(false);
       setSubmitPhase("idle");
     }
   }
