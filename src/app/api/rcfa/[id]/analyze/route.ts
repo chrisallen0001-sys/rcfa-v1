@@ -168,6 +168,10 @@ export async function POST(
           generatedBy: "ai" as const,
         })),
       }),
+      prisma.rcfa.update({
+        where: { id },
+        data: { status: "investigation" },
+      }),
     ]);
 
     return NextResponse.json(result, { status: 200 });
