@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 
 const OPERATING_CONTEXTS = [
   { value: "unknown", label: "Unknown" },
@@ -39,6 +40,7 @@ const INITIAL_FORM: IntakeFormData = {
 };
 
 export default function IntakePage() {
+  const router = useRouter();
   const [form, setForm] = useState<IntakeFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof IntakeFormData, string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -107,9 +109,8 @@ export default function IntakePage() {
         return;
       }
 
-      // TODO: redirect to RCFA detail page once built (Issue #16)
       const data = await res.json();
-      window.location.href = `/dashboard/rcfa/${data.id}`;
+      router.push(`/dashboard/rcfa/${data.id}`);
     } catch {
       setSubmitError("Something went wrong. Please try again.");
     } finally {
