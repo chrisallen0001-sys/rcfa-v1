@@ -44,6 +44,7 @@ export default function IntakePage() {
   const [form, setForm] = useState<IntakeFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof IntakeFormData, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "creating" | "analyzing">("idle");
   const [submitError, setSubmitError] = useState("");
 
   function updateField(field: keyof IntakeFormData, value: string) {
@@ -84,8 +85,9 @@ export default function IntakePage() {
     if (!validate()) return;
 
     setSubmitting(true);
+    setSubmitPhase("creating");
     try {
-      const res = await fetch("/api/rcfa", {
+      const createRes = await fetch("/api/rcfa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -103,18 +105,32 @@ export default function IntakePage() {
         }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
+      if (!createRes.ok) {
+        const data = await createRes.json();
         setSubmitError(data.error || "Failed to create RCFA.");
         return;
       }
 
-      const data = await res.json();
-      router.push(`/dashboard/rcfa/${data.id}`);
+      const { id } = await createRes.json();
+
+      setSubmitPhase("analyzing");
+      const analyzeRes = await fetch(`/api/rcfa/${id}/analyze`, {
+        method: "POST",
+      });
+
+      if (!analyzeRes.ok) {
+        const data = await analyzeRes.json();
+        setSubmitError(data.error || "AI analysis failed. You can retry from the detail page.");
+        router.push(`/dashboard/rcfa/${id}`);
+        return;
+      }
+
+      router.push(`/dashboard/rcfa/${id}`);
     } catch {
       setSubmitError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
+      setSubmitPhase("idle");
     }
   }
 
@@ -336,7 +352,11 @@ export default function IntakePage() {
             disabled={submitting}
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            {submitting ? "Creating…" : "Create RCFA"}
+            {submitPhase === "creating"
+              ? "Creating…"
+              : submitPhase === "analyzing"
+                ? "Analyzing…"
+                : "Create RCFA"}
           </button>
         </div>
       </form>
