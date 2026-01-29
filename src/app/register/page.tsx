@@ -44,20 +44,7 @@ export default function RegisterPage() {
         return;
       }
 
-      // Auto-login after successful registration
-      const loginRes = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
-
-      if (!loginRes.ok) {
-        // Registration succeeded but auto-login failed; send to login page
-        router.push("/login");
-        return;
-      }
-
-      router.push("/dashboard");
+      router.push("/login?registered=1");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
