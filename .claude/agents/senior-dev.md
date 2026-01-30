@@ -62,10 +62,10 @@ Ensure tests are:
 
 Run the full test suite locally before considering work complete.
 
-### Phase 4: Quality Checks
+### Phase 4: Quality Checks (run before every commit)
 
-- Run the project's linter and fix all issues
-- Apply code formatter for consistent style
+- Run `npx tsc --noEmit` and fix all type errors
+- Run `npm run lint` and fix all lint issues
 - Ensure proper typing (no unnecessary `any` types)
 - Self-review as if reviewing someone else's code
 
