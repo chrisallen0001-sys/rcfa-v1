@@ -45,19 +45,22 @@ export type RcfaRow = {
   failureHighlight?: string;
 };
 
-type SearchResultRow = {
+type SummaryRow = {
   id: string;
   title: string;
   equipment_description: string;
   status: RcfaStatus;
   created_at: Date;
-  root_cause_count: bigint;
+  final_root_cause_count: bigint;
   action_item_count: bigint;
-  open_action_count: bigint;
+  open_action_item_count: bigint;
+  total_count: bigint;
+};
+
+type SearchResultRow = SummaryRow & {
   equip_headline: string;
   failure_headline: string;
   rank: number;
-  total_count: bigint;
 };
 
 /**
@@ -80,18 +83,23 @@ async function searchRcfas(
   query: string,
   userId: string,
   isAdmin: boolean,
+  pageNum: number,
 ): Promise<{ rows: RcfaRow[]; total: number }> {
-  // For admin: params are [query, limit] => $1, $2
-  // For non-admin: params are [query, userId, limit] => $1, $2, $3
-  const limitParam = isAdmin ? "$2" : "$3";
-  const ownerClause = isAdmin ? "" : "AND r.created_by_user_id = $2::uuid";
-  const params = isAdmin
-    ? [query, ITEMS_PER_PAGE]
-    : [query, userId, ITEMS_PER_PAGE];
+  // Params: [query, owner (null for admin), limit, offset] => $1, $2, $3, $4
+  const offset = (pageNum - 1) * ITEMS_PER_PAGE;
+  const ownerParam = isAdmin ? null : userId;
+  const params: (string | number | null)[] = [
+    query,
+    ownerParam,
+    ITEMS_PER_PAGE,
+    offset,
+  ];
 
   // Use a CTE so we can count total matches while also returning ranked rows.
   // Note: equipment_description and failure_description are NOT NULL by schema
   // constraint, so COALESCE is unnecessary for to_tsvector calls.
+  // Tautology WHERE ($2::uuid IS NULL OR ...) lets admins see all rows without
+  // conditional SQL string building.
   const sql = `
     WITH matches AS (
       SELECT
@@ -114,23 +122,19 @@ async function searchRcfas(
         to_tsvector('english', r.equipment_description) ||
         to_tsvector('english', r.failure_description)
       ) @@ plainto_tsquery('english', $1)
-      ${ownerClause}
+      AND ($2::uuid IS NULL OR r.created_by_user_id = $2::uuid)
     )
     SELECT
       m.*,
       COUNT(*) OVER() AS total_count,
-      (SELECT count(*) FROM rcfa_root_cause_final f WHERE f.rcfa_id = m.id) AS root_cause_count,
-      (SELECT count(*) FROM rcfa_action_item a WHERE a.rcfa_id = m.id) AS action_item_count,
-      (SELECT count(*) FROM rcfa_action_item a WHERE a.rcfa_id = m.id AND a.status IN ('open','in_progress','blocked')) AS open_action_count
+      s.final_root_cause_count,
+      s.action_item_count,
+      s.open_action_item_count
     FROM matches m
+    JOIN rcfa_summary s ON s.id = m.id
     ORDER BY m.rank DESC, m.created_at DESC
-    LIMIT ${limitParam}
+    LIMIT $3 OFFSET $4
   `;
-
-  // Prisma.$queryRawUnsafe is needed here because the owner clause is
-  // conditionally included. The user-supplied search query is always passed as
-  // a positional parameter ($1) -- never interpolated -- so this is safe from
-  // SQL injection. LIMIT is also a positional parameter.
   const results = await prisma.$queryRawUnsafe<SearchResultRow[]>(
     sql,
     ...params,
@@ -144,9 +148,9 @@ async function searchRcfas(
     equipmentDescription: r.equipment_description,
     status: r.status,
     createdAt: new Date(r.created_at).toISOString().slice(0, 10),
-    rootCauseCount: Number(r.root_cause_count),
+    rootCauseCount: Number(r.final_root_cause_count),
     actionItemCount: Number(r.action_item_count),
-    openActionCount: Number(r.open_action_count),
+    openActionCount: Number(r.open_action_item_count),
     equipmentHighlight: sanitizeHighlight(r.equip_headline),
     failureHighlight: sanitizeHighlight(r.failure_headline),
   }));
@@ -171,48 +175,54 @@ export default async function DashboardPage({
   let searchTotal = 0;
 
   if (searchQuery) {
-    const result = await searchRcfas(searchQuery, userId, isAdmin);
+    const result = await searchRcfas(searchQuery, userId, isAdmin, pageNum);
     rows = result.rows;
     searchTotal = result.total;
     totalPages = Math.max(1, Math.ceil(result.total / ITEMS_PER_PAGE));
   } else {
-    const where = isAdmin ? {} : { createdByUserId: userId };
+    // Use a tautology WHERE clause so the query shape is always the same:
+    // pass null for admins (matches all rows), or the userId for non-admins.
+    const ownerParam = isAdmin ? null : userId;
+    const browseParams: (string | number | null)[] = [
+      ITEMS_PER_PAGE,
+      (pageNum - 1) * ITEMS_PER_PAGE,
+      ownerParam,
+    ];
 
-    const [rcfas, total] = await Promise.all([
-      prisma.rcfa.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (pageNum - 1) * ITEMS_PER_PAGE,
-        take: ITEMS_PER_PAGE,
-        include: {
-          _count: {
-            select: {
-              rootCauseFinals: true,
-              actionItems: true,
-            },
-          },
-          actionItems: {
-            where: {
-              status: { in: ["open", "in_progress", "blocked"] },
-            },
-            select: { id: true },
-          },
-        },
-      }),
-      prisma.rcfa.count({ where }),
-    ]);
+    const browseSql = `
+      SELECT
+        s.id,
+        s.title,
+        s.equipment_description,
+        s.status,
+        s.created_at,
+        s.final_root_cause_count,
+        s.action_item_count,
+        s.open_action_item_count,
+        COUNT(*) OVER() AS total_count
+      FROM rcfa_summary s
+      WHERE ($3::uuid IS NULL OR s.created_by_user_id = $3::uuid)
+      ORDER BY s.created_at DESC
+      LIMIT $1 OFFSET $2
+    `;
 
+    const browseResults = await prisma.$queryRawUnsafe<SummaryRow[]>(
+      browseSql,
+      ...browseParams,
+    );
+
+    const total = browseResults.length > 0 ? Number(browseResults[0].total_count) : 0;
     totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 
-    rows = rcfas.map((r) => ({
+    rows = browseResults.map((r) => ({
       id: r.id,
       title: r.title || "Untitled RCFA",
-      equipmentDescription: r.equipmentDescription,
+      equipmentDescription: r.equipment_description,
       status: r.status,
-      createdAt: r.createdAt.toISOString().slice(0, 10),
-      rootCauseCount: r._count.rootCauseFinals,
-      actionItemCount: r._count.actionItems,
-      openActionCount: r.actionItems.length,
+      createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+      rootCauseCount: Number(r.final_root_cause_count),
+      actionItemCount: Number(r.action_item_count),
+      openActionCount: Number(r.open_action_item_count),
     }));
   }
 
