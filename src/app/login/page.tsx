@@ -36,7 +36,7 @@ function LoginForm() {
         return;
       }
 
-      router.push("/dashboard/intake");
+      router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
