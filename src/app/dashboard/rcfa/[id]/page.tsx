@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
+import FollowupQuestions from "./FollowupQuestions";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -103,7 +104,10 @@ export default async function RcfaDetailPage({
   const rcfa = await prisma.rcfa.findUnique({
     where: { id },
     include: {
-      followupQuestions: { orderBy: { generatedAt: "asc" } },
+      followupQuestions: {
+        orderBy: { generatedAt: "asc" },
+        include: { answeredBy: { select: { email: true } } },
+      },
       rootCauseCandidates: { orderBy: { generatedAt: "asc" } },
       actionItemCandidates: { orderBy: { generatedAt: "asc" } },
     },
@@ -171,25 +175,17 @@ export default async function RcfaDetailPage({
         {/* Follow-up Questions */}
         {hasAnalysis && rcfa.followupQuestions.length > 0 && (
           <Section title="Follow-up Questions">
-            <div className="space-y-3">
-              {rcfa.followupQuestions.map((q, i) => (
-                <div key={q.id} className="text-sm">
-                  <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {i + 1}. {q.questionText}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {q.questionCategory}
-                    </span>
-                  </div>
-                  {q.answerText && (
-                    <p className="mt-1 whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
-                      {q.answerText}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
+            <FollowupQuestions
+              rcfaId={rcfa.id}
+              questions={rcfa.followupQuestions.map((q) => ({
+                id: q.id,
+                questionText: q.questionText,
+                questionCategory: q.questionCategory,
+                answerText: q.answerText,
+                answeredAt: q.answeredAt?.toISOString() ?? null,
+                answeredBy: q.answeredBy,
+              }))}
+            />
           </Section>
         )}
 
