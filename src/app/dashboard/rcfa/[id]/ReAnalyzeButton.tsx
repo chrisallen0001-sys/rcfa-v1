@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface ReAnalyzeButtonProps {
@@ -15,8 +15,11 @@ export default function ReAnalyzeButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingRef = useRef(false);
 
   async function handleReAnalyze() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -34,6 +37,7 @@ export default function ReAnalyzeButton({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to re-analyze");
     } finally {
+      pendingRef.current = false;
       setLoading(false);
     }
   }

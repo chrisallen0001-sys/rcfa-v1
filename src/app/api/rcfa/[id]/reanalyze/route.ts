@@ -9,6 +9,7 @@ import type {
   Priority,
 } from "@/generated/prisma/client";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
 const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions. Re-analyze using both the original intake data AND the follow-up answers to produce updated, more precise results.
@@ -79,7 +80,7 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
 
 function buildReAnalyzePrompt(
   rcfa: Rcfa,
-  answeredQuestions: RcfaFollowupQuestion[]
+  allQuestions: RcfaFollowupQuestion[]
 ): string {
   const intakeLines = [
     `Equipment Description: ${rcfa.equipmentDescription}`,
@@ -98,8 +99,10 @@ function buildReAnalyzePrompt(
     rcfa.additionalNotes && `Additional Notes: ${rcfa.additionalNotes}`,
   ];
 
-  const qaLines = answeredQuestions.map(
-    (q) => `Q: ${q.questionText}\nA: ${q.answerText}`
+  const qaLines = allQuestions.map((q) =>
+    q.answerText !== null
+      ? `Q: ${q.questionText}\nA: ${q.answerText}`
+      : `Q: ${q.questionText}\nA: (Not yet answered)`
   );
 
   return [
@@ -136,6 +139,10 @@ export async function POST(
     const { userId } = await getAuthContext();
     const { id } = await params;
 
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json({ error: "Invalid RCFA id" }, { status: 400 });
+    }
+
     const rcfa = await prisma.rcfa.findUnique({
       where: { id },
       include: {
@@ -169,7 +176,7 @@ export async function POST(
       );
     }
 
-    const userPrompt = buildReAnalyzePrompt(rcfa, answeredQuestions);
+    const userPrompt = buildReAnalyzePrompt(rcfa, rcfa.followupQuestions);
 
     let result: ReAnalysisResult;
     try {
@@ -192,6 +199,12 @@ export async function POST(
 
     // Replace old AI-generated candidates with new ones in a transaction
     await prisma.$transaction(async (tx) => {
+      // Re-read with row lock to prevent race conditions
+      const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
+      if (locked.status !== "investigation") {
+        throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      }
+
       // Delete old AI-generated candidates
       await tx.rcfaRootCauseCandidate.deleteMany({
         where: { rcfaId: id, generatedBy: "ai" },
@@ -225,6 +238,15 @@ export async function POST(
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "RCFA_NOT_IN_INVESTIGATION"
+    ) {
+      return NextResponse.json(
+        { error: "Only RCFAs in investigation status can be re-analyzed" },
+        { status: 409 }
+      );
+    }
     console.error("POST /api/rcfa/[id]/reanalyze error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
