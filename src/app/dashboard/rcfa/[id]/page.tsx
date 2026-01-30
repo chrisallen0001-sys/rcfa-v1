@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import FollowupQuestions from "./FollowupQuestions";
+import ReAnalyzeButton from "./ReAnalyzeButton";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -118,6 +119,9 @@ export default async function RcfaDetailPage({
   }
 
   const hasAnalysis = rcfa.status !== "draft";
+  const hasAnsweredQuestions = rcfa.followupQuestions.some(
+    (q) => q.answerText !== null
+  );
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -187,6 +191,14 @@ export default async function RcfaDetailPage({
               }))}
             />
           </Section>
+        )}
+
+        {/* Re-Analyze Button */}
+        {rcfa.status === "investigation" && (
+          <ReAnalyzeButton
+            rcfaId={rcfa.id}
+            hasAnsweredQuestions={hasAnsweredQuestions}
+          />
         )}
 
         {/* Root Cause Candidates */}
