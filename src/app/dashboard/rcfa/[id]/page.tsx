@@ -5,11 +5,13 @@ import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
+import PromoteActionItemButton from "./PromoteActionItemButton";
 import type {
   RcfaStatus,
   ConfidenceLabel,
   Priority,
   OperatingContext,
+  ActionItemStatus,
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -40,6 +42,22 @@ const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
   shutdown: "Shutdown",
   maintenance: "Maintenance",
   unknown: "Unknown",
+};
+
+const ACTION_STATUS_LABELS: Record<ActionItemStatus, string> = {
+  open: "Open",
+  in_progress: "In Progress",
+  blocked: "Blocked",
+  done: "Done",
+  canceled: "Canceled",
+};
+
+const ACTION_STATUS_COLORS: Record<ActionItemStatus, string> = {
+  open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  in_progress: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  done: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  canceled: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
 };
 
 const PRIORITY_COLORS: Record<Priority, string> = {
@@ -117,6 +135,10 @@ export default async function RcfaDetailPage({
         include: { selectedBy: { select: { email: true } } },
       },
       actionItemCandidates: { orderBy: { generatedAt: "asc" } },
+      actionItems: {
+        orderBy: { createdAt: "asc" },
+        include: { createdBy: { select: { email: true } } },
+      },
     },
   });
 
@@ -131,6 +153,11 @@ export default async function RcfaDetailPage({
   const promotedCandidateIds = new Set(
     rcfa.rootCauseFinals
       .map((f) => f.selectedFromCandidateId)
+      .filter(Boolean)
+  );
+  const promotedActionCandidateIds = new Set(
+    rcfa.actionItems
+      .map((a) => a.selectedFromCandidateId)
       .filter(Boolean)
   );
 
@@ -317,6 +344,59 @@ export default async function RcfaDetailPage({
                       <span>Success: {a.successCriteria}</span>
                     )}
                   </div>
+                  {rcfa.status === "investigation" &&
+                    !promotedActionCandidateIds.has(a.id) && (
+                      <div className="mt-3">
+                        <PromoteActionItemButton
+                          rcfaId={rcfa.id}
+                          candidateId={a.id}
+                        />
+                      </div>
+                    )}
+                  {promotedActionCandidateIds.has(a.id) && (
+                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                      Promoted to tracked
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Tracked Action Items */}
+        {hasAnalysis && rcfa.actionItems.length > 0 && (
+          <Section title="Tracked Action Items">
+            <div className="space-y-4">
+              {rcfa.actionItems.map((a) => (
+                <div
+                  key={a.id}
+                  className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {a.actionText}
+                    </p>
+                    <div className="flex gap-2">
+                      <Badge
+                        label={a.priority}
+                        colorClass={PRIORITY_COLORS[a.priority]}
+                      />
+                      <Badge
+                        label={ACTION_STATUS_LABELS[a.status]}
+                        colorClass={ACTION_STATUS_COLORS[a.status]}
+                      />
+                    </div>
+                  </div>
+                  {a.successCriteria && (
+                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      Success: {a.successCriteria}
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    Created by {a.createdBy.email} on{" "}
+                    {a.createdAt.toISOString().slice(0, 10)}
+                  </p>
                 </div>
               ))}
             </div>
