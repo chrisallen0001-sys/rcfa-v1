@@ -63,7 +63,27 @@ export async function PATCH(
       );
     }
 
-    const hasChanges = ["status", "ownerUserId", "dueDate"].some(
+    if (
+      body.completionNotes !== undefined &&
+      body.completionNotes !== null &&
+      typeof body.completionNotes !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "completionNotes must be a string or null" },
+        { status: 400 }
+      );
+    }
+    if (
+      typeof body.completionNotes === "string" &&
+      body.completionNotes.length > 2000
+    ) {
+      return NextResponse.json(
+        { error: "completionNotes must be 2000 characters or fewer" },
+        { status: 400 }
+      );
+    }
+
+    const hasChanges = ["status", "ownerUserId", "dueDate", "completionNotes"].some(
       (k) => body[k] !== undefined
     );
     if (!hasChanges) {
@@ -109,14 +129,23 @@ export async function PATCH(
       updatedByUserId: userId,
     };
 
+    const isCompletion =
+      (body.status === "done" || body.status === "canceled") &&
+      existing.status !== body.status;
+
     if (body.status !== undefined) {
       data.status = body.status;
-      if (body.status === "done") {
+      if (body.status === "done" || body.status === "canceled") {
         data.completedAt = new Date();
         data.completedByUserId = userId;
+        data.completionNotes =
+          typeof body.completionNotes === "string"
+            ? body.completionNotes.trim() || null
+            : null;
       } else {
         data.completedAt = null;
         data.completedByUserId = null;
+        data.completionNotes = null;
       }
     }
 
@@ -136,33 +165,56 @@ export async function PATCH(
         data,
       });
 
-      await tx.rcfaAuditEvent.create({
-        data: {
-          rcfaId: existing.rcfaId,
-          actorUserId: userId,
-          eventType: "action_item_updated",
-          eventPayload: {
-            actionItemId,
-            changes: {
-              ...(body.status !== undefined && {
-                status: { from: existing.status, to: body.status },
-              }),
-              ...(body.ownerUserId !== undefined && {
-                ownerUserId: {
-                  from: existing.ownerUserId,
-                  to: body.ownerUserId,
-                },
-              }),
-              ...(body.dueDate !== undefined && {
-                dueDate: {
-                  from: existing.dueDate?.toISOString().slice(0, 10) ?? null,
-                  to: body.dueDate,
-                },
-              }),
+      if (!isCompletion) {
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId: existing.rcfaId,
+            actorUserId: userId,
+            eventType: "action_item_updated",
+            eventPayload: {
+              actionItemId,
+              changes: {
+                ...(body.status !== undefined && {
+                  status: { from: existing.status, to: body.status },
+                }),
+                ...(body.ownerUserId !== undefined && {
+                  ownerUserId: {
+                    from: existing.ownerUserId,
+                    to: body.ownerUserId,
+                  },
+                }),
+                ...(body.dueDate !== undefined && {
+                  dueDate: {
+                    from: existing.dueDate?.toISOString().slice(0, 10) ?? null,
+                    to: body.dueDate,
+                  },
+                }),
+                ...(body.status !== undefined &&
+                  body.status !== "done" && body.status !== "canceled" &&
+                  existing.completionNotes !== null && {
+                    completionNotes: { from: existing.completionNotes, to: null },
+                  }),
+              },
             },
           },
-        },
-      });
+        });
+      }
+
+      if (isCompletion) {
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId: existing.rcfaId,
+            actorUserId: userId,
+            eventType: "action_completed",
+            eventPayload: {
+              actionItemId,
+              status: body.status,
+              completionNotes: data.completionNotes ?? null,
+              previousStatus: existing.status,
+            },
+          },
+        });
+      }
 
       return record;
     });
