@@ -45,19 +45,22 @@ export type RcfaRow = {
   failureHighlight?: string;
 };
 
-type SearchResultRow = {
+type SummaryRow = {
   id: string;
   title: string;
   equipment_description: string;
   status: RcfaStatus;
   created_at: Date;
-  root_cause_count: bigint;
+  final_root_cause_count: bigint;
   action_item_count: bigint;
-  open_action_count: bigint;
+  open_action_item_count: bigint;
+  total_count: bigint;
+};
+
+type SearchResultRow = SummaryRow & {
   equip_headline: string;
   failure_headline: string;
   rank: number;
-  total_count: bigint;
 };
 
 /**
@@ -119,10 +122,11 @@ async function searchRcfas(
     SELECT
       m.*,
       COUNT(*) OVER() AS total_count,
-      (SELECT count(*) FROM rcfa_root_cause_final f WHERE f.rcfa_id = m.id) AS root_cause_count,
-      (SELECT count(*) FROM rcfa_action_item a WHERE a.rcfa_id = m.id) AS action_item_count,
-      (SELECT count(*) FROM rcfa_action_item a WHERE a.rcfa_id = m.id AND a.status IN ('open','in_progress','blocked')) AS open_action_count
+      s.final_root_cause_count,
+      s.action_item_count,
+      s.open_action_item_count
     FROM matches m
+    JOIN rcfa_summary s ON s.id = m.id
     ORDER BY m.rank DESC, m.created_at DESC
     LIMIT ${limitParam}
   `;
@@ -144,9 +148,9 @@ async function searchRcfas(
     equipmentDescription: r.equipment_description,
     status: r.status,
     createdAt: new Date(r.created_at).toISOString().slice(0, 10),
-    rootCauseCount: Number(r.root_cause_count),
+    rootCauseCount: Number(r.final_root_cause_count),
     actionItemCount: Number(r.action_item_count),
-    openActionCount: Number(r.open_action_count),
+    openActionCount: Number(r.open_action_item_count),
     equipmentHighlight: sanitizeHighlight(r.equip_headline),
     failureHighlight: sanitizeHighlight(r.failure_headline),
   }));
@@ -176,43 +180,38 @@ export default async function DashboardPage({
     searchTotal = result.total;
     totalPages = Math.max(1, Math.ceil(result.total / ITEMS_PER_PAGE));
   } else {
-    const where = isAdmin ? {} : { createdByUserId: userId };
+    const ownerClause = isAdmin ? "" : "WHERE s.created_by_user_id = $3::uuid";
+    const browseParams: (string | number)[] = isAdmin
+      ? [ITEMS_PER_PAGE, (pageNum - 1) * ITEMS_PER_PAGE]
+      : [ITEMS_PER_PAGE, (pageNum - 1) * ITEMS_PER_PAGE, userId];
+    const limitParam = "$1";
+    const offsetParam = "$2";
 
-    const [rcfas, total] = await Promise.all([
-      prisma.rcfa.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (pageNum - 1) * ITEMS_PER_PAGE,
-        take: ITEMS_PER_PAGE,
-        include: {
-          _count: {
-            select: {
-              rootCauseFinals: true,
-              actionItems: true,
-            },
-          },
-          actionItems: {
-            where: {
-              status: { in: ["open", "in_progress", "blocked"] },
-            },
-            select: { id: true },
-          },
-        },
-      }),
-      prisma.rcfa.count({ where }),
-    ]);
+    const browseSql = `
+      SELECT s.*, COUNT(*) OVER() AS total_count
+      FROM rcfa_summary s
+      ${ownerClause}
+      ORDER BY s.created_at DESC
+      LIMIT ${limitParam} OFFSET ${offsetParam}
+    `;
 
+    const browseResults = await prisma.$queryRawUnsafe<SummaryRow[]>(
+      browseSql,
+      ...browseParams,
+    );
+
+    const total = browseResults.length > 0 ? Number(browseResults[0].total_count) : 0;
     totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 
-    rows = rcfas.map((r) => ({
+    rows = browseResults.map((r) => ({
       id: r.id,
       title: r.title || "Untitled RCFA",
-      equipmentDescription: r.equipmentDescription,
+      equipmentDescription: r.equipment_description,
       status: r.status,
-      createdAt: r.createdAt.toISOString().slice(0, 10),
-      rootCauseCount: r._count.rootCauseFinals,
-      actionItemCount: r._count.actionItems,
-      openActionCount: r.actionItems.length,
+      createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+      rootCauseCount: Number(r.final_root_cause_count),
+      actionItemCount: Number(r.action_item_count),
+      openActionCount: Number(r.open_action_item_count),
     }));
   }
 
