@@ -28,6 +28,18 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    if (causeText.length > 2000) {
+      return NextResponse.json(
+        { error: "causeText must be 2000 characters or fewer" },
+        { status: 400 }
+      );
+    }
+    if (evidenceSummary && evidenceSummary.length > 2000) {
+      return NextResponse.json(
+        { error: "evidenceSummary must be 2000 characters or fewer" },
+        { status: 400 }
+      );
+    }
 
     const rcfa = await prisma.rcfa.findUnique({ where: { id } });
     if (!rcfa) {
@@ -73,7 +85,9 @@ export async function PATCH(
           eventPayload: {
             finalId,
             previousCauseText: existing.causeText,
+            previousEvidenceSummary: existing.evidenceSummary,
             causeText,
+            evidenceSummary,
           },
         },
       });
