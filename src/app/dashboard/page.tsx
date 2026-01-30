@@ -2,11 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import type { RcfaStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
+import Link from "next/link";
 import RcfaListFilter from "./RcfaListFilter";
 
 export const metadata: Metadata = {
   title: "Dashboard – RCFA",
 };
+
+const ITEMS_PER_PAGE = 50;
 
 const STATUS_LABELS: Record<RcfaStatus, string> = {
   draft: "Draft",
@@ -36,31 +39,47 @@ export type RcfaRow = {
   openActionCount: number;
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const { userId, role } = await getAuthContext();
+  const { page } = await searchParams;
+  const pageNum = Math.max(1, parseInt(page ?? "1", 10) || 1);
 
   const isAdmin = role === "admin";
 
   const where = isAdmin ? {} : { createdByUserId: userId };
 
-  const rcfas = await prisma.rcfa.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: {
-        select: {
-          rootCauseFinals: true,
-          actionItems: true,
+  // `_count.actionItems` counts ALL action items (used for the total badge),
+  // while the separate `actionItems` relation query filters to only
+  // open/in_progress/blocked items (used for the `openActionCount` metric).
+  const [rcfas, total] = await Promise.all([
+    prisma.rcfa.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (pageNum - 1) * ITEMS_PER_PAGE,
+      take: ITEMS_PER_PAGE,
+      include: {
+        _count: {
+          select: {
+            rootCauseFinals: true,
+            actionItems: true,
+          },
+        },
+        actionItems: {
+          where: {
+            status: { in: ["open", "in_progress", "blocked"] },
+          },
+          select: { id: true },
         },
       },
-      actionItems: {
-        where: {
-          status: { in: ["open", "in_progress", "blocked"] },
-        },
-        select: { id: true },
-      },
-    },
-  });
+    }),
+    prisma.rcfa.count({ where }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 
   const rows: RcfaRow[] = rcfas.map((r) => ({
     id: r.id,
@@ -83,6 +102,29 @@ export default async function DashboardPage() {
         statusLabels={STATUS_LABELS}
         statusColors={STATUS_COLORS}
       />
+      {totalPages > 1 && (
+        <nav className="mt-6 flex items-center justify-center gap-2">
+          {pageNum > 1 && (
+            <Link
+              href={`/dashboard?page=${pageNum - 1}`}
+              className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              Previous
+            </Link>
+          )}
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            Page {pageNum} of {totalPages}
+          </span>
+          {pageNum < totalPages && (
+            <Link
+              href={`/dashboard?page=${pageNum + 1}`}
+              className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              Next
+            </Link>
+          )}
+        </nav>
+      )}
     </div>
   );
 }
