@@ -63,6 +63,26 @@ export async function PATCH(
       );
     }
 
+    if (
+      body.completionNotes !== undefined &&
+      body.completionNotes !== null &&
+      typeof body.completionNotes !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "completionNotes must be a string or null" },
+        { status: 400 }
+      );
+    }
+    if (
+      typeof body.completionNotes === "string" &&
+      body.completionNotes.length > 2000
+    ) {
+      return NextResponse.json(
+        { error: "completionNotes must be 2000 characters or fewer" },
+        { status: 400 }
+      );
+    }
+
     const hasChanges = ["status", "ownerUserId", "dueDate"].some(
       (k) => body[k] !== undefined
     );
@@ -109,14 +129,24 @@ export async function PATCH(
       updatedByUserId: userId,
     };
 
+    const isCompletion =
+      body.status === "done" || body.status === "canceled";
+
     if (body.status !== undefined) {
       data.status = body.status;
-      if (body.status === "done") {
+      if (body.status === "done" || body.status === "canceled") {
         data.completedAt = new Date();
         data.completedByUserId = userId;
+        if (body.completionNotes !== undefined) {
+          data.completionNotes =
+            typeof body.completionNotes === "string"
+              ? body.completionNotes.trim() || null
+              : null;
+        }
       } else {
         data.completedAt = null;
         data.completedByUserId = null;
+        data.completionNotes = null;
       }
     }
 
@@ -163,6 +193,22 @@ export async function PATCH(
           },
         },
       });
+
+      if (isCompletion) {
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId: existing.rcfaId,
+            actorUserId: userId,
+            eventType: "action_completed",
+            eventPayload: {
+              actionItemId,
+              status: body.status,
+              completionNotes: data.completionNotes ?? null,
+              previousStatus: existing.status,
+            },
+          },
+        });
+      }
 
       return record;
     });
