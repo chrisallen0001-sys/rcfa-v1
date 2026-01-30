@@ -8,12 +8,13 @@ import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
 import EditableRootCause from "./EditableRootCause";
+import AddActionItemForm from "./AddActionItemForm";
+import EditableActionItem from "./EditableActionItem";
 import type {
   RcfaStatus,
   ConfidenceLabel,
   Priority,
   OperatingContext,
-  ActionItemStatus,
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,21 +47,6 @@ const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
   unknown: "Unknown",
 };
 
-const ACTION_STATUS_LABELS: Record<ActionItemStatus, string> = {
-  open: "Open",
-  in_progress: "In Progress",
-  blocked: "Blocked",
-  done: "Done",
-  canceled: "Canceled",
-};
-
-const ACTION_STATUS_COLORS: Record<ActionItemStatus, string> = {
-  open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  in_progress: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  done: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  canceled: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-};
 
 const PRIORITY_COLORS: Record<Priority, string> = {
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -363,40 +349,27 @@ export default async function RcfaDetailPage({
         )}
 
         {/* Tracked Action Items */}
-        {hasAnalysis && rcfa.actionItems.length > 0 && (
+        {hasAnalysis && (rcfa.actionItems.length > 0 || rcfa.status === "investigation") && (
           <Section title="Tracked Action Items">
             <div className="space-y-4">
               {rcfa.actionItems.map((a) => (
-                <div
+                <EditableActionItem
                   key={a.id}
-                  className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {a.actionText}
-                    </p>
-                    <div className="flex gap-2">
-                      <Badge
-                        label={a.priority}
-                        colorClass={PRIORITY_COLORS[a.priority]}
-                      />
-                      <Badge
-                        label={ACTION_STATUS_LABELS[a.status]}
-                        colorClass={ACTION_STATUS_COLORS[a.status]}
-                      />
-                    </div>
-                  </div>
-                  {a.successCriteria && (
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      Success: {a.successCriteria}
-                    </p>
-                  )}
-                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Created by {a.createdBy.email} on{" "}
-                    {a.createdAt.toISOString().slice(0, 10)}
-                  </p>
-                </div>
+                  rcfaId={rcfa.id}
+                  actionItemId={a.id}
+                  actionText={a.actionText}
+                  priority={a.priority}
+                  status={a.status}
+                  successCriteria={a.successCriteria}
+                  dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
+                  createdByEmail={a.createdBy.email}
+                  createdAt={a.createdAt.toISOString().slice(0, 10)}
+                  isInvestigation={rcfa.status === "investigation"}
+                />
               ))}
+              {rcfa.status === "investigation" && (
+                <AddActionItemForm rcfaId={rcfa.id} />
+              )}
             </div>
           </Section>
         )}
