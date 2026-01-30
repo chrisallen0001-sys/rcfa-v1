@@ -11,6 +11,7 @@ import EditableRootCause from "./EditableRootCause";
 import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
+import CloseRcfaButton from "./CloseRcfaButton";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -105,7 +106,7 @@ export default async function RcfaDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ analyzeError?: string }>;
 }) {
-  const { userId } = await getAuthContext();
+  const { userId, role } = await getAuthContext();
   const { id } = await params;
   const { analyzeError } = await searchParams;
 
@@ -133,7 +134,9 @@ export default async function RcfaDetailPage({
     },
   });
 
-  if (!rcfa || rcfa.createdByUserId !== userId) {
+  const isOwner = rcfa?.createdByUserId === userId;
+  const isAdmin = role === "admin";
+  if (!rcfa || (!isOwner && !isAdmin)) {
     notFound();
   }
 
@@ -384,6 +387,11 @@ export default async function RcfaDetailPage({
               )}
             </div>
           </Section>
+        )}
+
+        {/* Close RCFA Button */}
+        {rcfa.status === "actions_open" && (
+          <CloseRcfaButton rcfaId={rcfa.id} />
         )}
       </div>
     </div>
