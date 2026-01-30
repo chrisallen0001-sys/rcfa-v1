@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
@@ -63,8 +63,19 @@ export default function ActionItemCard({
     }
   }, [item.id, router]);
 
+  useEffect(() => {
+    return () => {
+      queueRef.current = [];
+    };
+  }, []);
+
   function enqueue(patch: Record<string, unknown>) {
-    queueRef.current.push(patch);
+    if (queueRef.current.length > 0) {
+      const last = queueRef.current[queueRef.current.length - 1];
+      queueRef.current[queueRef.current.length - 1] = { ...last, ...patch };
+    } else {
+      queueRef.current.push(patch);
+    }
     flush();
   }
 
@@ -75,9 +86,9 @@ export default function ActionItemCard({
   }
 
   function handleOwnerChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const val = e.target.value || null;
-    setOwnerUserId(val ?? "");
-    enqueue({ ownerUserId: val });
+    const val = e.target.value;
+    setOwnerUserId(val);
+    enqueue({ ownerUserId: val || null });
   }
 
   function handleDueDateChange(e: React.ChangeEvent<HTMLInputElement>) {
