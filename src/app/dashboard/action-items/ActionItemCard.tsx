@@ -109,8 +109,8 @@ export default function ActionItemCard({
 
   function submitCompletion() {
     if (!completing) return;
-    setStatus(completing);
-    enqueue({ status: completing, completionNotes: completionNotes || null });
+    const notes = completionNotes.trim() || null;
+    enqueue({ status: completing, completionNotes: notes });
     setCompleting(null);
     setCompletionNotes("");
   }
@@ -177,7 +177,7 @@ export default function ActionItemCard({
         </label>
       </div>
 
-      {status !== "done" && status !== "canceled" && !completing && (
+      {status !== "done" && status !== "canceled" && !completing && !saving && (
         <div className="mt-3 flex gap-2">
           <button
             onClick={() => handleComplete("done")}
@@ -210,6 +210,9 @@ export default function ActionItemCard({
             rows={2}
             className="mb-2 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           />
+          <p className="mb-2 text-right text-xs text-zinc-400 dark:text-zinc-500">
+            {completionNotes.length}/2000
+          </p>
           <div className="flex gap-2">
             <button
               onClick={submitCompletion}
