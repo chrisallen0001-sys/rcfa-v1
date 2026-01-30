@@ -8,6 +8,7 @@ import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
 import EditableRootCause from "./EditableRootCause";
+import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
 import type {
@@ -231,6 +232,13 @@ export default async function RcfaDetailPage({
             rcfaId={rcfa.id}
             hasAnsweredQuestions={hasAnsweredQuestions}
           />
+        )}
+
+        {/* Finalize Investigation Button */}
+        {rcfa.status === "investigation" && (
+          <div className="mb-2">
+            <FinalizeInvestigationButton rcfaId={rcfa.id} />
+          </div>
         )}
 
         {/* Root Cause Candidates */}
