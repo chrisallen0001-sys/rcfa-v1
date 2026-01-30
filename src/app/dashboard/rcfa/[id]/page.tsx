@@ -280,7 +280,7 @@ export default async function RcfaDetailPage({
                   )}
                   <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                     Selected by {f.selectedBy.email} on{" "}
-                    {new Date(f.selectedAt).toLocaleDateString()}
+                    {f.selectedAt.toISOString().slice(0, 10)}
                   </p>
                 </div>
               ))}

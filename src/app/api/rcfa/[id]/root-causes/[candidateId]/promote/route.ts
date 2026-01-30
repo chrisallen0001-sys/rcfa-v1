@@ -37,23 +37,35 @@ export async function POST(
       );
     }
 
-    // Verify candidate exists and belongs to this RCFA
-    const candidate = await prisma.rcfaRootCauseCandidate.findUnique({
+    // Verify candidate exists and belongs to this RCFA (early check)
+    const candidateCheck = await prisma.rcfaRootCauseCandidate.findUnique({
       where: { id: candidateId },
     });
-    if (!candidate || candidate.rcfaId !== id) {
+    if (!candidateCheck || candidateCheck.rcfaId !== id) {
       return NextResponse.json(
         { error: "Root cause candidate not found" },
         { status: 404 }
       );
     }
 
-    // Transaction: create final root cause + audit event
+    // Transaction: re-read candidate, check for duplicates, create final + audit
     const finalRootCause = await prisma.$transaction(async (tx) => {
-      // Row-level lock to re-check status
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
       if (locked.status !== "investigation") {
         throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      }
+
+      // Re-read candidate inside transaction for consistency
+      const candidate = await tx.rcfaRootCauseCandidate.findUniqueOrThrow({
+        where: { id: candidateId },
+      });
+
+      // Prevent duplicate promotion of the same candidate
+      const existing = await tx.rcfaRootCauseFinal.findFirst({
+        where: { selectedFromCandidateId: candidateId },
+      });
+      if (existing) {
+        throw new Error("ALREADY_PROMOTED");
       }
 
       const created = await tx.rcfaRootCauseFinal.create({
@@ -86,14 +98,19 @@ export async function POST(
       { status: 201 }
     );
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "RCFA_NOT_IN_INVESTIGATION"
-    ) {
-      return NextResponse.json(
-        { error: "RCFA must be in investigation status to promote root causes" },
-        { status: 409 }
-      );
+    if (error instanceof Error) {
+      if (error.message === "RCFA_NOT_IN_INVESTIGATION") {
+        return NextResponse.json(
+          { error: "RCFA must be in investigation status to promote root causes" },
+          { status: 409 }
+        );
+      }
+      if (error.message === "ALREADY_PROMOTED") {
+        return NextResponse.json(
+          { error: "This candidate has already been promoted" },
+          { status: 409 }
+        );
+      }
     }
     console.error(
       "POST /api/rcfa/[id]/root-causes/[candidateId]/promote error:",
