@@ -57,17 +57,41 @@ type SearchResultRow = {
   equip_headline: string;
   failure_headline: string;
   rank: number;
+  total_count: bigint;
 };
+
+/**
+ * HTML-escape a string, then replace neutral highlight delimiters with <mark>.
+ * This ensures no raw HTML from the DB ever reaches the client.
+ */
+function sanitizeHighlight(raw: string): string {
+  const escaped = raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+  return escaped
+    .replace(/\[\[HL\]\]/g, "<mark>")
+    .replace(/\[\[\/HL\]\]/g, "</mark>");
+}
 
 async function searchRcfas(
   query: string,
   userId: string,
   isAdmin: boolean,
 ): Promise<{ rows: RcfaRow[]; total: number }> {
+  // For admin: params are [query, limit] => $1, $2
+  // For non-admin: params are [query, userId, limit] => $1, $2, $3
+  const limitParam = isAdmin ? "$2" : "$3";
   const ownerClause = isAdmin ? "" : "AND r.created_by_user_id = $2::uuid";
-  const params = isAdmin ? [query] : [query, userId];
+  const params = isAdmin
+    ? [query, ITEMS_PER_PAGE]
+    : [query, userId, ITEMS_PER_PAGE];
 
-  // Use a CTE so we can count total matches while also returning ranked rows
+  // Use a CTE so we can count total matches while also returning ranked rows.
+  // Note: equipment_description and failure_description are NOT NULL by schema
+  // constraint, so COALESCE is unnecessary for to_tsvector calls.
   const sql = `
     WITH matches AS (
       SELECT
@@ -82,9 +106,9 @@ async function searchRcfas(
           plainto_tsquery('english', $1)
         ) AS rank,
         ts_headline('english', r.equipment_description, plainto_tsquery('english', $1),
-          'StartSel=<mark>, StopSel=</mark>, MaxFragments=1, MaxWords=30') AS equip_headline,
+          'StartSel=[[HL]], StopSel=[[/HL]], MaxFragments=1, MaxWords=30') AS equip_headline,
         ts_headline('english', r.failure_description, plainto_tsquery('english', $1),
-          'StartSel=<mark>, StopSel=</mark>, MaxFragments=1, MaxWords=30') AS failure_headline
+          'StartSel=[[HL]], StopSel=[[/HL]], MaxFragments=1, MaxWords=30') AS failure_headline
       FROM rcfa r
       WHERE (
         to_tsvector('english', r.equipment_description) ||
@@ -94,22 +118,25 @@ async function searchRcfas(
     )
     SELECT
       m.*,
+      COUNT(*) OVER() AS total_count,
       (SELECT count(*) FROM rcfa_root_cause_final f WHERE f.rcfa_id = m.id) AS root_cause_count,
       (SELECT count(*) FROM rcfa_action_item a WHERE a.rcfa_id = m.id) AS action_item_count,
       (SELECT count(*) FROM rcfa_action_item a WHERE a.rcfa_id = m.id AND a.status IN ('open','in_progress','blocked')) AS open_action_count
     FROM matches m
     ORDER BY m.rank DESC, m.created_at DESC
-    LIMIT ${ITEMS_PER_PAGE}
+    LIMIT ${limitParam}
   `;
 
   // Prisma.$queryRawUnsafe is needed here because the owner clause is
   // conditionally included. The user-supplied search query is always passed as
   // a positional parameter ($1) -- never interpolated -- so this is safe from
-  // SQL injection.
+  // SQL injection. LIMIT is also a positional parameter.
   const results = await prisma.$queryRawUnsafe<SearchResultRow[]>(
     sql,
     ...params,
   );
+
+  const total = results.length > 0 ? Number(results[0].total_count) : 0;
 
   const rows: RcfaRow[] = results.map((r) => ({
     id: r.id,
@@ -120,11 +147,11 @@ async function searchRcfas(
     rootCauseCount: Number(r.root_cause_count),
     actionItemCount: Number(r.action_item_count),
     openActionCount: Number(r.open_action_count),
-    equipmentHighlight: r.equip_headline,
-    failureHighlight: r.failure_headline,
+    equipmentHighlight: sanitizeHighlight(r.equip_headline),
+    failureHighlight: sanitizeHighlight(r.failure_headline),
   }));
 
-  return { rows, total: rows.length };
+  return { rows, total };
 }
 
 export default async function DashboardPage({
@@ -141,11 +168,13 @@ export default async function DashboardPage({
 
   let rows: RcfaRow[];
   let totalPages: number;
+  let searchTotal = 0;
 
   if (searchQuery) {
     const result = await searchRcfas(searchQuery, userId, isAdmin);
     rows = result.rows;
-    totalPages = 1; // search results are capped at ITEMS_PER_PAGE
+    searchTotal = result.total;
+    totalPages = Math.max(1, Math.ceil(result.total / ITEMS_PER_PAGE));
   } else {
     const where = isAdmin ? {} : { createdByUserId: userId };
 
@@ -197,7 +226,7 @@ export default async function DashboardPage({
       </Suspense>
       {searchQuery && (
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-          {rows.length} result{rows.length !== 1 ? "s" : ""} for &ldquo;
+          {searchTotal} result{searchTotal !== 1 ? "s" : ""} for &ldquo;
           {searchQuery}&rdquo;
         </p>
       )}
@@ -207,11 +236,11 @@ export default async function DashboardPage({
         statusColors={STATUS_COLORS}
         isSearching={!!searchQuery}
       />
-      {!searchQuery && totalPages > 1 && (
+      {totalPages > 1 && (
         <nav className="mt-6 flex items-center justify-center gap-2">
           {pageNum > 1 && (
             <Link
-              href={`/dashboard?page=${pageNum - 1}`}
+              href={`/dashboard?page=${pageNum - 1}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
               className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
               Previous
@@ -222,7 +251,7 @@ export default async function DashboardPage({
           </span>
           {pageNum < totalPages && (
             <Link
-              href={`/dashboard?page=${pageNum + 1}`}
+              href={`/dashboard?page=${pageNum + 1}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
               className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
               Next

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function SearchInput() {
   const router = useRouter();
@@ -10,6 +10,13 @@ export default function SearchInput() {
   const [value, setValue] = useState(urlQ);
   const [prevUrlQ, setPrevUrlQ] = useState(urlQ);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear debounce timer on unmount to avoid firing after the component is gone.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   // Sync from URL on browser nav (back/forward) using the React pattern of
   // "adjusting state based on props" which avoids useEffect.
