@@ -72,6 +72,7 @@ export async function POST(
         data: {
           rcfaId: id,
           causeText: candidate.causeText,
+          evidenceSummary: candidate.rationaleText,
           selectedFromCandidateId: candidateId,
           selectedByUserId: userId,
         },
@@ -86,6 +87,7 @@ export async function POST(
             candidateId,
             finalId: created.id,
             causeText: candidate.causeText,
+            evidenceSummary: candidate.rationaleText,
           },
         },
       });
