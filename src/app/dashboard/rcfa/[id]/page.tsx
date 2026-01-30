@@ -106,7 +106,7 @@ export default async function RcfaDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ analyzeError?: string }>;
 }) {
-  const { userId } = await getAuthContext();
+  const { userId, role } = await getAuthContext();
   const { id } = await params;
   const { analyzeError } = await searchParams;
 
@@ -134,7 +134,9 @@ export default async function RcfaDetailPage({
     },
   });
 
-  if (!rcfa || rcfa.createdByUserId !== userId) {
+  const isOwner = rcfa?.createdByUserId === userId;
+  const isAdmin = role === "admin";
+  if (!rcfa || (!isOwner && !isAdmin)) {
     notFound();
   }
 
