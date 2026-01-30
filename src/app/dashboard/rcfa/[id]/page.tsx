@@ -11,6 +11,7 @@ import EditableRootCause from "./EditableRootCause";
 import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
+import CloseRcfaButton from "./CloseRcfaButton";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -384,6 +385,11 @@ export default async function RcfaDetailPage({
               )}
             </div>
           </Section>
+        )}
+
+        {/* Close RCFA Button */}
+        {rcfa.status === "actions_open" && (
+          <CloseRcfaButton rcfaId={rcfa.id} />
         )}
       </div>
     </div>
