@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface FollowupQuestion {
   id: string;
@@ -25,6 +26,7 @@ function QuestionCard({
   question: FollowupQuestion;
   index: number;
 }) {
+  const router = useRouter();
   const [answerText, setAnswerText] = useState(question.answerText ?? "");
   const [saving, setSaving] = useState(false);
   const [savedAnswer, setSavedAnswer] = useState(question.answerText);
@@ -60,6 +62,7 @@ function QuestionCard({
       setSavedAnswer(updated.answerText);
       setSavedAt(updated.answeredAt);
       setSavedByEmail(updated.answeredBy?.email ?? null);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save answer");
     } finally {
