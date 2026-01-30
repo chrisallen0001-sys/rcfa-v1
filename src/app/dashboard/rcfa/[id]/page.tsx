@@ -115,7 +115,7 @@ export default async function RcfaDetailPage({
     where: { id },
     include: {
       followupQuestions: {
-        orderBy: { generatedAt: "asc" },
+        orderBy: [{ generatedAt: "asc" }, { id: "asc" }],
         include: { answeredBy: { select: { email: true } } },
       },
       rootCauseCandidates: { orderBy: { generatedAt: "asc" } },

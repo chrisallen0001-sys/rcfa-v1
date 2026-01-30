@@ -146,7 +146,7 @@ export async function POST(
     const rcfa = await prisma.rcfa.findUnique({
       where: { id },
       include: {
-        followupQuestions: { orderBy: { generatedAt: "asc" } },
+        followupQuestions: { orderBy: [{ generatedAt: "asc" }, { id: "asc" }] },
       },
     });
 
