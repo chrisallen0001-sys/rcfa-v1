@@ -40,6 +40,8 @@ const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
   high: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
 
+const CONFIDENCE_ORDER: Record<ConfidenceLabel, number> = { high: 0, medium: 1, low: 2 };
+
 const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
   running: "Running",
   startup: "Startup",
@@ -134,6 +136,10 @@ export default async function RcfaDetailPage({
   if (!rcfa || rcfa.createdByUserId !== userId) {
     notFound();
   }
+
+  const sortedRootCauseCandidates = [...rcfa.rootCauseCandidates].sort(
+    (a, b) => CONFIDENCE_ORDER[a.confidenceLabel] - CONFIDENCE_ORDER[b.confidenceLabel]
+  );
 
   const hasAnalysis = rcfa.status !== "draft";
   const hasAnsweredQuestions = rcfa.followupQuestions.some(
@@ -235,10 +241,10 @@ export default async function RcfaDetailPage({
         )}
 
         {/* Root Cause Candidates */}
-        {hasAnalysis && rcfa.rootCauseCandidates.length > 0 && (
+        {hasAnalysis && sortedRootCauseCandidates.length > 0 && (
           <Section title="Root Cause Candidates">
             <div className="space-y-4">
-              {rcfa.rootCauseCandidates.map((c) => (
+              {sortedRootCauseCandidates.map((c) => (
                 <div
                   key={c.id}
                   className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
