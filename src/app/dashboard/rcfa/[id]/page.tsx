@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
+import StartInvestigationButton from "./StartInvestigationButton";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -138,6 +139,12 @@ export default async function RcfaDetailPage({
       {analyzeError && (
         <div className="mb-6 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
           AI analysis could not be completed. Your RCFA has been saved as a draft.
+        </div>
+      )}
+
+      {rcfa.status === "draft" && (
+        <div className="mb-6">
+          <StartInvestigationButton rcfaId={rcfa.id} />
         </div>
       )}
 
