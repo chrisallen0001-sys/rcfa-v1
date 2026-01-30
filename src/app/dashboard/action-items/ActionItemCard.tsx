@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
@@ -12,7 +12,6 @@ type Props = {
   priorityLabels: Record<Priority, string>;
   priorityColors: Record<Priority, string>;
   statusLabels: Record<ActionItemStatus, string>;
-  statusColors: Record<ActionItemStatus, string>;
 };
 
 export default function ActionItemCard({
@@ -21,7 +20,6 @@ export default function ActionItemCard({
   priorityLabels,
   priorityColors,
   statusLabels,
-  statusColors,
 }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState(item.status);
@@ -29,11 +27,15 @@ export default function ActionItemCard({
   const [dueDate, setDueDate] = useState(item.dueDate ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pendingRef = useRef(false);
+  const queueRef = useRef<Record<string, unknown>[]>([]);
+  const inflightRef = useRef(false);
 
-  async function save(patch: Record<string, unknown>) {
-    if (pendingRef.current) return;
-    pendingRef.current = true;
+  const flush = useCallback(async () => {
+    if (inflightRef.current) return;
+    const next = queueRef.current.shift();
+    if (!next) return;
+
+    inflightRef.current = true;
     setSaving(true);
     setError(null);
 
@@ -41,43 +43,48 @@ export default function ActionItemCard({
       const res = await fetch(`/api/action-items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify(next),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Failed to update");
       }
-
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update");
     } finally {
-      pendingRef.current = false;
-      setSaving(false);
+      inflightRef.current = false;
+      if (queueRef.current.length > 0) {
+        flush();
+      } else {
+        setSaving(false);
+        router.refresh();
+      }
     }
+  }, [item.id, router]);
+
+  function enqueue(patch: Record<string, unknown>) {
+    queueRef.current.push(patch);
+    flush();
   }
 
   function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value as ActionItemStatus;
     setStatus(val);
-    save({ status: val });
+    enqueue({ status: val });
   }
 
   function handleOwnerChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value || null;
     setOwnerUserId(val ?? "");
-    save({ ownerUserId: val });
+    enqueue({ ownerUserId: val });
   }
 
   function handleDueDateChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
     setDueDate(val);
-    save({ dueDate: val || null });
+    enqueue({ dueDate: val || null });
   }
-
-  const ownerLabel =
-    users.find((u) => u.id === ownerUserId)?.displayName ?? "Unassigned";
 
   const selectClass =
     "rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";

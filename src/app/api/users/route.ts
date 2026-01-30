@@ -7,7 +7,7 @@ export async function GET() {
     await getAuthContext();
 
     const users = await prisma.appUser.findMany({
-      select: { id: true, email: true, displayName: true },
+      select: { id: true, displayName: true },
       orderBy: { displayName: "asc" },
     });
 

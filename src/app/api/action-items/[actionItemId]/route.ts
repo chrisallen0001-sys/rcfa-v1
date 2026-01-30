@@ -63,6 +63,16 @@ export async function PATCH(
       );
     }
 
+    const hasChanges = ["status", "ownerUserId", "dueDate"].some(
+      (k) => body[k] !== undefined
+    );
+    if (!hasChanges) {
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
+    }
+
     const existing = await prisma.rcfaActionItem.findUnique({
       where: { id: actionItemId },
       include: { rcfa: { select: { createdByUserId: true } } },
@@ -75,7 +85,10 @@ export async function PATCH(
       );
     }
 
-    if (existing.rcfa.createdByUserId !== userId) {
+    if (
+      existing.rcfa.createdByUserId !== userId &&
+      existing.ownerUserId !== userId
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -101,6 +114,9 @@ export async function PATCH(
       if (body.status === "done") {
         data.completedAt = new Date();
         data.completedByUserId = userId;
+      } else {
+        data.completedAt = null;
+        data.completedByUserId = null;
       }
     }
 

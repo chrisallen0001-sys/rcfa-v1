@@ -13,7 +13,6 @@ type Props = {
   priorityLabels: Record<Priority, string>;
   priorityColors: Record<Priority, string>;
   statusLabels: Record<ActionItemStatus, string>;
-  statusColors: Record<ActionItemStatus, string>;
 };
 
 export default function ActionItemsFilter({
@@ -24,7 +23,6 @@ export default function ActionItemsFilter({
   priorityLabels,
   priorityColors,
   statusLabels,
-  statusColors,
 }: Props) {
   const [filter, setFilter] = useState<"mine" | "all">("mine");
 
@@ -67,7 +65,6 @@ export default function ActionItemsFilter({
               priorityLabels={priorityLabels}
               priorityColors={priorityColors}
               statusLabels={statusLabels}
-              statusColors={statusColors}
             />
           ))}
         </div>
