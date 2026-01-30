@@ -4,6 +4,7 @@ import { getAuthContext } from "@/lib/auth-context";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
+import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -111,6 +112,10 @@ export default async function RcfaDetailPage({
         include: { answeredBy: { select: { email: true } } },
       },
       rootCauseCandidates: { orderBy: { generatedAt: "asc" } },
+      rootCauseFinals: {
+        orderBy: { selectedAt: "asc" },
+        include: { selectedBy: { select: { email: true } } },
+      },
       actionItemCandidates: { orderBy: { generatedAt: "asc" } },
     },
   });
@@ -122,6 +127,11 @@ export default async function RcfaDetailPage({
   const hasAnalysis = rcfa.status !== "draft";
   const hasAnsweredQuestions = rcfa.followupQuestions.some(
     (q) => q.answerText !== null
+  );
+  const promotedCandidateIds = new Set(
+    rcfa.rootCauseFinals
+      .map((f) => f.selectedFromCandidateId)
+      .filter(Boolean)
   );
 
   return (
@@ -231,6 +241,47 @@ export default async function RcfaDetailPage({
                       {c.rationaleText}
                     </p>
                   )}
+                  {rcfa.status === "investigation" &&
+                    !promotedCandidateIds.has(c.id) && (
+                      <div className="mt-3">
+                        <PromoteRootCauseButton
+                          rcfaId={rcfa.id}
+                          candidateId={c.id}
+                        />
+                      </div>
+                    )}
+                  {promotedCandidateIds.has(c.id) && (
+                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                      Promoted to final
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Final Root Causes */}
+        {hasAnalysis && rcfa.rootCauseFinals.length > 0 && (
+          <Section title="Final Root Causes">
+            <div className="space-y-4">
+              {rcfa.rootCauseFinals.map((f) => (
+                <div
+                  key={f.id}
+                  className="rounded-md border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20"
+                >
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {f.causeText}
+                  </p>
+                  {f.evidenceSummary && (
+                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {f.evidenceSummary}
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    Selected by {f.selectedBy.email} on{" "}
+                    {f.selectedAt.toISOString().slice(0, 10)}
+                  </p>
                 </div>
               ))}
             </div>
