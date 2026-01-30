@@ -29,6 +29,15 @@ export async function PATCH(
       typeof body.successCriteria === "string"
         ? body.successCriteria.trim() || null
         : null;
+    if (
+      typeof body.priority === "string" &&
+      !VALID_PRIORITIES.includes(body.priority as Priority)
+    ) {
+      return NextResponse.json(
+        { error: "priority must be low, medium, or high" },
+        { status: 400 }
+      );
+    }
     const priority: Priority =
       typeof body.priority === "string" &&
       VALID_PRIORITIES.includes(body.priority as Priority)
@@ -108,9 +117,11 @@ export async function PATCH(
             previousActionText: existing.actionText,
             previousPriority: existing.priority,
             previousSuccessCriteria: existing.successCriteria,
+            previousDueDate: existing.dueDate,
             actionText,
             priority,
             successCriteria,
+            dueDate,
           },
         },
       });

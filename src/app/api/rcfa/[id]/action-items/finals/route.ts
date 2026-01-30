@@ -29,10 +29,10 @@ export async function POST(
       typeof body.successCriteria === "string"
         ? body.successCriteria.trim() || null
         : null;
+    const rawPriority = typeof body.priority === "string" ? body.priority : null;
     const priority: Priority =
-      typeof body.priority === "string" &&
-      VALID_PRIORITIES.includes(body.priority as Priority)
-        ? (body.priority as Priority)
+      rawPriority && VALID_PRIORITIES.includes(rawPriority as Priority)
+        ? (rawPriority as Priority)
         : "medium";
     const dueDate =
       typeof body.dueDate === "string" && ISO_DATE_RE.test(body.dueDate)
@@ -101,6 +101,7 @@ export async function POST(
             actionText,
             priority,
             successCriteria,
+            dueDate,
           },
         },
       });
