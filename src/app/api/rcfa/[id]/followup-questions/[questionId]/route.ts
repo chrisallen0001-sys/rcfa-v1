@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { PrismaClientKnownRequestError } from "@/generated/prisma/internal/prismaNamespace";
 import { getAuthContext } from "@/lib/auth-context";
 
 export async function PATCH(
@@ -40,6 +41,13 @@ export async function PATCH(
       );
     }
 
+    if (answerText.length > 10000) {
+      return NextResponse.json(
+        { error: "answerText must not exceed 10000 characters" },
+        { status: 400 }
+      );
+    }
+
     const updated = await prisma.rcfaFollowupQuestion.update({
       where: { id: questionId, rcfaId },
       data: {
@@ -54,6 +62,15 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (
+      error instanceof PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return NextResponse.json(
+        { error: "Question not found" },
+        { status: 404 }
+      );
+    }
     console.error("Failed to save followup answer:", error);
     return NextResponse.json(
       { error: "Internal server error" },
