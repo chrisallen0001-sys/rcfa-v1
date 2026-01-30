@@ -32,15 +32,6 @@ const STATUS_LABELS: Record<ActionItemStatus, string> = {
   canceled: "Canceled",
 };
 
-const STATUS_COLORS: Record<ActionItemStatus, string> = {
-  open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  in_progress:
-    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  done: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  canceled: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-};
-
 export type ActionItemRow = {
   id: string;
   actionText: string;
@@ -50,6 +41,11 @@ export type ActionItemRow = {
   ownerUserId: string | null;
   rcfaId: string;
   rcfaTitle: string;
+};
+
+export type UserOption = {
+  id: string;
+  displayName: string;
 };
 
 export default async function ActionItemsPage({
@@ -63,7 +59,7 @@ export default async function ActionItemsPage({
 
   const where = { rcfa: { createdByUserId: userId } } as const;
 
-  const [items, total] = await Promise.all([
+  const [items, total, users] = await Promise.all([
     prisma.rcfaActionItem.findMany({
       where,
       skip: (pageNum - 1) * ITEMS_PER_PAGE,
@@ -75,6 +71,10 @@ export default async function ActionItemsPage({
       orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
     }),
     prisma.rcfaActionItem.count({ where }),
+    prisma.appUser.findMany({
+      select: { id: true, displayName: true },
+      orderBy: { displayName: "asc" },
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
@@ -99,10 +99,10 @@ export default async function ActionItemsPage({
         items={rows}
         totalItems={total}
         currentUserId={userId}
+        users={users}
         priorityLabels={PRIORITY_LABELS}
         priorityColors={PRIORITY_COLORS}
         statusLabels={STATUS_LABELS}
-        statusColors={STATUS_COLORS}
       />
       {totalPages > 1 && (
         <nav className="mt-6 flex items-center justify-center gap-2">
