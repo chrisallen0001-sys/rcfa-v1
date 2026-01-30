@@ -39,6 +39,13 @@ export async function POST(
         throw new Error("RCFA_NOT_IN_INVESTIGATION");
       }
 
+      const finalCount = await tx.rcfaRootCauseFinal.count({
+        where: { rcfaId: id },
+      });
+      if (finalCount === 0) {
+        throw new Error("RCFA_NO_ROOT_CAUSES");
+      }
+
       await tx.rcfa.update({
         where: { id },
         data: { status: "actions_open" },
@@ -63,6 +70,15 @@ export async function POST(
       return NextResponse.json(
         { error: "Only investigation RCFAs can be finalized" },
         { status: 409 }
+      );
+    }
+    if (
+      error instanceof Error &&
+      error.message === "RCFA_NO_ROOT_CAUSES"
+    ) {
+      return NextResponse.json(
+        { error: "At least one root cause must be finalized before advancing" },
+        { status: 422 }
       );
     }
     console.error("POST /api/rcfa/[id]/finalize error:", error);

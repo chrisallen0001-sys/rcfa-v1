@@ -234,13 +234,6 @@ export default async function RcfaDetailPage({
           />
         )}
 
-        {/* Finalize Investigation Button */}
-        {rcfa.status === "investigation" && (
-          <div className="mb-2">
-            <FinalizeInvestigationButton rcfaId={rcfa.id} />
-          </div>
-        )}
-
         {/* Root Cause Candidates */}
         {hasAnalysis && rcfa.rootCauseCandidates.length > 0 && (
           <Section title="Root Cause Candidates">
@@ -305,6 +298,11 @@ export default async function RcfaDetailPage({
               )}
             </div>
           </Section>
+        )}
+
+        {/* Finalize Investigation Button */}
+        {rcfa.status === "investigation" && (
+          <FinalizeInvestigationButton rcfaId={rcfa.id} />
         )}
 
         {/* Action Item Candidates */}
