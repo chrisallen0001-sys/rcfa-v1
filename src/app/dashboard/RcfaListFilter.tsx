@@ -9,6 +9,8 @@ type Props = {
   items: RcfaRow[];
   statusLabels: Record<RcfaStatus, string>;
   statusColors: Record<RcfaStatus, string>;
+  /** When true, status filter buttons are hidden (search results shown as-is). */
+  isSearching?: boolean;
 };
 
 const ALL_STATUSES: RcfaStatus[] = [
@@ -22,11 +24,14 @@ export default function RcfaListFilter({
   items,
   statusLabels,
   statusColors,
+  isSearching = false,
 }: Props) {
   const [filter, setFilter] = useState<RcfaStatus | "all">("all");
 
   const filtered =
-    filter === "all" ? items : items.filter((r) => r.status === filter);
+    isSearching || filter === "all"
+      ? items
+      : items.filter((r) => r.status === filter);
 
   const btnClass = (active: boolean) =>
     `rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -37,32 +42,36 @@ export default function RcfaListFilter({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilter("all")}
-          className={btnClass(filter === "all")}
-        >
-          All ({items.length})
-        </button>
-        {ALL_STATUSES.map((s) => {
-          const count = items.filter((r) => r.status === s).length;
-          return (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={btnClass(filter === s)}
-            >
-              {statusLabels[s]} ({count})
-            </button>
-          );
-        })}
-      </div>
+      {!isSearching && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilter("all")}
+            className={btnClass(filter === "all")}
+          >
+            All ({items.length})
+          </button>
+          {ALL_STATUSES.map((s) => {
+            const count = items.filter((r) => r.status === s).length;
+            return (
+              <button
+                key={s}
+                onClick={() => setFilter(s)}
+                className={btnClass(filter === s)}
+              >
+                {statusLabels[s]} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {items.length === 0
-            ? "No RCFAs yet. Create one from the intake form to get started."
-            : "No RCFAs match the selected filter."}
+          {isSearching
+            ? "No RCFAs match your search."
+            : items.length === 0
+              ? "No RCFAs yet. Create one from the intake form to get started."
+              : "No RCFAs match the selected filter."}
         </p>
       ) : (
         <div className="space-y-3">
@@ -87,6 +96,37 @@ export default function RcfaListFilter({
                   {statusLabels[r.status]}
                 </span>
               </div>
+
+              {/* Search highlight snippets */}
+              {isSearching && (r.equipmentHighlight || r.failureHighlight) && (
+                <div className="mt-2 space-y-1 rounded border border-zinc-100 bg-zinc-50 p-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                  {r.equipmentHighlight && (
+                    <p>
+                      <span className="font-medium text-zinc-500 dark:text-zinc-500">
+                        Equipment:{" "}
+                      </span>
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: r.equipmentHighlight,
+                        }}
+                      />
+                    </p>
+                  )}
+                  {r.failureHighlight && (
+                    <p>
+                      <span className="font-medium text-zinc-500 dark:text-zinc-500">
+                        Failure:{" "}
+                      </span>
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: r.failureHighlight,
+                        }}
+                      />
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-zinc-500 dark:text-zinc-400">
                 <span>Created {r.createdAt}</span>
                 <span>
