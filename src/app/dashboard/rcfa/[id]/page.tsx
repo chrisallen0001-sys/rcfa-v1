@@ -6,6 +6,8 @@ import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
+import AddRootCauseForm from "./AddRootCauseForm";
+import EditableRootCause from "./EditableRootCause";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -289,28 +291,24 @@ export default async function RcfaDetailPage({
         )}
 
         {/* Final Root Causes */}
-        {hasAnalysis && rcfa.rootCauseFinals.length > 0 && (
+        {hasAnalysis && (rcfa.rootCauseFinals.length > 0 || rcfa.status === "investigation") && (
           <Section title="Final Root Causes">
             <div className="space-y-4">
               {rcfa.rootCauseFinals.map((f) => (
-                <div
+                <EditableRootCause
                   key={f.id}
-                  className="rounded-md border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20"
-                >
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {f.causeText}
-                  </p>
-                  {f.evidenceSummary && (
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      {f.evidenceSummary}
-                    </p>
-                  )}
-                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Selected by {f.selectedBy.email} on{" "}
-                    {f.selectedAt.toISOString().slice(0, 10)}
-                  </p>
-                </div>
+                  rcfaId={rcfa.id}
+                  finalId={f.id}
+                  causeText={f.causeText}
+                  evidenceSummary={f.evidenceSummary}
+                  selectedByEmail={f.selectedBy.email}
+                  selectedAt={f.selectedAt.toISOString().slice(0, 10)}
+                  isInvestigation={rcfa.status === "investigation"}
+                />
               ))}
+              {rcfa.status === "investigation" && (
+                <AddRootCauseForm rcfaId={rcfa.id} />
+              )}
             </div>
           </Section>
         )}
