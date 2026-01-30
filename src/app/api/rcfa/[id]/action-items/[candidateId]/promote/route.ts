@@ -86,7 +86,7 @@ export async function POST(
         data: {
           rcfaId: id,
           actorUserId: userId,
-          eventType: "promoted_to_final",
+          eventType: "action_item_promoted",
           eventPayload: {
             candidateId,
             actionItemId: created.id,
