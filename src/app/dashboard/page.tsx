@@ -83,18 +83,23 @@ async function searchRcfas(
   query: string,
   userId: string,
   isAdmin: boolean,
+  pageNum: number,
 ): Promise<{ rows: RcfaRow[]; total: number }> {
-  // For admin: params are [query, limit] => $1, $2
-  // For non-admin: params are [query, userId, limit] => $1, $2, $3
-  const limitParam = isAdmin ? "$2" : "$3";
-  const ownerClause = isAdmin ? "" : "AND r.created_by_user_id = $2::uuid";
-  const params = isAdmin
-    ? [query, ITEMS_PER_PAGE]
-    : [query, userId, ITEMS_PER_PAGE];
+  // Params: [query, owner (null for admin), limit, offset] => $1, $2, $3, $4
+  const offset = (pageNum - 1) * ITEMS_PER_PAGE;
+  const ownerParam = isAdmin ? null : userId;
+  const params: (string | number | null)[] = [
+    query,
+    ownerParam,
+    ITEMS_PER_PAGE,
+    offset,
+  ];
 
   // Use a CTE so we can count total matches while also returning ranked rows.
   // Note: equipment_description and failure_description are NOT NULL by schema
   // constraint, so COALESCE is unnecessary for to_tsvector calls.
+  // Tautology WHERE ($2::uuid IS NULL OR ...) lets admins see all rows without
+  // conditional SQL string building.
   const sql = `
     WITH matches AS (
       SELECT
@@ -117,7 +122,7 @@ async function searchRcfas(
         to_tsvector('english', r.equipment_description) ||
         to_tsvector('english', r.failure_description)
       ) @@ plainto_tsquery('english', $1)
-      ${ownerClause}
+      AND ($2::uuid IS NULL OR r.created_by_user_id = $2::uuid)
     )
     SELECT
       m.*,
@@ -128,13 +133,8 @@ async function searchRcfas(
     FROM matches m
     JOIN rcfa_summary s ON s.id = m.id
     ORDER BY m.rank DESC, m.created_at DESC
-    LIMIT ${limitParam}
+    LIMIT $3 OFFSET $4
   `;
-
-  // Prisma.$queryRawUnsafe is needed here because the owner clause is
-  // conditionally included. The user-supplied search query is always passed as
-  // a positional parameter ($1) -- never interpolated -- so this is safe from
-  // SQL injection. LIMIT is also a positional parameter.
   const results = await prisma.$queryRawUnsafe<SearchResultRow[]>(
     sql,
     ...params,
@@ -175,24 +175,35 @@ export default async function DashboardPage({
   let searchTotal = 0;
 
   if (searchQuery) {
-    const result = await searchRcfas(searchQuery, userId, isAdmin);
+    const result = await searchRcfas(searchQuery, userId, isAdmin, pageNum);
     rows = result.rows;
     searchTotal = result.total;
     totalPages = Math.max(1, Math.ceil(result.total / ITEMS_PER_PAGE));
   } else {
-    const ownerClause = isAdmin ? "" : "WHERE s.created_by_user_id = $3::uuid";
-    const browseParams: (string | number)[] = isAdmin
-      ? [ITEMS_PER_PAGE, (pageNum - 1) * ITEMS_PER_PAGE]
-      : [ITEMS_PER_PAGE, (pageNum - 1) * ITEMS_PER_PAGE, userId];
-    const limitParam = "$1";
-    const offsetParam = "$2";
+    // Use a tautology WHERE clause so the query shape is always the same:
+    // pass null for admins (matches all rows), or the userId for non-admins.
+    const ownerParam = isAdmin ? null : userId;
+    const browseParams: (string | number | null)[] = [
+      ITEMS_PER_PAGE,
+      (pageNum - 1) * ITEMS_PER_PAGE,
+      ownerParam,
+    ];
 
     const browseSql = `
-      SELECT s.*, COUNT(*) OVER() AS total_count
+      SELECT
+        s.id,
+        s.title,
+        s.equipment_description,
+        s.status,
+        s.created_at,
+        s.final_root_cause_count,
+        s.action_item_count,
+        s.open_action_item_count,
+        COUNT(*) OVER() AS total_count
       FROM rcfa_summary s
-      ${ownerClause}
+      WHERE ($3::uuid IS NULL OR s.created_by_user_id = $3::uuid)
       ORDER BY s.created_at DESC
-      LIMIT ${limitParam} OFFSET ${offsetParam}
+      LIMIT $1 OFFSET $2
     `;
 
     const browseResults = await prisma.$queryRawUnsafe<SummaryRow[]>(
