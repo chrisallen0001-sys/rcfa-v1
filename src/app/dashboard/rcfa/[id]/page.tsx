@@ -135,6 +135,11 @@ export default async function RcfaDetailPage({
     notFound();
   }
 
+  const confidenceOrder = { high: 0, medium: 1, low: 2 } as const;
+  const sortedRootCauseCandidates = [...rcfa.rootCauseCandidates].sort(
+    (a, b) => confidenceOrder[a.confidenceLabel] - confidenceOrder[b.confidenceLabel]
+  );
+
   const hasAnalysis = rcfa.status !== "draft";
   const hasAnsweredQuestions = rcfa.followupQuestions.some(
     (q) => q.answerText !== null
@@ -235,10 +240,10 @@ export default async function RcfaDetailPage({
         )}
 
         {/* Root Cause Candidates */}
-        {hasAnalysis && rcfa.rootCauseCandidates.length > 0 && (
+        {hasAnalysis && sortedRootCauseCandidates.length > 0 && (
           <Section title="Root Cause Candidates">
             <div className="space-y-4">
-              {rcfa.rootCauseCandidates.map((c) => (
+              {sortedRootCauseCandidates.map((c) => (
                 <div
                   key={c.id}
                   className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
