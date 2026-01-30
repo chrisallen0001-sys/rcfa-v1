@@ -40,6 +40,8 @@ const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
   high: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
 
+const CONFIDENCE_ORDER: Record<ConfidenceLabel, number> = { high: 0, medium: 1, low: 2 };
+
 const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
   running: "Running",
   startup: "Startup",
@@ -135,9 +137,8 @@ export default async function RcfaDetailPage({
     notFound();
   }
 
-  const confidenceOrder = { high: 0, medium: 1, low: 2 } as const;
   const sortedRootCauseCandidates = [...rcfa.rootCauseCandidates].sort(
-    (a, b) => confidenceOrder[a.confidenceLabel] - confidenceOrder[b.confidenceLabel]
+    (a, b) => CONFIDENCE_ORDER[a.confidenceLabel] - CONFIDENCE_ORDER[b.confidenceLabel]
   );
 
   const hasAnalysis = rcfa.status !== "draft";
