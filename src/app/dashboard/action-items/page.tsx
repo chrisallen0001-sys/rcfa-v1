@@ -52,6 +52,12 @@ export type ActionItemRow = {
   rcfaTitle: string;
 };
 
+export type UserOption = {
+  id: string;
+  email: string;
+  displayName: string;
+};
+
 export default async function ActionItemsPage({
   searchParams,
 }: {
@@ -63,7 +69,7 @@ export default async function ActionItemsPage({
 
   const where = { rcfa: { createdByUserId: userId } } as const;
 
-  const [items, total] = await Promise.all([
+  const [items, total, users] = await Promise.all([
     prisma.rcfaActionItem.findMany({
       where,
       skip: (pageNum - 1) * ITEMS_PER_PAGE,
@@ -75,6 +81,10 @@ export default async function ActionItemsPage({
       orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
     }),
     prisma.rcfaActionItem.count({ where }),
+    prisma.appUser.findMany({
+      select: { id: true, email: true, displayName: true },
+      orderBy: { displayName: "asc" },
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
@@ -99,6 +109,7 @@ export default async function ActionItemsPage({
         items={rows}
         totalItems={total}
         currentUserId={userId}
+        users={users}
         priorityLabels={PRIORITY_LABELS}
         priorityColors={PRIORITY_COLORS}
         statusLabels={STATUS_LABELS}
