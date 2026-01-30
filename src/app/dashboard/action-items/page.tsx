@@ -48,6 +48,8 @@ export default async function ActionItemsPage() {
   const { userId } = await getAuthContext();
 
   const items = await prisma.rcfaActionItem.findMany({
+    where: { rcfa: { createdByUserId: userId } },
+    take: 100,
     include: {
       rcfa: { select: { id: true, title: true } },
       owner: { select: { id: true, email: true } },
