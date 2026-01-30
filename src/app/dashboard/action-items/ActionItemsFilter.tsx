@@ -7,6 +7,7 @@ import type { ActionItemRow } from "./page";
 
 type Props = {
   items: ActionItemRow[];
+  totalItems: number;
   currentUserId: string;
   priorityLabels: Record<Priority, string>;
   priorityColors: Record<Priority, string>;
@@ -16,6 +17,7 @@ type Props = {
 
 export default function ActionItemsFilter({
   items,
+  totalItems,
   currentUserId,
   priorityLabels,
   priorityColors,
@@ -56,7 +58,9 @@ export default function ActionItemsFilter({
 
       {filtered.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No action items found.
+          {totalItems === 0
+            ? "No action items yet. Create an RCFA to get started."
+            : "No action items match the current filter."}
         </p>
       ) : (
         <div className="space-y-3">

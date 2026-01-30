@@ -1,7 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
+import type { Metadata } from "next";
+import Link from "next/link";
 import ActionItemsFilter from "./ActionItemsFilter";
+
+export const metadata: Metadata = {
+  title: "Action Items – RCFA",
+};
+
+const ITEMS_PER_PAGE = 50;
 
 const PRIORITY_LABELS: Record<Priority, string> = {
   low: "Low",
@@ -44,18 +52,32 @@ export type ActionItemRow = {
   rcfaTitle: string;
 };
 
-export default async function ActionItemsPage() {
+export default async function ActionItemsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const { userId } = await getAuthContext();
+  const { page } = await searchParams;
+  const pageNum = Math.max(1, parseInt(page ?? "1", 10) || 1);
 
-  const items = await prisma.rcfaActionItem.findMany({
-    where: { rcfa: { createdByUserId: userId } },
-    take: 100,
-    include: {
-      rcfa: { select: { id: true, title: true } },
-      owner: { select: { id: true, email: true } },
-    },
-    orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
-  });
+  const where = { rcfa: { createdByUserId: userId } } as const;
+
+  const [items, total] = await Promise.all([
+    prisma.rcfaActionItem.findMany({
+      where,
+      skip: (pageNum - 1) * ITEMS_PER_PAGE,
+      take: ITEMS_PER_PAGE,
+      include: {
+        rcfa: { select: { id: true, title: true } },
+        owner: { select: { id: true, email: true } },
+      },
+      orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
+    }),
+    prisma.rcfaActionItem.count({ where }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 
   const rows: ActionItemRow[] = items.map((item) => ({
     id: item.id,
@@ -75,12 +97,36 @@ export default async function ActionItemsPage() {
       </h1>
       <ActionItemsFilter
         items={rows}
+        totalItems={total}
         currentUserId={userId}
         priorityLabels={PRIORITY_LABELS}
         priorityColors={PRIORITY_COLORS}
         statusLabels={STATUS_LABELS}
         statusColors={STATUS_COLORS}
       />
+      {totalPages > 1 && (
+        <nav className="mt-6 flex items-center justify-center gap-2">
+          {pageNum > 1 && (
+            <Link
+              href={`/dashboard/action-items?page=${pageNum - 1}`}
+              className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              Previous
+            </Link>
+          )}
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            Page {pageNum} of {totalPages}
+          </span>
+          {pageNum < totalPages && (
+            <Link
+              href={`/dashboard/action-items?page=${pageNum + 1}`}
+              className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              Next
+            </Link>
+          )}
+        </nav>
+      )}
     </div>
   );
 }
