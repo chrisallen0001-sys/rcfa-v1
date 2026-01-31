@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthContext } from "@/lib/auth-context";
+import { requireAdmin } from "@/lib/require-admin";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const { userId: currentUserId } = await getAuthContext();
-
-    // Verify role from DB to guard against stale JWT
-    const currentUser = await prisma.appUser.findUnique({
-      where: { id: currentUserId },
-      select: { role: true },
-    });
-    if (currentUser?.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const { forbidden, userId: currentUserId } = await requireAdmin();
+    if (forbidden) return forbidden;
 
     const { userId } = await params;
 

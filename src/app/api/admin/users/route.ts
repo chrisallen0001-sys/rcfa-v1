@@ -2,21 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { PrismaClientKnownRequestError } from "@/generated/prisma/internal/prismaNamespace";
 import { prisma } from "@/lib/prisma";
-import { getAuthContext } from "@/lib/auth-context";
+import { requireAdmin } from "@/lib/require-admin";
 
 const SALT_ROUNDS = 10;
-
-async function requireAdmin() {
-  const { userId } = await getAuthContext();
-  const user = await prisma.appUser.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
-  if (user?.role !== "admin") {
-    return { forbidden: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-  return { forbidden: null };
-}
 
 export async function GET() {
   try {

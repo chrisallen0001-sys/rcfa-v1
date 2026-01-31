@@ -83,9 +83,15 @@ export default function UserManagement({
   return (
     <>
       {roleError && (
-        <p className="mb-3 text-sm text-red-600 dark:text-red-400">
-          {roleError}
-        </p>
+        <div className="mb-3 flex items-center justify-between rounded-md bg-red-50 px-3 py-2 dark:bg-red-900/20">
+          <p className="text-sm text-red-600 dark:text-red-400">{roleError}</p>
+          <button
+            onClick={() => setRoleError("")}
+            className="ml-2 text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+          >
+            Dismiss
+          </button>
+        </div>
       )}
       {/* User table */}
       <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">

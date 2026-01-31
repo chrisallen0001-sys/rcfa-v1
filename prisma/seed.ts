@@ -4,14 +4,14 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
+
 async function main() {
   if (!ADMIN_EMAIL) {
     console.log("ADMIN_EMAIL not set — skipping admin bootstrap.");
     return;
   }
-
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
 
   const email = ADMIN_EMAIL.trim().toLowerCase();
 
@@ -35,7 +35,9 @@ async function main() {
   console.log(`Promoted ${email} to admin.`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());
