@@ -20,6 +20,7 @@ export default function UserManagement({
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState("");
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -58,6 +59,7 @@ export default function UserManagement({
 
   async function handleToggleRole(user: User) {
     setTogglingId(user.id);
+    setRoleError("");
     const newRole = user.role === "admin" ? "user" : "admin";
 
     const res = await fetch(`/api/admin/users/${user.id}`, {
@@ -71,12 +73,20 @@ export default function UserManagement({
       setUsers((prev) =>
         prev.map((u) => (u.id === user.id ? { ...u, role: updated.role } : u))
       );
+    } else {
+      const body = await res.json();
+      setRoleError(body.error || "Failed to update role");
     }
     setTogglingId(null);
   }
 
   return (
     <>
+      {roleError && (
+        <p className="mb-3 text-sm text-red-600 dark:text-red-400">
+          {roleError}
+        </p>
+      )}
       {/* User table */}
       <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
         <table className="w-full text-left text-sm">

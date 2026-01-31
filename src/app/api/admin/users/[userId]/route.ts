@@ -7,8 +7,14 @@ export async function PATCH(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const { role } = await getAuthContext();
-    if (role !== "admin") {
+    const { userId: currentUserId } = await getAuthContext();
+
+    // Verify role from DB to guard against stale JWT
+    const currentUser = await prisma.appUser.findUnique({
+      where: { id: currentUserId },
+      select: { role: true },
+    });
+    if (currentUser?.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -33,8 +39,17 @@ export async function PATCH(
       );
     }
 
+    // Prevent self-demotion
+    if (userId === currentUserId && newRole !== "admin") {
+      return NextResponse.json(
+        { error: "Cannot demote yourself" },
+        { status: 400 }
+      );
+    }
+
     const existing = await prisma.appUser.findUnique({
       where: { id: userId },
+      select: { id: true },
     });
 
     if (!existing) {

@@ -6,17 +6,21 @@ import { getAuthContext } from "@/lib/auth-context";
 
 const SALT_ROUNDS = 10;
 
-function adminGuard(role: string) {
-  if (role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+async function requireAdmin() {
+  const { userId } = await getAuthContext();
+  const user = await prisma.appUser.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (user?.role !== "admin") {
+    return { forbidden: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
-  return null;
+  return { forbidden: null };
 }
 
 export async function GET() {
   try {
-    const { role } = await getAuthContext();
-    const forbidden = adminGuard(role);
+    const { forbidden } = await requireAdmin();
     if (forbidden) return forbidden;
 
     const users = await prisma.appUser.findMany({
@@ -42,8 +46,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { role } = await getAuthContext();
-    const forbidden = adminGuard(role);
+    const { forbidden } = await requireAdmin();
     if (forbidden) return forbidden;
 
     let body: {
