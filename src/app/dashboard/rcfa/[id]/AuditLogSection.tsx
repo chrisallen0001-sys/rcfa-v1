@@ -114,6 +114,7 @@ export default function AuditLogSection({ events }: AuditLogSectionProps) {
     <section className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
         className="flex w-full items-center justify-between p-6 text-left"
       >
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
@@ -142,32 +143,35 @@ export default function AuditLogSection({ events }: AuditLogSectionProps) {
       {isExpanded && (
         <div className="border-t border-zinc-200 dark:border-zinc-800">
           <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {events.map((event) => (
-              <div key={event.id} className="px-6 py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {formatEventType(event.eventType)}
-                    </p>
-                    {formatPayloadSummary(event.eventType, event.eventPayload) && (
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                        {formatPayloadSummary(event.eventType, event.eventPayload)}
+            {events.map((event) => {
+              const summary = formatPayloadSummary(event.eventType, event.eventPayload);
+              return (
+                <div key={event.id} className="px-6 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {formatEventType(event.eventType)}
                       </p>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0 text-right">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {formatTimestamp(event.createdAt)}
-                    </p>
-                    {event.actorEmail && (
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        {event.actorEmail}
+                      {summary && (
+                        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                          {summary}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {formatTimestamp(event.createdAt)}
                       </p>
-                    )}
+                      {event.actorEmail && (
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          {event.actorEmail}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
