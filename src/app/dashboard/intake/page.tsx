@@ -3,6 +3,8 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Spinner } from "@/components/Spinner";
+import { useElapsedTime } from "../rcfa/[id]/useElapsedTime";
 
 const OPERATING_CONTEXTS = [
   { value: "unknown", label: "Unknown" },
@@ -47,6 +49,7 @@ export default function IntakePage() {
   const [submitPhase, setSubmitPhase] = useState<"idle" | "creating" | "analyzing">("idle");
   const submitting = submitPhase !== "idle";
   const [submitError, setSubmitError] = useState("");
+  const elapsed = useElapsedTime(submitPhase === "analyzing");
 
   function updateField(field: keyof IntakeFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -357,11 +360,19 @@ export default function IntakePage() {
             disabled={submitting}
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            {submitPhase === "creating"
-              ? "Creating…"
-              : submitPhase === "analyzing"
-                ? "Analyzing…"
-                : "Create RCFA"}
+            {submitPhase === "creating" ? (
+              <span className="flex items-center gap-2">
+                <Spinner />
+                Creating...
+              </span>
+            ) : submitPhase === "analyzing" ? (
+              <span className="flex items-center gap-2">
+                <Spinner />
+                Analyzing... {elapsed}s
+              </span>
+            ) : (
+              "Create RCFA"
+            )}
           </button>
         </div>
       </form>
