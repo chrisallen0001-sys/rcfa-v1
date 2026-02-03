@@ -234,6 +234,19 @@ export async function POST(
           generatedBy: "ai" as const,
         })),
       });
+
+      await tx.rcfaAuditEvent.create({
+        data: {
+          rcfaId: id,
+          actorUserId: userId,
+          eventType: "candidate_generated",
+          eventPayload: {
+            source: "ai_reanalysis",
+            rootCauseCandidateCount: result.rootCauseCandidates.length,
+            actionItemCandidateCount: result.actionItems.length,
+          },
+        },
+      });
     });
 
     return NextResponse.json(result, { status: 200 });
