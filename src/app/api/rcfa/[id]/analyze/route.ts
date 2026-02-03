@@ -9,6 +9,7 @@ import type {
   Priority,
 } from "@/generated/prisma/client";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
 const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). Analyze the intake data provided and return valid JSON only with the following structure:
@@ -130,8 +131,11 @@ export async function POST(
 ) {
   try {
     const { userId } = await getAuthContext();
-
     const { id } = await params;
+
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json({ error: "Invalid RCFA id" }, { status: 400 });
+    }
 
     // Read outside transaction for early auth/404 checks
     const rcfa = await prisma.rcfa.findUnique({ where: { id } });
@@ -212,15 +216,6 @@ export async function POST(
         data: {
           rcfaId: id,
           actorUserId: userId,
-          eventType: "status_changed",
-          eventPayload: { from: "draft", to: "investigation" },
-        },
-      });
-
-      await tx.rcfaAuditEvent.create({
-        data: {
-          rcfaId: id,
-          actorUserId: userId,
           eventType: "candidate_generated",
           eventPayload: {
             source: "ai_initial_analysis",
@@ -228,6 +223,15 @@ export async function POST(
             actionItemCandidateCount: result.actionItems.length,
             followUpQuestionCount: result.followUpQuestions.length,
           },
+        },
+      });
+
+      await tx.rcfaAuditEvent.create({
+        data: {
+          rcfaId: id,
+          actorUserId: userId,
+          eventType: "status_changed",
+          eventPayload: { from: "draft", to: "investigation" },
         },
       });
     });
