@@ -92,6 +92,14 @@ export default async function ActionItemsPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mb-2">
+        <Link
+          href="/dashboard"
+          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+        >
+          &larr; Dashboard
+        </Link>
+      </div>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
         Action Items
       </h1>
