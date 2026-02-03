@@ -12,6 +12,7 @@ import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
 import CloseRcfaButton from "./CloseRcfaButton";
+import DeleteRcfaButton from "./DeleteRcfaButton";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -392,6 +393,16 @@ export default async function RcfaDetailPage({
         {/* Close RCFA Button */}
         {rcfa.status === "actions_open" && (
           <CloseRcfaButton rcfaId={rcfa.id} />
+        )}
+
+        {/* Admin Delete Button */}
+        {isAdmin && (
+          <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              Admin actions
+            </p>
+            <DeleteRcfaButton rcfaId={rcfa.id} rcfaTitle={rcfa.title} />
+          </div>
         )}
       </div>
     </div>
