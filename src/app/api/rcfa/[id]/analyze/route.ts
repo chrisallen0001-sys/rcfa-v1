@@ -207,6 +207,29 @@ export async function POST(
         where: { id },
         data: { status: "investigation" },
       });
+
+      await tx.rcfaAuditEvent.create({
+        data: {
+          rcfaId: id,
+          actorUserId: userId,
+          eventType: "status_changed",
+          eventPayload: { from: "draft", to: "investigation" },
+        },
+      });
+
+      await tx.rcfaAuditEvent.create({
+        data: {
+          rcfaId: id,
+          actorUserId: userId,
+          eventType: "candidate_generated",
+          eventPayload: {
+            source: "ai_initial_analysis",
+            rootCauseCandidateCount: result.rootCauseCandidates.length,
+            actionItemCandidateCount: result.actionItems.length,
+            followUpQuestionCount: result.followUpQuestions.length,
+          },
+        },
+      });
     });
 
     return NextResponse.json(result, { status: 200 });
