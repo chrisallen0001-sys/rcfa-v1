@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const OPERATING_CONTEXTS = [
   { value: "unknown", label: "Unknown" },
@@ -132,6 +133,14 @@ export default function IntakePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mb-2">
+        <Link
+          href="/dashboard"
+          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+        >
+          &larr; Dashboard
+        </Link>
+      </div>
       <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
         New RCFA
       </h1>
