@@ -13,6 +13,7 @@ import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
 import CloseRcfaButton from "./CloseRcfaButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
+import AuditLogSection from "./AuditLogSection";
 import type {
   RcfaStatus,
   ConfidenceLabel,
@@ -131,6 +132,10 @@ export default async function RcfaDetailPage({
       actionItems: {
         orderBy: { createdAt: "asc" },
         include: { createdBy: { select: { email: true } } },
+      },
+      auditEvents: {
+        orderBy: { createdAt: "desc" },
+        include: { actor: { select: { email: true } } },
       },
     },
   });
@@ -393,6 +398,19 @@ export default async function RcfaDetailPage({
         {/* Close RCFA Button */}
         {rcfa.status === "actions_open" && (
           <CloseRcfaButton rcfaId={rcfa.id} />
+        )}
+
+        {/* Audit Log */}
+        {rcfa.auditEvents.length > 0 && (
+          <AuditLogSection
+            events={rcfa.auditEvents.map((e) => ({
+              id: e.id,
+              eventType: e.eventType,
+              eventPayload: e.eventPayload as Record<string, unknown>,
+              createdAt: e.createdAt.toISOString(),
+              actorEmail: e.actor?.email ?? null,
+            }))}
+          />
         )}
 
         {/* Admin Delete Button */}
