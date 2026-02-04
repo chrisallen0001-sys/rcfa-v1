@@ -28,17 +28,17 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && open) {
+      if (e.key === "Escape" && open && !loading) {
         onClose();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, loading]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node) && !loading) {
         onClose();
       }
     }
@@ -46,7 +46,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [open, onClose]);
+  }, [open, onClose, loading]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

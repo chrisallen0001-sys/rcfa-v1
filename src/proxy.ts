@@ -11,6 +11,7 @@ export async function proxy(request: NextRequest) {
     headers.delete("x-user-id");
     headers.delete("x-user-email");
     headers.delete("x-user-role");
+    headers.delete("x-user-display-name");
     return NextResponse.next({ request: { headers } });
   }
 
@@ -31,6 +32,7 @@ export async function proxy(request: NextRequest) {
     headers.set("x-user-id", payload.sub);
     headers.set("x-user-email", payload.email);
     headers.set("x-user-role", payload.role);
+    headers.set("x-user-display-name", payload.displayName);
 
     return NextResponse.next({ request: { headers } });
   } catch {

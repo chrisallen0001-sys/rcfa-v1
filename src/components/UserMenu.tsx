@@ -66,6 +66,8 @@ export default function UserMenu({ displayName }: UserMenuProps) {
       <div ref={menuRef} className="relative">
         <button
           onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-haspopup="menu"
           className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           <span className="text-zinc-500 dark:text-zinc-400">Signed in as</span>
@@ -81,14 +83,20 @@ export default function UserMenu({ displayName }: UserMenuProps) {
         </button>
 
         {open && (
-          <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <div
+            role="menu"
+            aria-label="User menu"
+            className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          >
             <button
+              role="menuitem"
               onClick={handleChangePassword}
               className="w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Change Password
             </button>
             <button
+              role="menuitem"
               onClick={handleLogout}
               disabled={loggingOut}
               className={`w-full px-4 py-2 text-left text-sm disabled:opacity-50 ${
