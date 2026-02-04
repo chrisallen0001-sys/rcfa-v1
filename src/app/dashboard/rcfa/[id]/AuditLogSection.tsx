@@ -27,6 +27,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   action_item_created: "Action Item Created",
   action_completed: "Action Completed",
   rcfa_deleted: "RCFA Deleted",
+  rcfa_soft_deleted: "RCFA Deleted",
 };
 
 function formatEventType(eventType: string): string {
@@ -82,6 +83,7 @@ function formatPayloadSummary(
         ? truncate(String(payload.actionText), 60)
         : "Action completed";
     case "rcfa_deleted":
+    case "rcfa_soft_deleted":
       return payload.title
         ? `"${truncate(String(payload.title), 50)}"`
         : "RCFA deleted";

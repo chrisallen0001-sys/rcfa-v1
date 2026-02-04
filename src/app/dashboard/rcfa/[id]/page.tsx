@@ -143,7 +143,8 @@ export default async function RcfaDetailPage({
 
   const isOwner = rcfa?.createdByUserId === userId;
   const isAdmin = role === "admin";
-  if (!rcfa || (!isOwner && !isAdmin)) {
+  // Return 404 if RCFA doesn't exist, is soft-deleted, or user lacks access
+  if (!rcfa || rcfa.deletedAt || (!isOwner && !isAdmin)) {
     notFound();
   }
 
