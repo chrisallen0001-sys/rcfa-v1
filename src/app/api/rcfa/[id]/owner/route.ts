@@ -43,17 +43,7 @@ export async function PATCH(
       );
     }
 
-    // Verify the RCFA exists and is not deleted
-    const rcfa = await prisma.rcfa.findUnique({
-      where: { id },
-      select: { id: true, ownerUserId: true, deletedAt: true },
-    });
-
-    if (!rcfa || rcfa.deletedAt) {
-      return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
-    }
-
-    // Verify the new owner exists
+    // Verify the new owner exists (outside transaction since it won't change)
     const newOwner = await prisma.appUser.findUnique({
       where: { id: newOwnerUserId },
       select: { id: true, displayName: true },
@@ -63,28 +53,41 @@ export async function PATCH(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Skip if already the owner
-    if (rcfa.ownerUserId === newOwnerUserId) {
-      return NextResponse.json({
-        success: true,
-        ownerUserId: newOwnerUserId,
-        ownerDisplayName: newOwner.displayName,
+    // Use interactive transaction to ensure consistent reads and writes
+    const result = await prisma.$transaction(async (tx) => {
+      // Verify the RCFA exists and is not deleted
+      const rcfa = await tx.rcfa.findUnique({
+        where: { id },
+        select: { id: true, ownerUserId: true, deletedAt: true },
       });
-    }
 
-    // Get the previous owner for audit trail
-    const previousOwner = await prisma.appUser.findUnique({
-      where: { id: rcfa.ownerUserId },
-      select: { displayName: true },
-    });
+      if (!rcfa || rcfa.deletedAt) {
+        return { error: "RCFA not found", status: 404 } as const;
+      }
 
-    // Update owner and create audit event in a transaction
-    await prisma.$transaction([
-      prisma.rcfa.update({
+      // Skip if already the owner
+      if (rcfa.ownerUserId === newOwnerUserId) {
+        return {
+          success: true,
+          ownerUserId: newOwnerUserId,
+          ownerDisplayName: newOwner.displayName,
+        } as const;
+      }
+
+      // Get the previous owner for audit trail (inside transaction for consistency)
+      const previousOwner = await tx.appUser.findUnique({
+        where: { id: rcfa.ownerUserId },
+        select: { displayName: true },
+      });
+
+      // Update owner
+      await tx.rcfa.update({
         where: { id },
         data: { ownerUserId: newOwnerUserId },
-      }),
-      prisma.rcfaAuditEvent.create({
+      });
+
+      // Create audit event
+      await tx.rcfaAuditEvent.create({
         data: {
           rcfaId: id,
           actorUserId: userId,
@@ -96,14 +99,21 @@ export async function PATCH(
             newOwnerName: newOwner.displayName,
           },
         },
-      }),
-    ]);
+      });
 
-    return NextResponse.json({
-      success: true,
-      ownerUserId: newOwnerUserId,
-      ownerDisplayName: newOwner.displayName,
+      return {
+        success: true,
+        ownerUserId: newOwnerUserId,
+        ownerDisplayName: newOwner.displayName,
+      } as const;
     });
+
+    // Handle transaction result
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("PATCH /api/rcfa/[id]/owner error:", error);
     return NextResponse.json(

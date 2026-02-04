@@ -31,7 +31,12 @@ export default function ReassignOwnerButton({
     if (isOpen && users.length === 0) {
       setIsFetchingUsers(true);
       fetch("/api/users")
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error("Failed to fetch users");
+          }
+          return res.json();
+        })
         .then((data) => {
           if (Array.isArray(data)) {
             setUsers(data);
@@ -39,8 +44,8 @@ export default function ReassignOwnerButton({
             setError(data.error);
           }
         })
-        .catch(() => {
-          setError("Failed to load users");
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : "Failed to load users");
         })
         .finally(() => {
           setIsFetchingUsers(false);
@@ -106,13 +111,17 @@ export default function ReassignOwnerButton({
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Loading users...
         </p>
+      ) : users.length === 0 && !error ? (
+        <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+          No users available
+        </p>
       ) : (
         <>
           <select
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
             className="mb-3 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-            disabled={isLoading}
+            disabled={isLoading || users.length === 0}
           >
             {users.map((user) => (
               <option key={user.id} value={user.id}>
@@ -125,7 +134,7 @@ export default function ReassignOwnerButton({
           <div className="flex gap-2">
             <button
               onClick={handleSubmit}
-              disabled={isLoading || selectedUserId === currentOwnerId}
+              disabled={isLoading || selectedUserId === currentOwnerId || users.length === 0}
               className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               {isLoading ? "Saving..." : "Save"}
