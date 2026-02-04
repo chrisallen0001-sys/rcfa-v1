@@ -73,8 +73,8 @@ export default function DateInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  // Get default class names from react-day-picker
-  const defaultClassNames = getDefaultClassNames();
+  // Get default class names from react-day-picker (memoized)
+  const defaultClassNames = useMemo(() => getDefaultClassNames(), []);
 
   // Parse the value string to a Date object
   const selectedDate = useMemo(() => {
@@ -83,11 +83,9 @@ export default function DateInput({
     return isValid(parsed) ? parsed : undefined;
   }, [value]);
 
-  // Get today's date for min constraint
-  const today = useMemo(() => new Date(), []);
-
-  // Only apply min date for new dates (empty value)
-  const minDate = minToday && !value ? today : undefined;
+  // Calculate min date fresh when calendar is open to avoid stale date reference
+  // (e.g., if user leaves page open overnight)
+  const minDate = minToday && !value && isOpen ? new Date() : undefined;
 
   // Format date for display
   const displayValue = selectedDate ? format(selectedDate, "MM/dd/yyyy") : "";
@@ -135,6 +133,14 @@ export default function DateInput({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
+
+  // Handle keyboard navigation for accessibility
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (!disabled && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      setIsOpen(!isOpen);
+    }
+  };
 
   const inputBaseClass = inline
     ? "rounded-md border border-zinc-300 bg-white px-2 py-1 pr-14 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 cursor-pointer"
@@ -190,6 +196,7 @@ export default function DateInput({
               placeholder="Select date"
               disabled={disabled}
               onClick={() => !disabled && setIsOpen(!isOpen)}
+              onKeyDown={handleInputKeyDown}
               className={inputBaseClass}
             />
             <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
@@ -236,6 +243,7 @@ export default function DateInput({
           placeholder="Select date"
           disabled={disabled}
           onClick={() => !disabled && setIsOpen(!isOpen)}
+          onKeyDown={handleInputKeyDown}
           className={inputBaseClass}
         />
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
