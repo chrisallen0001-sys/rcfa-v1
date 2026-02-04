@@ -6,11 +6,11 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { displayName } = await getAuthContext();
+  const { displayName, role } = await getAuthContext();
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <AppHeader displayName={displayName} />
+      <AppHeader displayName={displayName} role={role} />
       <main>{children}</main>
     </div>
   );
