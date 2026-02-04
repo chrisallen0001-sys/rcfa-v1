@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
+import { formatRcfaNumber } from "@/lib/rcfa-utils";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -40,6 +41,7 @@ export type ActionItemRow = {
   dueDate: string | null;
   ownerUserId: string | null;
   rcfaId: string;
+  rcfaNumber: string;
   rcfaTitle: string;
 };
 
@@ -65,7 +67,7 @@ export default async function ActionItemsPage({
       skip: (pageNum - 1) * ITEMS_PER_PAGE,
       take: ITEMS_PER_PAGE,
       include: {
-        rcfa: { select: { id: true, title: true } },
+        rcfa: { select: { id: true, rcfaNumber: true, title: true } },
         owner: { select: { id: true, email: true } },
       },
       orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
@@ -87,6 +89,7 @@ export default async function ActionItemsPage({
     dueDate: item.dueDate?.toISOString().slice(0, 10) ?? null,
     ownerUserId: item.ownerUserId,
     rcfaId: item.rcfa.id,
+    rcfaNumber: formatRcfaNumber(item.rcfa.rcfaNumber),
     rcfaTitle: item.rcfa.title ?? "Untitled RCFA",
   }));
 
