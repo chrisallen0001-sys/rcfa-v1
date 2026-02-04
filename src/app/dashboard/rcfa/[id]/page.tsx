@@ -263,6 +263,7 @@ export default async function RcfaDetailPage({
                 answeredAt: q.answeredAt?.toISOString() ?? null,
                 answeredBy: q.answeredBy,
               }))}
+              isInvestigation={rcfa.status === "investigation"}
             />
           </Section>
         )}
