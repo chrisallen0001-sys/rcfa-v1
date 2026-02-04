@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -56,11 +57,19 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <Image
+            src="/aletheia_logo.png"
+            alt="Aletheia"
+            width={180}
+            height={60}
+            className="mx-auto h-12 w-auto dark:invert"
+            priority
+          />
+          <h1 className="mt-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Create an account
           </h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Register to start using RCFA
+            Register to start using Aletheia
           </p>
         </div>
 
