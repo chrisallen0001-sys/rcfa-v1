@@ -11,14 +11,22 @@ export async function PATCH(
     const { userId } = await getAuthContext();
     const { id: rcfaId, questionId } = await params;
 
-    // Verify the RCFA belongs to this user
+    // Verify the RCFA belongs to this user and is in investigation status
     const rcfa = await prisma.rcfa.findUnique({
       where: { id: rcfaId },
-      select: { createdByUserId: true },
+      select: { createdByUserId: true, status: true },
     });
 
     if (!rcfa || rcfa.createdByUserId !== userId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // Only allow edits during investigation phase (GxP compliance)
+    if (rcfa.status !== "investigation") {
+      return NextResponse.json(
+        { error: "Follow-up questions can only be edited during investigation" },
+        { status: 403 }
+      );
     }
 
     let body: Record<string, unknown>;
