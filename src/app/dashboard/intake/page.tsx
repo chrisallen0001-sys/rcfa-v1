@@ -15,6 +15,7 @@ const OPERATING_CONTEXTS = [
 ] as const;
 
 interface IntakeFormData {
+  title: string;
   equipmentDescription: string;
   equipmentMake: string;
   equipmentModel: string;
@@ -29,6 +30,7 @@ interface IntakeFormData {
 }
 
 const INITIAL_FORM: IntakeFormData = {
+  title: "",
   equipmentDescription: "",
   equipmentMake: "",
   equipmentModel: "",
@@ -65,6 +67,11 @@ export default function IntakePage() {
   function validate(): boolean {
     const next: Partial<Record<keyof IntakeFormData, string>> = {};
 
+    if (!form.title.trim()) {
+      next.title = "Title is required.";
+    } else if (form.title.trim().length > 200) {
+      next.title = "Title must be 200 characters or fewer.";
+    }
     if (!form.equipmentDescription.trim()) {
       next.equipmentDescription = "Equipment description is required.";
     }
@@ -94,6 +101,7 @@ export default function IntakePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: form.title.trim(),
           equipmentDescription: form.equipmentDescription.trim(),
           equipmentMake: form.equipmentMake.trim() || undefined,
           equipmentModel: form.equipmentModel.trim() || undefined,
@@ -157,6 +165,29 @@ export default function IntakePage() {
             {submitError}
           </div>
         )}
+
+        {/* RCFA Title */}
+        <div>
+          <label htmlFor="title" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            RCFA Title <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="title"
+            type="text"
+            required
+            maxLength={200}
+            value={form.title}
+            onChange={(e) => updateField("title", e.target.value)}
+            className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
+            placeholder="e.g. Pump P-101 Bearing Failure"
+          />
+          {errors.title && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title}</p>
+          )}
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            A short, descriptive title to identify this RCFA
+          </p>
+        </div>
 
         {/* Equipment Description */}
         <fieldset className="space-y-4">
