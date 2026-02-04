@@ -78,8 +78,7 @@ const PREVIOUS_FIELD_MAP: Record<string, string> = {
   previousDueDate: "dueDate",
   previousStatus: "status",
   previousOwnerUserId: "ownerUserId",
-  // Owner change event uses different field names
-  previousOwnerId: "newOwnerId",
+  // Owner change event - only show name (ID is not user-friendly)
   previousOwnerName: "newOwnerName",
 };
 
