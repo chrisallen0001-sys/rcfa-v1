@@ -59,6 +59,7 @@ const FIELD_LABELS: Record<string, string> = {
   actionItemId: "Action Item ID",
   candidateId: "Candidate ID",
   completionNotes: "Completion Notes",
+  owner: "Owner",
   ownerUserId: "Owner",
   previousOwnerUserId: "Previous Owner",
   // Owner change event fields
