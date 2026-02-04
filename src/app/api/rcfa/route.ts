@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     const {
+      title,
       equipmentDescription,
       failureDescription,
       operatingContext,
@@ -39,16 +40,24 @@ export async function POST(request: NextRequest) {
       additionalNotes,
     } = body as Record<string, string | number | undefined>;
 
+    const trimmedTitle = title ? String(title).trim() : "";
     const trimmedEquipDesc = equipmentDescription ? String(equipmentDescription).trim() : "";
     const trimmedFailureDesc = failureDescription ? String(failureDescription).trim() : "";
     const trimmedContext = operatingContext ? String(operatingContext).trim() : "";
 
-    if (!trimmedEquipDesc || !trimmedFailureDesc || !trimmedContext) {
+    if (!trimmedTitle || !trimmedEquipDesc || !trimmedFailureDesc || !trimmedContext) {
       return NextResponse.json(
         {
           error:
-            "equipmentDescription, failureDescription, and operatingContext are required",
+            "title, equipmentDescription, failureDescription, and operatingContext are required",
         },
+        { status: 400 }
+      );
+    }
+
+    if (trimmedTitle.length > 200) {
+      return NextResponse.json(
+        { error: "title must be 200 characters or fewer" },
         { status: 400 }
       );
     }
@@ -77,6 +86,7 @@ export async function POST(request: NextRequest) {
 
     const rcfa = await prisma.rcfa.create({
       data: {
+        title: trimmedTitle,
         equipmentDescription: trimmedEquipDesc,
         failureDescription: trimmedFailureDesc,
         operatingContext: trimmedContext as OperatingContext,
