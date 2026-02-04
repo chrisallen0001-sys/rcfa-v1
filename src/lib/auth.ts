@@ -5,6 +5,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: AppUserRole;
+  displayName: string;
 }
 
 const TOKEN_COOKIE_NAME = "auth_token";
@@ -19,7 +20,7 @@ function getSecret() {
 }
 
 export async function createToken(payload: JwtPayload): Promise<string> {
-  return new SignJWT({ email: payload.email, role: payload.role })
+  return new SignJWT({ email: payload.email, role: payload.role, displayName: payload.displayName })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -33,6 +34,7 @@ export async function verifyToken(token: string): Promise<JwtPayload> {
     sub: payload.sub as string,
     email: payload.email as string,
     role: payload.role as AppUserRole,
+    displayName: payload.displayName as string,
   };
 }
 
