@@ -81,6 +81,7 @@ model AppUser {
 
   // Relations
   createdRcfas          Rcfa[]                @relation("RcfaCreatedBy")
+  deletedRcfas          Rcfa[]                @relation("RcfaDeletedBy")
   answeredFollowups     RcfaFollowupQuestion[] @relation("FollowupAnsweredBy")
   selectedRootCauses    RcfaRootCauseFinal[]  @relation("RootCauseSelectedBy")
   updatedRootCauses     RcfaRootCauseFinal[]  @relation("RootCauseUpdatedBy")
@@ -127,8 +128,13 @@ model Rcfa {
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   closedAt  DateTime? @map("closed_at") @db.Timestamptz
 
+  // Soft delete columns (GxP compliance - preserves audit trail)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedByUserId String?   @map("deleted_by_user_id") @db.Uuid
+
   // Relations
   createdBy            AppUser                  @relation("RcfaCreatedBy", fields: [createdByUserId], references: [id])
+  deletedBy            AppUser?                 @relation("RcfaDeletedBy", fields: [deletedByUserId], references: [id])
   followupQuestions    RcfaFollowupQuestion[]
   rootCauseCandidates  RcfaRootCauseCandidate[]
   rootCauseFinals      RcfaRootCauseFinal[]
@@ -138,6 +144,7 @@ model Rcfa {
 
   @@index([status])
   @@index([createdAt])
+  @@index([deletedAt])
   @@map("rcfa")
 }
 

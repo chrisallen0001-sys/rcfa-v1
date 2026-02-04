@@ -26,6 +26,7 @@ export async function DELETE(
         title: true,
         status: true,
         equipmentDescription: true,
+        deletedAt: true,
       },
     });
 
@@ -33,13 +34,30 @@ export async function DELETE(
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
     }
 
+    // Already soft-deleted
+    if (rcfa.deletedAt) {
+      return NextResponse.json(
+        { error: "RCFA has already been deleted" },
+        { status: 400 }
+      );
+    }
+
     await prisma.$transaction(async (tx) => {
-      // Write audit event before deletion (captures RCFA info for record)
+      // Soft delete: set deletedAt and deletedByUserId
+      await tx.rcfa.update({
+        where: { id },
+        data: {
+          deletedAt: new Date(),
+          deletedByUserId: userId,
+        },
+      });
+
+      // Write audit event for soft delete (GxP compliance)
       await tx.rcfaAuditEvent.create({
         data: {
           rcfaId: id,
           actorUserId: userId,
-          eventType: "rcfa_deleted",
+          eventType: "rcfa_soft_deleted",
           eventPayload: {
             title: rcfa.title,
             status: rcfa.status,
@@ -47,9 +65,6 @@ export async function DELETE(
           },
         },
       });
-
-      // Delete the RCFA (cascades to all child records via ON DELETE CASCADE)
-      await tx.rcfa.delete({ where: { id } });
     });
 
     return NextResponse.json({ success: true }, { status: 200 });
