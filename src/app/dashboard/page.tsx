@@ -33,6 +33,7 @@ const STATUS_COLORS: Record<RcfaStatus, string> = {
 
 export type RcfaRow = {
   id: string;
+  rcfaNumber: number;
   title: string;
   equipmentDescription: string;
   status: RcfaStatus;
@@ -48,6 +49,7 @@ export type RcfaRow = {
 
 type SummaryRow = {
   id: string;
+  rcfa_number: number;
   title: string;
   equipment_description: string;
   status: RcfaStatus;
@@ -105,6 +107,7 @@ async function searchRcfas(
     WITH matches AS (
       SELECT
         r.id,
+        r.rcfa_number,
         r.title,
         r.equipment_description,
         r.status,
@@ -146,6 +149,7 @@ async function searchRcfas(
 
   const rows: RcfaRow[] = results.map((r) => ({
     id: r.id,
+    rcfaNumber: r.rcfa_number,
     title: r.title || "Untitled RCFA",
     equipmentDescription: r.equipment_description,
     status: r.status,
@@ -194,6 +198,7 @@ export default async function DashboardPage({
     const browseSql = `
       SELECT
         s.id,
+        s.rcfa_number,
         s.title,
         s.equipment_description,
         s.status,
@@ -218,6 +223,7 @@ export default async function DashboardPage({
 
     rows = browseResults.map((r) => ({
       id: r.id,
+      rcfaNumber: r.rcfa_number,
       title: r.title || "Untitled RCFA",
       equipmentDescription: r.equipment_description,
       status: r.status,

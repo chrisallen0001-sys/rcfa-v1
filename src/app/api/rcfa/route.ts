@@ -84,8 +84,14 @@ export async function POST(request: NextRequest) {
     const trimOpt = (v: string | number | undefined) =>
       v ? String(v).trim() || undefined : undefined;
 
+    // Get next RCFA number from sequence
+    const [{ nextval }] = await prisma.$queryRaw<[{ nextval: bigint }]>`
+      SELECT nextval('rcfa_number_seq')
+    `;
+
     const rcfa = await prisma.rcfa.create({
       data: {
+        rcfaNumber: Number(nextval),
         title: trimmedTitle,
         equipmentDescription: trimmedEquipDesc,
         failureDescription: trimmedFailureDesc,

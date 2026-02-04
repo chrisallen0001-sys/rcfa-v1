@@ -100,6 +100,7 @@ model AppUser {
 
 model Rcfa {
   id                   String   @id @default(uuid()) @db.Uuid
+  rcfaNumber           Int      @unique @map("rcfa_number")
   title                String   @default("")
   equipmentDescription String   @map("equipment_description")
 
