@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
+import { formatRcfaNumber } from "@/lib/rcfa-utils";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
@@ -188,7 +189,7 @@ export default async function RcfaDetailPage({
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="shrink-0 rounded bg-zinc-100 px-2 py-1 text-sm font-mono font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-            RCFA-{String(rcfa.rcfaNumber).padStart(3, "0")}
+            {formatRcfaNumber(rcfa.rcfaNumber)}
           </span>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             {rcfa.title || "RCFA Detail"}

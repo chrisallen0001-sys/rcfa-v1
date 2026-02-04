@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
+import { formatRcfaNumber } from "@/lib/rcfa-utils";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -88,7 +89,7 @@ export default async function ActionItemsPage({
     dueDate: item.dueDate?.toISOString().slice(0, 10) ?? null,
     ownerUserId: item.ownerUserId,
     rcfaId: item.rcfa.id,
-    rcfaNumber: `RCFA-${String(item.rcfa.rcfaNumber).padStart(3, "0")}`,
+    rcfaNumber: formatRcfaNumber(item.rcfa.rcfaNumber),
     rcfaTitle: item.rcfa.title ?? "Untitled RCFA",
   }));
 

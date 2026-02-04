@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { RcfaStatus } from "@/generated/prisma/client";
 import type { RcfaRow } from "./page";
+import { formatRcfaNumber } from "@/lib/rcfa-utils";
 
 type Props = {
   items: RcfaRow[];
@@ -85,7 +86,7 @@ export default function RcfaListFilter({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                      RCFA-{String(r.rcfaNumber).padStart(3, "0")}
+                      {formatRcfaNumber(r.rcfaNumber)}
                     </span>
                     <h2 className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
                       {r.title}
