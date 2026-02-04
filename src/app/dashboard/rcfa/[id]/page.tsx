@@ -178,9 +178,14 @@ export default async function RcfaDetailPage({
         </Link>
       </div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          {rcfa.title || "RCFA Detail"}
-        </h1>
+        <div className="flex items-center gap-3">
+          <span className="shrink-0 rounded bg-zinc-100 px-2 py-1 text-sm font-mono font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+            RCFA-{String(rcfa.rcfaNumber).padStart(3, "0")}
+          </span>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            {rcfa.title || "RCFA Detail"}
+          </h1>
+        </div>
         <Badge
           label={STATUS_LABELS[rcfa.status]}
           colorClass={STATUS_COLORS[rcfa.status]}
