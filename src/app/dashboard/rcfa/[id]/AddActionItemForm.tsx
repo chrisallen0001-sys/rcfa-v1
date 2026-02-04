@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import DateInput from "@/components/DateInput";
 
 interface AddActionItemFormProps {
   rcfaId: string;
@@ -110,21 +111,13 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
             <option value="high">High</option>
           </select>
         </div>
-        <div>
-          <label
-            htmlFor="dueDate"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >
-            Due Date
-          </label>
-          <input
-            id="dueDate"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-          />
-        </div>
+        <DateInput
+          id="dueDate"
+          label="Due Date"
+          value={dueDate}
+          onChange={setDueDate}
+          minToday
+        />
       </div>
       <div>
         <label
