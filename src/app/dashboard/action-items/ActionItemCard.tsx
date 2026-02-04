@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import type { ActionItemRow, UserOption } from "./page";
+import DateInput from "@/components/DateInput";
 
 type Props = {
   item: ActionItemRow;
@@ -95,8 +96,7 @@ export default function ActionItemCard({
     enqueue({ ownerUserId: val || null });
   }
 
-  function handleDueDateChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value;
+  function handleDueDateChange(val: string) {
     setDueDate(val);
     enqueue({ dueDate: val || null });
   }
@@ -165,16 +165,14 @@ export default function ActionItemCard({
           </select>
         </label>
 
-        <label className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-          Due
-          <input
-            type="date"
-            value={dueDate}
-            onChange={handleDueDateChange}
-            disabled={saving}
-            className={selectClass}
-          />
-        </label>
+        <DateInput
+          label="Due"
+          value={dueDate}
+          onChange={handleDueDateChange}
+          disabled={saving}
+          inline
+          minToday
+        />
       </div>
 
       {status !== "done" && status !== "canceled" && !completing && !saving && (

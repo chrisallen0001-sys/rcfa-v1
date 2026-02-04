@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import DateInput from "@/components/DateInput";
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -169,17 +170,12 @@ export default function EditableActionItem({
                 <option value="high">High</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Due Date
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-              />
-            </div>
+            <DateInput
+              label="Due Date"
+              value={dueDate}
+              onChange={setDueDate}
+              minToday
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
