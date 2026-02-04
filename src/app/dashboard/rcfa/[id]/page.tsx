@@ -14,6 +14,7 @@ import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
 import CloseRcfaButton from "./CloseRcfaButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
+import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
 import type {
   RcfaStatus,
@@ -120,6 +121,7 @@ export default async function RcfaDetailPage({
   const rcfa = await prisma.rcfa.findUnique({
     where: { id },
     include: {
+      owner: { select: { id: true, displayName: true } },
       followupQuestions: {
         orderBy: [{ generatedAt: "asc" }, { id: "asc" }],
         include: { answeredBy: { select: { email: true } } },
@@ -190,6 +192,9 @@ export default async function RcfaDetailPage({
           label={STATUS_LABELS[rcfa.status]}
           colorClass={STATUS_COLORS[rcfa.status]}
         />
+      </div>
+      <div className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
+        <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
       {analyzeError && (
@@ -428,13 +433,20 @@ export default async function RcfaDetailPage({
           />
         )}
 
-        {/* Admin Delete Button */}
+        {/* Admin Actions */}
         {isAdmin && (
           <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
               Admin actions
             </p>
-            <DeleteRcfaButton rcfaId={rcfa.id} rcfaTitle={rcfa.title} />
+            <div className="space-y-4">
+              <ReassignOwnerButton
+                rcfaId={rcfa.id}
+                currentOwnerId={rcfa.owner.id}
+                currentOwnerName={rcfa.owner.displayName}
+              />
+              <DeleteRcfaButton rcfaId={rcfa.id} rcfaTitle={rcfa.title} />
+            </div>
           </div>
         )}
       </div>

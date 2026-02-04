@@ -81,6 +81,7 @@ model AppUser {
 
   // Relations
   createdRcfas          Rcfa[]                @relation("RcfaCreatedBy")
+  ownedRcfas            Rcfa[]                @relation("RcfaOwner")
   deletedRcfas          Rcfa[]                @relation("RcfaDeletedBy")
   answeredFollowups     RcfaFollowupQuestion[] @relation("FollowupAnsweredBy")
   selectedRootCauses    RcfaRootCauseFinal[]  @relation("RootCauseSelectedBy")
@@ -124,6 +125,7 @@ model Rcfa {
 
   status         RcfaStatus @default(draft)
   createdByUserId String    @map("created_by_user_id") @db.Uuid
+  ownerUserId     String    @map("owner_user_id") @db.Uuid
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -135,6 +137,7 @@ model Rcfa {
 
   // Relations
   createdBy            AppUser                  @relation("RcfaCreatedBy", fields: [createdByUserId], references: [id])
+  owner                AppUser                  @relation("RcfaOwner", fields: [ownerUserId], references: [id])
   deletedBy            AppUser?                 @relation("RcfaDeletedBy", fields: [deletedByUserId], references: [id])
   followupQuestions    RcfaFollowupQuestion[]
   rootCauseCandidates  RcfaRootCauseCandidate[]
@@ -146,6 +149,7 @@ model Rcfa {
   @@index([status])
   @@index([createdAt])
   @@index([deletedAt])
+  @@index([ownerUserId])
   @@map("rcfa")
 }
 

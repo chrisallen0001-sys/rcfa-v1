@@ -38,6 +38,7 @@ export type RcfaRow = {
   equipmentDescription: string;
   status: RcfaStatus;
   createdAt: string;
+  ownerDisplayName: string;
   rootCauseCount: number;
   actionItemCount: number;
   openActionCount: number;
@@ -54,6 +55,7 @@ type SummaryRow = {
   equipment_description: string;
   status: RcfaStatus;
   created_at: Date;
+  owner_display_name: string;
   final_root_cause_count: bigint;
   action_item_count: bigint;
   open_action_item_count: bigint;
@@ -132,6 +134,7 @@ async function searchRcfas(
     SELECT
       m.*,
       COUNT(*) OVER() AS total_count,
+      s.owner_display_name,
       s.final_root_cause_count,
       s.action_item_count,
       s.open_action_item_count
@@ -154,6 +157,7 @@ async function searchRcfas(
     equipmentDescription: r.equipment_description,
     status: r.status,
     createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+    ownerDisplayName: r.owner_display_name,
     rootCauseCount: Number(r.final_root_cause_count),
     actionItemCount: Number(r.action_item_count),
     openActionCount: Number(r.open_action_item_count),
@@ -203,6 +207,7 @@ export default async function DashboardPage({
         s.equipment_description,
         s.status,
         s.created_at,
+        s.owner_display_name,
         s.final_root_cause_count,
         s.action_item_count,
         s.open_action_item_count,
@@ -228,6 +233,7 @@ export default async function DashboardPage({
       equipmentDescription: r.equipment_description,
       status: r.status,
       createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+      ownerDisplayName: r.owner_display_name,
       rootCauseCount: Number(r.final_root_cause_count),
       actionItemCount: Number(r.action_item_count),
       openActionCount: Number(r.open_action_item_count),
