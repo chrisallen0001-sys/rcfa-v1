@@ -46,6 +46,7 @@ AI-guided Root Cause Failure Analysis tool that standardizes investigations and 
 
 | Field | Required | Description |
 |-------|----------|-------------|
+| Title | Yes | Short label for RCFA identification |
 | Equipment Description | Yes | Free-text description of equipment and function |
 | Make / Model / Serial | No | Equipment identifiers |
 | Approximate Age | No | Years or lifecycle stage |
@@ -115,7 +116,7 @@ AI-guided Root Cause Failure Analysis tool that standardizes investigations and 
 | Table | Purpose |
 |-------|---------|
 | `app_user` | Local accounts |
-| `rcfa` | Parent investigation record |
+| `rcfa` | Parent investigation record (includes `title`, `rcfa_number`, `owner_user_id`) |
 | `rcfa_followup_question` | AI/human questions + answers |
 | `rcfa_root_cause_candidate` | AI suggestions (non-authoritative) |
 | `rcfa_root_cause_final` | Validated root causes (authoritative) |
@@ -157,7 +158,13 @@ rcfa (parent)
 | `promoted_to_final` | User promotes candidate → final |
 | `final_updated` | User edits a final record |
 | `final_deleted` | User deletes a final record |
+| `final_created` | User creates root cause without promoting from candidate |
 | `action_completed` | Action item marked done/canceled |
+| `action_item_created` | User creates action item manually |
+| `action_item_updated` | User edits action item |
+| `action_item_deleted` | User deletes action item |
+| `owner_changed` | RCFA owner reassigned |
+| `rcfa_soft_deleted` | Admin soft-deletes an RCFA |
 
 </details>
 

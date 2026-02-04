@@ -1,7 +1,7 @@
 **RCFA AI Tool (V1) — Data Model Spec**
 
-Version: Draft v1  
-Last updated: 2026-01-22
+Version: Draft v1
+Last updated: 2026-02-04
 
 # 1. Purpose
 
@@ -71,7 +71,11 @@ Key fields:
 
 - id (UUID) — unique RCFA ID
 
-- title — short label for list views
+- rcfa_number — auto-generated sequential identifier (format: RCFA-001, RCFA-002, etc.)
+
+- title — required short label for RCFA identification
+
+- owner_user_id (FK) — RCFA owner, defaults to creator
 
 - equipment_description — free text for V1 (CMMS integration is out of scope)
 
@@ -92,6 +96,8 @@ Key fields:
 - status — draft/investigation/actions_open/closed
 
 - created_by_user_id and timestamps
+
+- deleted_at / deleted_by_user_id — soft delete fields (nullable); RCFAs are never hard-deleted for GxP compliance
 
 Notes:
 
@@ -281,7 +287,7 @@ Key fields:
 
 Notes:
 
-- Recommended event types: candidate_generated, promoted_to_final, final_updated, final_deleted, status_changed, action_completed.
+- Recommended event types: candidate_generated, promoted_to_final, final_updated, final_deleted, final_created, status_changed, action_completed, action_item_created, action_item_updated, action_item_deleted, owner_changed, rcfa_soft_deleted.
 
 - V1 does not require full record versioning; event logs are sufficient.
 
