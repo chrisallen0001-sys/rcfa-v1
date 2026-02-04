@@ -128,7 +128,7 @@ async function searchRcfas(
         to_tsvector('english', r.equipment_description) ||
         to_tsvector('english', r.failure_description)
       ) @@ plainto_tsquery('english', $1)
-      AND ($2::uuid IS NULL OR r.created_by_user_id = $2::uuid)
+      AND ($2::uuid IS NULL OR r.owner_user_id = $2::uuid)
       AND r.deleted_at IS NULL
     )
     SELECT
@@ -213,7 +213,7 @@ export default async function DashboardPage({
         s.open_action_item_count,
         COUNT(*) OVER() AS total_count
       FROM rcfa_summary s
-      WHERE ($3::uuid IS NULL OR s.created_by_user_id = $3::uuid)
+      WHERE ($3::uuid IS NULL OR s.owner_user_id = $3::uuid)
       ORDER BY s.created_at DESC
       LIMIT $1 OFFSET $2
     `;
