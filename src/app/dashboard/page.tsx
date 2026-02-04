@@ -60,8 +60,7 @@ type SummaryRow = {
   total_count: bigint;
 };
 
-type SearchResultRow = Omit<SummaryRow, 'rcfa_number'> & {
-  rcfa_number: number;
+type SearchResultRow = SummaryRow & {
   equip_headline: string;
   failure_headline: string;
   rank: number;
