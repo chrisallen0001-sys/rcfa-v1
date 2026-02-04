@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useMemo } from "react";
 
 type DateInputProps = {
   value: string;
@@ -12,11 +12,26 @@ type DateInputProps = {
   label?: string;
   /** Optional id override (auto-generated if not provided) */
   id?: string;
-  /** Set min to today's date (useful for due dates) */
+  /** Set min to today's date for new dates (existing past dates can still be edited) */
   minToday?: boolean;
   /** Custom className for the container */
   className?: string;
 };
+
+/** Clear (X) icon for the clear button */
+function ClearIcon({ size = "md" }: { size?: "sm" | "md" }) {
+  const sizeClass = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className={sizeClass}
+    >
+      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+    </svg>
+  );
+}
 
 /**
  * Improved date input component with clear button and better UX.
@@ -35,10 +50,15 @@ export default function DateInput({
   const generatedId = useId();
   const inputId = providedId ?? generatedId;
 
-  // Get today's date in YYYY-MM-DD format for min attribute
-  const today = new Date().toISOString().split("T")[0];
+  // Memoize today's date calculation (YYYY-MM-DD format)
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  const handleClear = () => {
+  // Only apply min date for new dates (empty value), allowing existing past dates to be edited
+  const minDate = minToday && !value ? today : undefined;
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
     onChange("");
   };
 
@@ -56,7 +76,7 @@ export default function DateInput({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
-            min={minToday ? today : undefined}
+            min={minDate}
             className="rounded-md border border-zinc-300 bg-white px-2 py-1 pr-7 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 [color-scheme:light] dark:[color-scheme:dark]"
           />
           {value && !disabled && (
@@ -67,14 +87,7 @@ export default function DateInput({
               title="Clear date"
               aria-label="Clear date"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-3.5 w-3.5"
-              >
-                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-              </svg>
+              <ClearIcon size="sm" />
             </button>
           )}
         </span>
@@ -100,8 +113,8 @@ export default function DateInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          min={minToday ? today : undefined}
-          className="block w-full rounded-md border border-zinc-300 px-3 py-2 pr-9 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 [color-scheme:light] dark:[color-scheme:dark]"
+          min={minDate}
+          className="block w-full rounded-md border border-zinc-300 px-3 py-2 pr-9 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 [color-scheme:light] dark:[color-scheme:dark]"
         />
         {value && !disabled && (
           <button
@@ -111,14 +124,7 @@ export default function DateInput({
             title="Clear date"
             aria-label="Clear date"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="h-4 w-4"
-            >
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
+            <ClearIcon size="md" />
           </button>
         )}
       </div>
