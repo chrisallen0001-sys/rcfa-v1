@@ -13,7 +13,8 @@ export default function LogoutButton() {
     setError(false);
     try {
       const res = await fetch("/api/auth/logout", { method: "POST" });
-      if (res.ok) {
+      // Treat 401 as success - session was already invalid
+      if (res.ok || res.status === 401) {
         router.push("/login");
       } else {
         setError(true);
