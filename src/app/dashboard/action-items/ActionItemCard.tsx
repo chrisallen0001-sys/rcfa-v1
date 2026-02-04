@@ -240,9 +240,13 @@ export default function ActionItemCard({
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
         <Link
           href={`/dashboard/rcfa/${item.rcfaId}`}
-          className="underline hover:text-zinc-700 dark:hover:text-zinc-300"
+          className="hover:text-zinc-700 dark:hover:text-zinc-300"
         >
-          {item.rcfaTitle}
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">
+            {item.rcfaNumber}
+          </span>
+          <span className="mx-1.5">·</span>
+          <span className="underline">{item.rcfaTitle}</span>
         </Link>
         {saving && <span className="text-zinc-400">Saving...</span>}
         {error && (
