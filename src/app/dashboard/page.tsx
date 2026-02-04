@@ -38,6 +38,7 @@ export type RcfaRow = {
   equipmentDescription: string;
   status: RcfaStatus;
   createdAt: string;
+  ownerDisplayName: string;
   rootCauseCount: number;
   actionItemCount: number;
   openActionCount: number;
@@ -54,6 +55,7 @@ type SummaryRow = {
   equipment_description: string;
   status: RcfaStatus;
   created_at: Date;
+  owner_display_name: string;
   final_root_cause_count: bigint;
   action_item_count: bigint;
   open_action_item_count: bigint;
@@ -126,12 +128,13 @@ async function searchRcfas(
         to_tsvector('english', r.equipment_description) ||
         to_tsvector('english', r.failure_description)
       ) @@ plainto_tsquery('english', $1)
-      AND ($2::uuid IS NULL OR r.created_by_user_id = $2::uuid)
+      AND ($2::uuid IS NULL OR r.owner_user_id = $2::uuid)
       AND r.deleted_at IS NULL
     )
     SELECT
       m.*,
       COUNT(*) OVER() AS total_count,
+      s.owner_display_name,
       s.final_root_cause_count,
       s.action_item_count,
       s.open_action_item_count
@@ -154,6 +157,7 @@ async function searchRcfas(
     equipmentDescription: r.equipment_description,
     status: r.status,
     createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+    ownerDisplayName: r.owner_display_name,
     rootCauseCount: Number(r.final_root_cause_count),
     actionItemCount: Number(r.action_item_count),
     openActionCount: Number(r.open_action_item_count),
@@ -203,12 +207,13 @@ export default async function DashboardPage({
         s.equipment_description,
         s.status,
         s.created_at,
+        s.owner_display_name,
         s.final_root_cause_count,
         s.action_item_count,
         s.open_action_item_count,
         COUNT(*) OVER() AS total_count
       FROM rcfa_summary s
-      WHERE ($3::uuid IS NULL OR s.created_by_user_id = $3::uuid)
+      WHERE ($3::uuid IS NULL OR s.owner_user_id = $3::uuid)
       ORDER BY s.created_at DESC
       LIMIT $1 OFFSET $2
     `;
@@ -228,6 +233,7 @@ export default async function DashboardPage({
       equipmentDescription: r.equipment_description,
       status: r.status,
       createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+      ownerDisplayName: r.owner_display_name,
       rootCauseCount: Number(r.final_root_cause_count),
       actionItemCount: Number(r.action_item_count),
       openActionCount: Number(r.open_action_item_count),

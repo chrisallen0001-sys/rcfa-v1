@@ -133,6 +133,7 @@ export default function RcfaListFilter({
               )}
 
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                <span>Owner: {r.ownerDisplayName}</span>
                 <span>Created {r.createdAt}</span>
                 <span>
                   {r.rootCauseCount} root{" "}

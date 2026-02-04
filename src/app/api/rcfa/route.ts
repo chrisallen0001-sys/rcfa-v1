@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
         additionalNotes: trimOpt(additionalNotes),
         status: "draft",
         createdByUserId: userId,
+        ownerUserId: userId,
       },
     });
 
