@@ -80,14 +80,20 @@ function Section({
 }
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
-  if (!value) return null;
+  const isEmpty = !value;
   return (
     <div>
       <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
         {label}
       </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
-        {value}
+      <dd
+        className={`mt-1 whitespace-pre-wrap text-sm ${
+          isEmpty
+            ? "text-zinc-400 dark:text-zinc-500"
+            : "text-zinc-900 dark:text-zinc-100"
+        }`}
+      >
+        {value || "—"}
       </dd>
     </div>
   );
