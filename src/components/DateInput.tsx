@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useRef, useState, useEffect } from "react";
-import { DayPicker } from "react-day-picker";
+import { DayPicker, getDefaultClassNames } from "react-day-picker";
 import { format, parse, isValid } from "date-fns";
 import "react-day-picker/style.css";
 
@@ -73,6 +73,9 @@ export default function DateInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
 
+  // Get default class names from react-day-picker
+  const defaultClassNames = getDefaultClassNames();
+
   // Parse the value string to a Date object
   const selectedDate = useMemo(() => {
     if (!value) return undefined;
@@ -138,7 +141,7 @@ export default function DateInput({
     : "block w-full rounded-md border border-zinc-300 px-3 py-2 pr-16 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 cursor-pointer";
 
   const calendarContent = (
-    <div className="absolute z-50 mt-1 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="absolute left-0 z-50 mt-1 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
       <DayPicker
         mode="single"
         selected={selectedDate}
@@ -146,26 +149,10 @@ export default function DateInput({
         defaultMonth={selectedDate}
         disabled={minDate ? { before: minDate } : undefined}
         classNames={{
-          root: "text-zinc-900 dark:text-zinc-100",
-          months: "flex flex-col",
-          month: "space-y-2",
-          caption: "flex justify-center pt-1 relative items-center",
-          caption_label: "text-sm font-medium",
-          nav: "space-x-1 flex items-center",
-          nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 inline-flex items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800",
-          nav_button_previous: "absolute left-1",
-          nav_button_next: "absolute right-1",
-          table: "w-full border-collapse space-y-1",
-          head_row: "flex",
-          head_cell: "text-zinc-500 dark:text-zinc-400 rounded-md w-8 font-normal text-[0.8rem]",
-          row: "flex w-full mt-1",
-          cell: "text-center text-sm p-0 relative [&:has([aria-selected])]:bg-zinc-100 dark:[&:has([aria-selected])]:bg-zinc-800 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-          day: "h-8 w-8 p-0 font-normal aria-selected:opacity-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md inline-flex items-center justify-center",
-          day_selected: "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200",
-          day_today: "bg-zinc-100 dark:bg-zinc-800 font-semibold",
-          day_outside: "text-zinc-400 dark:text-zinc-600 opacity-50",
-          day_disabled: "text-zinc-400 dark:text-zinc-600 opacity-50 cursor-not-allowed",
-          day_hidden: "invisible",
+          root: `${defaultClassNames.root} text-zinc-900 dark:text-zinc-100`,
+          today: `${defaultClassNames.today} font-bold`,
+          selected: `${defaultClassNames.selected} bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900`,
+          chevron: `${defaultClassNames.chevron} fill-zinc-600 dark:fill-zinc-400`,
         }}
       />
       <div className="mt-2 flex justify-between border-t border-zinc-200 pt-2 dark:border-zinc-700">
