@@ -28,6 +28,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   action_completed: "Action Completed",
   rcfa_deleted: "RCFA Deleted",
   rcfa_soft_deleted: "RCFA Deleted",
+  owner_changed: "Owner Changed",
 };
 
 // Labels for payload fields to make them human-readable
@@ -58,11 +59,17 @@ const FIELD_LABELS: Record<string, string> = {
   actionItemId: "Action Item ID",
   candidateId: "Candidate ID",
   completionNotes: "Completion Notes",
+  owner: "Owner",
   ownerUserId: "Owner",
   previousOwnerUserId: "Previous Owner",
+  // Owner change event fields
+  previousOwnerId: "Previous Owner",
+  previousOwnerName: "Previous Owner",
+  newOwnerId: "New Owner",
+  newOwnerName: "New Owner",
 };
 
-// Fields that represent "before" values for update events
+// Fields that represent "before" values for update events (previousXxx -> xxx pattern)
 const PREVIOUS_FIELD_MAP: Record<string, string> = {
   previousCauseText: "causeText",
   previousEvidenceSummary: "evidenceSummary",
@@ -72,6 +79,8 @@ const PREVIOUS_FIELD_MAP: Record<string, string> = {
   previousDueDate: "dueDate",
   previousStatus: "status",
   previousOwnerUserId: "ownerUserId",
+  // Owner change event - only show name (ID is not user-friendly)
+  previousOwnerName: "newOwnerName",
 };
 
 function formatEventType(eventType: string): string {
@@ -131,6 +140,11 @@ function formatPayloadSummary(
       return payload.title
         ? `"${truncate(String(payload.title), 50)}"`
         : "RCFA deleted";
+    case "owner_changed":
+      if (payload.previousOwnerName && payload.newOwnerName) {
+        return `${payload.previousOwnerName} → ${payload.newOwnerName}`;
+      }
+      return "Owner reassigned";
     default:
       return "";
   }
@@ -185,7 +199,11 @@ function formatValue(value: unknown): string {
 }
 
 function isUpdateEvent(eventType: string): boolean {
-  return eventType === "final_updated" || eventType === "action_item_updated";
+  return (
+    eventType === "final_updated" ||
+    eventType === "action_item_updated" ||
+    eventType === "owner_changed"
+  );
 }
 
 function getChangedFields(payload: Record<string, unknown>): Array<{
@@ -201,15 +219,40 @@ function getChangedFields(payload: Record<string, unknown>): Array<{
     currentValue: unknown;
   }> = [];
 
+  // Handle nested "changes" structure from action items API
+  // Format: { changes: { field: { from, to } } }
+  if (payload.changes && typeof payload.changes === "object") {
+    const changesObj = payload.changes as Record<string, { from?: unknown; to?: unknown }>;
+    for (const [field, change] of Object.entries(changesObj)) {
+      if (change && typeof change === "object" && ("from" in change || "to" in change)) {
+        const previousValue = change.from;
+        const currentValue = change.to;
+        // Only show if value actually changed
+        if (JSON.stringify(previousValue) !== JSON.stringify(currentValue)) {
+          changes.push({
+            field,
+            label: formatFieldLabel(field),
+            previousValue,
+            currentValue,
+          });
+        }
+      }
+    }
+    return changes;
+  }
+
+  // Handle flat previousXxx/xxx pattern from finals routes and owner changes
   for (const [prevKey, currentKey] of Object.entries(PREVIOUS_FIELD_MAP)) {
     if (prevKey in payload) {
       const previousValue = payload[prevKey];
       const currentValue = payload[currentKey];
       // Only show if value actually changed
       if (JSON.stringify(previousValue) !== JSON.stringify(currentValue)) {
+        // Use a display-friendly label for owner changes
+        const displayLabel = prevKey === "previousOwnerName" ? "Owner" : formatFieldLabel(currentKey);
         changes.push({
           field: currentKey,
-          label: formatFieldLabel(currentKey),
+          label: displayLabel,
           previousValue,
           currentValue,
         });

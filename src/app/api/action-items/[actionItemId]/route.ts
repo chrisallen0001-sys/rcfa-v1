@@ -112,16 +112,33 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Validate owner exists if provided
-    if (body.ownerUserId) {
-      const owner = await prisma.appUser.findUnique({
-        where: { id: body.ownerUserId },
-      });
-      if (!owner) {
-        return NextResponse.json(
-          { error: "Owner user not found" },
-          { status: 400 }
-        );
+    // Fetch owner names for audit trail (if owner is changing)
+    let previousOwnerName: string | null = null;
+    let newOwnerName: string | null = null;
+
+    if (body.ownerUserId !== undefined) {
+      // Fetch previous owner name if there was one
+      if (existing.ownerUserId) {
+        const previousOwner = await prisma.appUser.findUnique({
+          where: { id: existing.ownerUserId },
+          select: { displayName: true },
+        });
+        previousOwnerName = previousOwner?.displayName ?? null;
+      }
+
+      // Validate and fetch new owner if provided
+      if (body.ownerUserId) {
+        const newOwner = await prisma.appUser.findUnique({
+          where: { id: body.ownerUserId },
+          select: { displayName: true },
+        });
+        if (!newOwner) {
+          return NextResponse.json(
+            { error: "Owner user not found" },
+            { status: 400 }
+          );
+        }
+        newOwnerName = newOwner.displayName;
       }
     }
 
@@ -178,9 +195,9 @@ export async function PATCH(
                   status: { from: existing.status, to: body.status },
                 }),
                 ...(body.ownerUserId !== undefined && {
-                  ownerUserId: {
-                    from: existing.ownerUserId,
-                    to: body.ownerUserId,
+                  owner: {
+                    from: previousOwnerName,
+                    to: newOwnerName,
                   },
                 }),
                 ...(body.dueDate !== undefined && {
