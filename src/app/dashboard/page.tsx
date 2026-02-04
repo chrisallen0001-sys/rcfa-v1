@@ -241,33 +241,9 @@ export default async function DashboardPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          RCFAs
-        </h1>
-        <div className="flex items-center gap-3">
-          {isAdmin && (
-            <Link
-              href="/dashboard/admin/users"
-              className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-            >
-              User Management
-            </Link>
-          )}
-          <Link
-            href="/dashboard/action-items"
-            className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            Action Items
-          </Link>
-          <Link
-            href="/dashboard/intake"
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            New RCFA
-          </Link>
-        </div>
-      </div>
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        RCFAs
+      </h1>
       <Suspense>
         <SearchInput />
       </Suspense>

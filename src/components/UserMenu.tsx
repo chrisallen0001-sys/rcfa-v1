@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import ChangePasswordModal from "./ChangePasswordModal";
+import type { AppUserRole } from "@/generated/prisma/client";
 
 interface UserMenuProps {
   displayName: string;
+  role: AppUserRole;
 }
 
-export default function UserMenu({ displayName }: UserMenuProps) {
+export default function UserMenu({ displayName, role }: UserMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -88,6 +91,25 @@ export default function UserMenu({ displayName }: UserMenuProps) {
             aria-label="User menu"
             className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
           >
+            <Link
+              href="/dashboard/action-items"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Action Items
+            </Link>
+            {role === "admin" && (
+              <Link
+                href="/dashboard/admin/users"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                User Management
+              </Link>
+            )}
+            <div className="my-1 border-t border-zinc-200 dark:border-zinc-700" role="separator" />
             <button
               role="menuitem"
               onClick={handleChangePassword}
