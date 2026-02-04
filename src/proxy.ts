@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, TOKEN_COOKIE_NAME } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/api/auth/login", "/api/auth/register", "/login", "/register"];
+const PUBLIC_PATHS = ["/api/auth/login", "/api/auth/register", "/api/auth/logout", "/login", "/register"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -35,9 +35,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   } catch {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Session expired" }, { status: 401 });
     }
     const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("expired", "1");
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete(TOKEN_COOKIE_NAME);
     return response;
