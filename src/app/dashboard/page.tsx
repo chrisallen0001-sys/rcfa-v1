@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import RcfaListFilter from "./RcfaListFilter";
 import SearchInput from "./SearchInput";
-import LogoutButton from "./LogoutButton";
 
 export const metadata: Metadata = {
   title: "Dashboard – RCFA",
@@ -267,7 +266,6 @@ export default async function DashboardPage({
           >
             New RCFA
           </Link>
-          <LogoutButton />
         </div>
       </div>
       <Suspense>
