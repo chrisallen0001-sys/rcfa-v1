@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
         email: emailNormalized,
         displayName: displayName.trim(),
         passwordHash,
+        status: "pending_approval",
       },
     });
 
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         displayName: user.displayName,
         role: user.role,
+        status: user.status,
       },
       { status: 201 }
     );
