@@ -98,16 +98,27 @@ export default async function ActionItemsPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-6 flex items-baseline gap-2 text-2xl font-semibold tracking-tight">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="flex items-baseline gap-2 text-2xl font-semibold tracking-tight">
+          <Link
+            href="/dashboard"
+            className="text-sm font-medium text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
+          >
+            RCFAs
+          </Link>
+          <span className="text-zinc-300 dark:text-zinc-600" aria-hidden="true">/</span>
+          <span className="text-zinc-900 dark:text-zinc-50">Action Items</span>
+        </h1>
         <Link
-          href="/dashboard"
-          className="text-sm font-medium text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
+          href="/dashboard/intake"
+          className="flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
         >
-          RCFAs
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          New RCFA
         </Link>
-        <span className="text-zinc-300 dark:text-zinc-600" aria-hidden="true">/</span>
-        <span className="text-zinc-900 dark:text-zinc-50">Action Items</span>
-      </h1>
+      </div>
       <ActionItemsFilter
         items={rows}
         totalItems={total}
