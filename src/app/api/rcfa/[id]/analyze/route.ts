@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
 import { getAuthContext } from "@/lib/auth-context";
+import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import type {
   Rcfa,
   QuestionCategory,
@@ -228,9 +229,9 @@ export async function POST(
         data: {
           rcfaId: id,
           actorUserId: userId,
-          eventType: "candidate_generated",
+          eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
-            source: "ai_initial_analysis",
+            source: AUDIT_SOURCES.AI_INITIAL_ANALYSIS,
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
             followUpQuestionCount: result.followUpQuestions.length,

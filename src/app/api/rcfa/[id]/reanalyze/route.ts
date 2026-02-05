@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
 import { getAuthContext } from "@/lib/auth-context";
+import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import type {
   Rcfa,
   RcfaFollowupQuestion,
@@ -176,6 +177,29 @@ export async function POST(
       );
     }
 
+    // Guard: reject if no answers have changed since the last re-analysis
+    const lastReanalysis = await prisma.rcfaAuditEvent.findFirst({
+      where: {
+        rcfaId: id,
+        eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
+        eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+
+    if (lastReanalysis) {
+      const hasNewAnswers = answeredQuestions.some(
+        (q) => q.answeredAt !== null && q.answeredAt > lastReanalysis.createdAt
+      );
+      if (!hasNewAnswers) {
+        return NextResponse.json(
+          { error: "No new or updated answers since the last re-analysis" },
+          { status: 422 }
+        );
+      }
+    }
+
     const userPrompt = buildReAnalyzePrompt(rcfa, rcfa.followupQuestions);
 
     let result: ReAnalysisResult;
@@ -239,9 +263,9 @@ export async function POST(
         data: {
           rcfaId: id,
           actorUserId: userId,
-          eventType: "candidate_generated",
+          eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
-            source: "ai_reanalysis",
+            source: AUDIT_SOURCES.AI_REANALYSIS,
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
           },
