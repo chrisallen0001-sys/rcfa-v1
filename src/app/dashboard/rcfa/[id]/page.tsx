@@ -83,8 +83,8 @@ function Section({
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   const isEmpty = !value;
   return (
-    <div>
-      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+    <div className="rounded-md border border-zinc-100 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+      <dt className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">
         {label}
       </dt>
       <dd
