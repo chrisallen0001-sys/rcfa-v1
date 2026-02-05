@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
       equipmentModel,
       equipmentSerialNumber,
       equipmentAgeYears,
+      downtimeMinutes,
+      productionCostUsd,
+      maintenanceCostUsd,
       preFailureConditions,
       workHistorySummary,
       activePmsSummary,
@@ -81,6 +84,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (downtimeMinutes != null) {
+      const mins = Number(downtimeMinutes);
+      if (!Number.isInteger(mins) || mins < 0) {
+        return NextResponse.json(
+          { error: "downtimeMinutes must be a non-negative integer" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (productionCostUsd != null) {
+      const cost = Number(productionCostUsd);
+      if (isNaN(cost) || cost < 0) {
+        return NextResponse.json(
+          { error: "productionCostUsd must be a non-negative number" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (maintenanceCostUsd != null) {
+      const cost = Number(maintenanceCostUsd);
+      if (isNaN(cost) || cost < 0) {
+        return NextResponse.json(
+          { error: "maintenanceCostUsd must be a non-negative number" },
+          { status: 400 }
+        );
+      }
+    }
+
     const trimOpt = (v: string | number | undefined) =>
       v ? String(v).trim() || undefined : undefined;
 
@@ -101,6 +134,12 @@ export async function POST(request: NextRequest) {
         equipmentSerialNumber: trimOpt(equipmentSerialNumber),
         equipmentAgeYears:
           equipmentAgeYears != null ? Number(equipmentAgeYears) : undefined,
+        downtimeMinutes:
+          downtimeMinutes != null ? Number(downtimeMinutes) : undefined,
+        productionCostUsd:
+          productionCostUsd != null ? Number(productionCostUsd) : undefined,
+        maintenanceCostUsd:
+          maintenanceCostUsd != null ? Number(maintenanceCostUsd) : undefined,
         preFailureConditions: trimOpt(preFailureConditions),
         workHistorySummary: trimOpt(workHistorySummary),
         activePmsSummary: trimOpt(activePmsSummary),

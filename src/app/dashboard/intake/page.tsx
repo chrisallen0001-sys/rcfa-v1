@@ -21,6 +21,9 @@ interface IntakeFormData {
   equipmentModel: string;
   equipmentSerialNumber: string;
   equipmentAgeYears: string;
+  downtimeMinutes: string;
+  productionCostUsd: string;
+  maintenanceCostUsd: string;
   workHistorySummary: string;
   activePmsSummary: string;
   operatingContext: string;
@@ -36,6 +39,9 @@ const INITIAL_FORM: IntakeFormData = {
   equipmentModel: "",
   equipmentSerialNumber: "",
   equipmentAgeYears: "",
+  downtimeMinutes: "",
+  productionCostUsd: "",
+  maintenanceCostUsd: "",
   workHistorySummary: "",
   activePmsSummary: "",
   operatingContext: "unknown",
@@ -84,6 +90,15 @@ export default function IntakePage() {
     if (form.equipmentAgeYears && (isNaN(Number(form.equipmentAgeYears)) || Number(form.equipmentAgeYears) < 0)) {
       next.equipmentAgeYears = "Age must be a non-negative number.";
     }
+    if (form.downtimeMinutes && (!Number.isInteger(Number(form.downtimeMinutes)) || Number(form.downtimeMinutes) < 0)) {
+      next.downtimeMinutes = "Downtime must be a non-negative whole number.";
+    }
+    if (form.productionCostUsd && (isNaN(Number(form.productionCostUsd)) || Number(form.productionCostUsd) < 0)) {
+      next.productionCostUsd = "Production cost must be a non-negative number.";
+    }
+    if (form.maintenanceCostUsd && (isNaN(Number(form.maintenanceCostUsd)) || Number(form.maintenanceCostUsd) < 0)) {
+      next.maintenanceCostUsd = "Maintenance cost must be a non-negative number.";
+    }
 
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -107,6 +122,9 @@ export default function IntakePage() {
           equipmentModel: form.equipmentModel.trim() || undefined,
           equipmentSerialNumber: form.equipmentSerialNumber.trim() || undefined,
           equipmentAgeYears: form.equipmentAgeYears ? Number(form.equipmentAgeYears) : undefined,
+          downtimeMinutes: form.downtimeMinutes ? Number(form.downtimeMinutes) : undefined,
+          productionCostUsd: form.productionCostUsd ? Number(form.productionCostUsd) : undefined,
+          maintenanceCostUsd: form.maintenanceCostUsd ? Number(form.maintenanceCostUsd) : undefined,
           workHistorySummary: form.workHistorySummary.trim() || undefined,
           activePmsSummary: form.activePmsSummary.trim() || undefined,
           operatingContext: form.operatingContext,
@@ -272,6 +290,70 @@ export default function IntakePage() {
             {errors.equipmentAgeYears && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.equipmentAgeYears}</p>
             )}
+          </div>
+        </fieldset>
+
+        {/* Cost & Downtime */}
+        <fieldset className="space-y-4">
+          <legend className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+            Cost &amp; Downtime
+          </legend>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label htmlFor="downtimeMinutes" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Downtime (minutes)
+              </label>
+              <input
+                id="downtimeMinutes"
+                type="number"
+                min="0"
+                step="1"
+                value={form.downtimeMinutes}
+                onChange={(e) => updateField("downtimeMinutes", e.target.value)}
+                className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
+                placeholder="e.g. 480"
+              />
+              {errors.downtimeMinutes && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.downtimeMinutes}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="productionCostUsd" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Production Cost (USD)
+              </label>
+              <input
+                id="productionCostUsd"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.productionCostUsd}
+                onChange={(e) => updateField("productionCostUsd", e.target.value)}
+                className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
+                placeholder="e.g. 15000.00"
+              />
+              {errors.productionCostUsd && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.productionCostUsd}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="maintenanceCostUsd" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Maintenance Cost (USD)
+              </label>
+              <input
+                id="maintenanceCostUsd"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.maintenanceCostUsd}
+                onChange={(e) => updateField("maintenanceCostUsd", e.target.value)}
+                className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
+                placeholder="e.g. 5000.00"
+              />
+              {errors.maintenanceCostUsd && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.maintenanceCostUsd}</p>
+              )}
+            </div>
           </div>
         </fieldset>
 

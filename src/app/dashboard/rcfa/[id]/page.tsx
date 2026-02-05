@@ -258,11 +258,39 @@ export default async function RcfaDetailPage({
             />
             <Field
               label="Production Cost (USD)"
-              value={rcfa.productionCostUsd?.toString() ?? null}
+              value={
+                rcfa.productionCostUsd != null
+                  ? new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(Number(rcfa.productionCostUsd))
+                  : null
+              }
             />
             <Field
               label="Maintenance Cost (USD)"
-              value={rcfa.maintenanceCostUsd?.toString() ?? null}
+              value={
+                rcfa.maintenanceCostUsd != null
+                  ? new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(Number(rcfa.maintenanceCostUsd))
+                  : null
+              }
+            />
+            <Field
+              label="Total Cost (USD)"
+              value={
+                rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
+                  ? new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(
+                      Number(rcfa.productionCostUsd ?? 0) +
+                        Number(rcfa.maintenanceCostUsd ?? 0)
+                    )
+                  : null
+              }
             />
           </dl>
           <dl className="mt-4 grid gap-4">
