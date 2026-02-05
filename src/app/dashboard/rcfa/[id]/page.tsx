@@ -64,6 +64,15 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+function formatUsd(value: unknown): string | null {
+  return value != null ? usdFormatter.format(Number(value)) : null;
+}
+
 function Section({
   title,
   children,
@@ -258,34 +267,17 @@ export default async function RcfaDetailPage({
             />
             <Field
               label="Production Cost (USD)"
-              value={
-                rcfa.productionCostUsd != null
-                  ? new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                    }).format(Number(rcfa.productionCostUsd))
-                  : null
-              }
+              value={formatUsd(rcfa.productionCostUsd)}
             />
             <Field
               label="Maintenance Cost (USD)"
-              value={
-                rcfa.maintenanceCostUsd != null
-                  ? new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                    }).format(Number(rcfa.maintenanceCostUsd))
-                  : null
-              }
+              value={formatUsd(rcfa.maintenanceCostUsd)}
             />
             <Field
               label="Total Cost (USD)"
               value={
                 rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
-                  ? new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                    }).format(
+                  ? formatUsd(
                       Number(rcfa.productionCostUsd ?? 0) +
                         Number(rcfa.maintenanceCostUsd ?? 0)
                     )
