@@ -13,14 +13,14 @@ export async function PATCH(
 
     const rcfa = await prisma.rcfa.findUnique({
       where: { id: rcfaId },
-      select: { createdByUserId: true, status: true },
+      select: { ownerUserId: true, status: true },
     });
 
     if (!rcfa) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    if (rcfa.createdByUserId !== userId && role !== "admin") {
+    if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

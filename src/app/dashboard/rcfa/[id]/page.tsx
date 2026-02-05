@@ -150,12 +150,13 @@ export default async function RcfaDetailPage({
     },
   });
 
-  const isOwner = rcfa?.ownerUserId === userId;
-  const isAdmin = role === "admin";
-  const canEdit = isOwner || isAdmin;
   if (!rcfa || rcfa.deletedAt) {
     notFound();
   }
+
+  const isOwner = rcfa.ownerUserId === userId;
+  const isAdmin = role === "admin";
+  const canEdit = isOwner || isAdmin;
 
   const sortedRootCauseCandidates = [...rcfa.rootCauseCandidates].sort(
     (a, b) => CONFIDENCE_ORDER[a.confidenceLabel] - CONFIDENCE_ORDER[b.confidenceLabel]

@@ -95,7 +95,7 @@ export async function PATCH(
 
     const existing = await prisma.rcfaActionItem.findUnique({
       where: { id: actionItemId },
-      include: { rcfa: { select: { createdByUserId: true } } },
+      include: { rcfa: { select: { ownerUserId: true } } },
     });
 
     if (!existing) {
@@ -106,7 +106,7 @@ export async function PATCH(
     }
 
     if (
-      existing.rcfa.createdByUserId !== userId &&
+      existing.rcfa.ownerUserId !== userId &&
       existing.ownerUserId !== userId &&
       role !== "admin"
     ) {
