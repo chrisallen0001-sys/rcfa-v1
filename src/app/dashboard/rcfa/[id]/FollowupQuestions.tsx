@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { QuestionCategory } from "@/generated/prisma/client";
 
@@ -12,6 +12,10 @@ const CATEGORY_LABELS: Record<QuestionCategory, string> = {
   safety: "Safety",
   other: "Other",
 };
+
+const DEBOUNCE_MS = 2000;
+
+type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
 
 interface FollowupQuestion {
   id: string;
@@ -33,53 +37,157 @@ function QuestionCard({
   question,
   index,
   isInvestigation,
+  onDirtyChange,
 }: {
   rcfaId: string;
   question: FollowupQuestion;
   index: number;
   isInvestigation: boolean;
+  onDirtyChange: (questionId: string, isDirty: boolean) => void;
 }) {
   const router = useRouter();
   const [answerText, setAnswerText] = useState(question.answerText ?? "");
-  const [saving, setSaving] = useState(false);
   const [savedAnswer, setSavedAnswer] = useState(question.answerText);
   const [savedAt, setSavedAt] = useState(question.answeredAt);
   const [savedByEmail, setSavedByEmail] = useState(
     question.answeredBy?.email ?? null
   );
+  const [status, setStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isDirty = answerText.trim() !== (savedAnswer ?? "");
 
-  async function handleSave() {
-    if (!answerText.trim()) return;
-    setSaving(true);
-    setError(null);
+  // Notify parent of dirty state changes
+  useEffect(() => {
+    onDirtyChange(question.id, isDirty || status === "pending" || status === "saving");
+  }, [isDirty, status, question.id, onDirtyChange]);
 
-    try {
-      const res = await fetch(
-        `/api/rcfa/${rcfaId}/followup-questions/${question.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answerText: answerText.trim() }),
+  const save = useCallback(
+    async (textToSave: string) => {
+      const trimmed = textToSave.trim();
+      if (!trimmed) return;
+
+      // Abort any in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      setStatus("saving");
+      setError(null);
+
+      try {
+        const res = await fetch(
+          `/api/rcfa/${rcfaId}/followup-questions/${question.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ answerText: trimmed }),
+            signal: abortControllerRef.current.signal,
+          }
+        );
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? "Failed to save");
         }
-      );
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to save");
+        const updated = await res.json();
+        setSavedAnswer(updated.answerText);
+        setSavedAt(updated.answeredAt);
+        setSavedByEmail(updated.answeredBy?.email ?? null);
+        setStatus("saved");
+        router.refresh();
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          // Request was aborted, don't update state
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Failed to save answer");
+        setStatus("error");
+      }
+    },
+    [rcfaId, question.id, router]
+  );
+
+  const handleChange = useCallback(
+    (newValue: string) => {
+      setAnswerText(newValue);
+
+      // Clear any existing debounce timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
 
-      const updated = await res.json();
-      setSavedAnswer(updated.answerText);
-      setSavedAt(updated.answeredAt);
-      setSavedByEmail(updated.answeredBy?.email ?? null);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save answer");
-    } finally {
-      setSaving(false);
+      const trimmedNew = newValue.trim();
+      const trimmedSaved = savedAnswer ?? "";
+
+      // Only schedule save if there's actual change and non-empty content
+      if (trimmedNew && trimmedNew !== trimmedSaved) {
+        setStatus("pending");
+        debounceTimerRef.current = setTimeout(() => {
+          save(newValue);
+        }, DEBOUNCE_MS);
+      } else if (!trimmedNew || trimmedNew === trimmedSaved) {
+        setStatus("idle");
+      }
+    },
+    [savedAnswer, save]
+  );
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const retryHandler = useCallback(() => {
+    save(answerText);
+  }, [save, answerText]);
+
+  function renderStatusIndicator() {
+    switch (status) {
+      case "pending":
+        return (
+          <span className="text-xs text-amber-600 dark:text-amber-400">
+            Unsaved changes
+          </span>
+        );
+      case "saving":
+        return (
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            Saving...
+          </span>
+        );
+      case "saved":
+        return (
+          <span className="text-xs text-green-600 dark:text-green-400">
+            Saved
+          </span>
+        );
+      case "error":
+        return (
+          <span className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+            {error ?? "Failed to save"}
+            <button
+              onClick={retryHandler}
+              className="underline hover:no-underline"
+            >
+              Retry
+            </button>
+          </span>
+        );
+      default:
+        return null;
     }
   }
 
@@ -99,7 +207,7 @@ function QuestionCard({
           <div className="mt-3">
             <textarea
               value={answerText}
-              onChange={(e) => setAnswerText(e.target.value)}
+              onChange={(e) => handleChange(e.target.value)}
               placeholder="Type your answer..."
               maxLength={10000}
               rows={3}
@@ -117,18 +225,7 @@ function QuestionCard({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {error && (
-                <span className="text-xs text-red-600 dark:text-red-400">
-                  {error}
-                </span>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={saving || !isDirty || !answerText.trim()}
-                className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
+              {renderStatusIndicator()}
             </div>
           </div>
         </>
@@ -162,6 +259,39 @@ export default function FollowupQuestions({
   questions,
   isInvestigation,
 }: FollowupQuestionsProps) {
+  const [dirtyQuestions, setDirtyQuestions] = useState<Set<string>>(new Set());
+
+  const handleDirtyChange = useCallback(
+    (questionId: string, isDirty: boolean) => {
+      setDirtyQuestions((prev) => {
+        const next = new Set(prev);
+        if (isDirty) {
+          next.add(questionId);
+        } else {
+          next.delete(questionId);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  // Navigation guard: warn user about unsaved changes
+  useEffect(() => {
+    if (!isInvestigation) return;
+
+    const hasUnsaved = dirtyQuestions.size > 0;
+
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (hasUnsaved) {
+        e.preventDefault();
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirtyQuestions, isInvestigation]);
+
   return (
     <div className="space-y-3">
       {questions.map((q, i) => (
@@ -171,6 +301,7 @@ export default function FollowupQuestions({
           question={q}
           index={i}
           isInvestigation={isInvestigation}
+          onDirtyChange={handleDirtyChange}
         />
       ))}
     </div>
