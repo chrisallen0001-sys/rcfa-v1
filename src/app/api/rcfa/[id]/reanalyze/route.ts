@@ -54,7 +54,7 @@ Return valid JSON only with the following structure:
 }
 
 Requirements:
-- noMaterialChange: Set to true ONLY when your re-derived analysis is substantively the same as the existing candidates. When true, rootCauseCandidates and actionItems should be empty arrays.
+- noMaterialChange: Set to true ONLY when your re-derived analysis is substantively the same as the existing candidates. When true, rootCauseCandidates and actionItems should be empty arrays. If no existing candidates are on file (both sections show "(none)"), you MUST set noMaterialChange to false and provide your full analysis.
 - When noMaterialChange is false: rootCauseCandidates should have 3 to 6 items, actionItems should have 5 to 10 items.
 - rootCauseCandidates: Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
 - actionItems: Include priority, a concrete timeframe, and measurable success criteria.
@@ -96,6 +96,12 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
 
   // When noMaterialChange is true, empty arrays are expected
   if (!noMaterialChange) {
+    if (obj.rootCauseCandidates.length === 0 || obj.actionItems.length === 0) {
+      throw new Error(
+        "AI returned noMaterialChange=false but provided empty candidates; aborting to prevent data loss"
+      );
+    }
+
     for (const c of obj.rootCauseCandidates) {
       if (!c?.causeText || typeof c.causeText !== "string") {
         throw new Error("Malformed rootCauseCandidate: missing causeText");
@@ -120,6 +126,13 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
     rootCauseCandidates: noMaterialChange ? [] : obj.rootCauseCandidates,
     actionItems: noMaterialChange ? [] : obj.actionItems,
   } as ReAnalysisResult;
+}
+
+/** Truncate a text field to a safe length for inclusion in the LLM prompt. */
+function truncateField(text: string | null, maxLen = 500): string {
+  if (!text) return "";
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + "…";
 }
 
 function buildReAnalyzePrompt(
@@ -155,7 +168,7 @@ function buildReAnalyzePrompt(
     rootCauseCandidates.length > 0
       ? rootCauseCandidates.map(
           (c, i) =>
-            `[${i + 1}] (${c.generatedBy}) ${c.causeText} | Confidence: ${c.confidenceLabel}${c.rationaleText ? ` | Rationale: ${c.rationaleText}` : ""}`
+            `[${i + 1}] (existing) ${truncateField(c.causeText)} | Confidence: ${c.confidenceLabel}${c.rationaleText ? ` | Rationale: ${truncateField(c.rationaleText)}` : ""}`
         )
       : ["(none)"];
 
@@ -163,7 +176,7 @@ function buildReAnalyzePrompt(
     actionItemCandidates.length > 0
       ? actionItemCandidates.map(
           (a, i) =>
-            `[${i + 1}] (${a.generatedBy}) ${a.actionText} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${a.timeframeText}` : ""}${a.rationaleText ? ` | Rationale: ${a.rationaleText}` : ""}${a.successCriteria ? ` | Success Criteria: ${a.successCriteria}` : ""}`
+            `[${i + 1}] (existing) ${truncateField(a.actionText)} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${truncateField(a.timeframeText)}` : ""}${a.rationaleText ? ` | Rationale: ${truncateField(a.rationaleText)}` : ""}${a.successCriteria ? ` | Success Criteria: ${truncateField(a.successCriteria)}` : ""}`
         )
       : ["(none)"];
 
@@ -299,7 +312,9 @@ export async function POST(
     }
 
     if (result.noMaterialChange) {
-      // No material change — preserve existing candidates, log for traceability
+      // No material change — preserve existing candidates, log for traceability.
+      // No transaction needed: we are only inserting a single audit row and not
+      // modifying candidates, so there is no multi-table consistency concern.
       await prisma.rcfaAuditEvent.create({
         data: {
           rcfaId: id,

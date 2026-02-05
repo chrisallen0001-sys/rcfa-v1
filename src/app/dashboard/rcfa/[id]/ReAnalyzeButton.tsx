@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
 import { useElapsedTime } from "./useElapsedTime";
@@ -12,6 +12,7 @@ interface ReAnalyzeButtonProps {
 }
 
 function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
+  const titleId = useId();
   const modalRef = useRef<HTMLDivElement>(null);
   const okButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -61,14 +62,14 @@ function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="no-material-change-title"
+      aria-labelledby={titleId}
     >
       <div
         ref={modalRef}
         className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
       >
         <h2
-          id="no-material-change-title"
+          id={titleId}
           className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
         >
           No Material Change
