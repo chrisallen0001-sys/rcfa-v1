@@ -126,6 +126,54 @@ export default function UserManagement({
     }
   }
 
+  async function handleApprove(user: User) {
+    setTogglingId(user.id);
+    setActionError("");
+
+    const res = await fetch(`/api/admin/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "active" }),
+    });
+
+    if (res.ok) {
+      const updated = await res.json();
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id ? { ...u, role: updated.role, status: updated.status } : u
+        )
+      );
+    } else {
+      const body = await res.json();
+      setActionError(body.error || "Failed to approve user");
+    }
+    setTogglingId(null);
+  }
+
+  async function handleReject(user: User) {
+    setTogglingId(user.id);
+    setActionError("");
+
+    const res = await fetch(`/api/admin/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "disabled" }),
+    });
+
+    if (res.ok) {
+      const updated = await res.json();
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id ? { ...u, role: updated.role, status: updated.status } : u
+        )
+      );
+    } else {
+      const body = await res.json();
+      setActionError(body.error || "Failed to reject user");
+    }
+    setTogglingId(null);
+  }
+
   return (
     <>
       {actionError && (
@@ -208,19 +256,23 @@ export default function UserManagement({
             {users.map((user) => {
               const isCurrentUser = user.id === currentUserId;
               const isDisabled = user.status === "disabled";
+              const isPending = user.status === "pending_approval";
+              const isDimmed = isDisabled || isPending;
 
               return (
                 <tr
                   key={user.id}
                   className={`${
-                    isDisabled
-                      ? "bg-zinc-50 dark:bg-zinc-900/50"
-                      : "bg-white dark:bg-zinc-900"
+                    isPending
+                      ? "bg-amber-50/50 dark:bg-amber-900/10"
+                      : isDisabled
+                        ? "bg-zinc-50 dark:bg-zinc-900/50"
+                        : "bg-white dark:bg-zinc-900"
                   }`}
                 >
                   <td
                     className={`px-4 py-3 ${
-                      isDisabled
+                      isDimmed
                         ? "text-zinc-400 dark:text-zinc-500"
                         : "text-zinc-900 dark:text-zinc-100"
                     }`}
@@ -229,7 +281,7 @@ export default function UserManagement({
                   </td>
                   <td
                     className={`px-4 py-3 ${
-                      isDisabled
+                      isDimmed
                         ? "text-zinc-400 dark:text-zinc-500"
                         : "text-zinc-700 dark:text-zinc-300"
                     }`}
@@ -240,10 +292,10 @@ export default function UserManagement({
                     <span
                       className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         user.role === "admin"
-                          ? isDisabled
+                          ? isDimmed
                             ? "bg-purple-50 text-purple-400 dark:bg-purple-900/20 dark:text-purple-500"
                             : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                          : isDisabled
+                          : isDimmed
                             ? "bg-zinc-50 text-zinc-400 dark:bg-zinc-800/50 dark:text-zinc-500"
                             : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                       }`}
@@ -254,17 +306,19 @@ export default function UserManagement({
                   <td className="px-4 py-3">
                     <span
                       className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        isDisabled
-                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        isPending
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          : isDisabled
+                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                       }`}
                     >
-                      {isDisabled ? "Disabled" : "Active"}
+                      {isPending ? "Pending" : isDisabled ? "Disabled" : "Active"}
                     </span>
                   </td>
                   <td
                     className={`px-4 py-3 ${
-                      isDisabled
+                      isDimmed
                         ? "text-zinc-400 dark:text-zinc-500"
                         : "text-zinc-500 dark:text-zinc-400"
                     }`}
@@ -273,33 +327,54 @@ export default function UserManagement({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => handleToggleRole(user)}
-                        disabled={togglingId === user.id || isCurrentUser}
-                        className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                      >
-                        {togglingId === user.id
-                          ? "Saving..."
-                          : user.role === "admin"
-                            ? "Demote"
-                            : "Promote"}
-                      </button>
-                      {!isCurrentUser && (
-                        <button
-                          onClick={() => handleDisableClick(user)}
-                          disabled={togglingId === user.id}
-                          className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
-                            isDisabled
-                              ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                              : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-                          }`}
-                        >
-                          {togglingId === user.id
-                            ? "Saving..."
-                            : isDisabled
-                              ? "Enable"
-                              : "Disable"}
-                        </button>
+                      {isPending ? (
+                        <>
+                          <button
+                            onClick={() => handleApprove(user)}
+                            disabled={togglingId === user.id}
+                            className="rounded-md bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                          >
+                            {togglingId === user.id ? "Saving..." : "Approve"}
+                          </button>
+                          <button
+                            onClick={() => handleReject(user)}
+                            disabled={togglingId === user.id}
+                            className="rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                          >
+                            {togglingId === user.id ? "Saving..." : "Reject"}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleToggleRole(user)}
+                            disabled={togglingId === user.id || isCurrentUser}
+                            className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                          >
+                            {togglingId === user.id
+                              ? "Saving..."
+                              : user.role === "admin"
+                                ? "Demote"
+                                : "Promote"}
+                          </button>
+                          {!isCurrentUser && (
+                            <button
+                              onClick={() => handleDisableClick(user)}
+                              disabled={togglingId === user.id}
+                              className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                                isDisabled
+                                  ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                                  : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                              }`}
+                            >
+                              {togglingId === user.id
+                                ? "Saving..."
+                                : isDisabled
+                                  ? "Enable"
+                                  : "Disable"}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>

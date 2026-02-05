@@ -45,7 +45,7 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/login?registered=1");
+      router.push("/login?pending=1");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

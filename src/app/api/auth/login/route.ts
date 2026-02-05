@@ -46,8 +46,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if account is disabled
-    if (user.status !== "active") {
+    // Check if account is active
+    if (user.status === "pending_approval") {
+      return NextResponse.json(
+        { error: "Your account is pending admin approval. Please contact an administrator." },
+        { status: 403 }
+      );
+    }
+
+    if (user.status === "disabled") {
       return NextResponse.json(
         { error: "Your account has been disabled. Contact an administrator." },
         { status: 403 }

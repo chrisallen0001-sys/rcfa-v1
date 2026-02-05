@@ -9,6 +9,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered");
+  const pending = searchParams.get("pending");
   const expired = searchParams.get("expired");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,7 +73,13 @@ function LoginForm() {
               Your session has expired. Please sign in again.
             </div>
           )}
-          {registered && !error && !expired && (
+          {pending && !error && !expired && (
+            <div className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              Your account has been created and is pending admin approval. You&apos;ll
+              be able to log in once an administrator approves your account.
+            </div>
+          )}
+          {registered && !error && !expired && !pending && (
             <div className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
               Account created successfully. Please sign in.
             </div>

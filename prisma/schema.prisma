@@ -19,6 +19,7 @@ enum AppUserRole {
 enum UserStatus {
   active
   disabled
+  pending_approval
 }
 
 enum RcfaStatus {
