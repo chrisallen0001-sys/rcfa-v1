@@ -72,6 +72,10 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
 
   const noMaterialChange = obj.noMaterialChange === true;
 
+  if (noMaterialChange && (obj.rootCauseCandidates.length > 0 || obj.actionItems.length > 0)) {
+    console.warn("AI returned noMaterialChange=true with non-empty arrays; discarding candidates");
+  }
+
   // When noMaterialChange is true, empty arrays are expected
   if (!noMaterialChange) {
     for (const c of obj.rootCauseCandidates) {
@@ -254,6 +258,8 @@ export async function POST(
           eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
             source: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
+            rootCauseCandidateCount: 0,
+            actionItemCandidateCount: 0,
           },
         },
       });

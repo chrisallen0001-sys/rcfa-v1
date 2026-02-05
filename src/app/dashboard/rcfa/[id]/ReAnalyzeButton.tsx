@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
 import { useElapsedTime } from "./useElapsedTime";
@@ -13,11 +13,33 @@ interface ReAnalyzeButtonProps {
 
 function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const okButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    okButtonRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         onClose();
+        return;
+      }
+      // Trap focus within the dialog
+      if (e.key === "Tab" && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     }
     document.addEventListener("keydown", handleKeyDown);
@@ -35,12 +57,20 @@ function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="no-material-change-title"
+    >
       <div
         ref={modalRef}
         className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
       >
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h2
+          id="no-material-change-title"
+          className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
+        >
           No Material Change
         </h2>
         <p className="mt-4 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
@@ -53,6 +83,7 @@ function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
         </p>
         <div className="mt-6 flex justify-end">
           <button
+            ref={okButtonRef}
             onClick={onClose}
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
@@ -107,6 +138,11 @@ export default function ReAnalyzeButton({
     }
   }
 
+  const handleDialogClose = useCallback(() => {
+    setShowNoChangeDialog(false);
+    router.refresh();
+  }, [router]);
+
   return (
     <>
       <div className="flex items-center gap-3">
@@ -136,7 +172,7 @@ export default function ReAnalyzeButton({
         )}
       </div>
       {showNoChangeDialog && (
-        <NoMaterialChangeDialog onClose={() => setShowNoChangeDialog(false)} />
+        <NoMaterialChangeDialog onClose={handleDialogClose} />
       )}
     </>
   );
