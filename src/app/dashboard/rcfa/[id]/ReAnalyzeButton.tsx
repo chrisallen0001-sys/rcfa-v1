@@ -8,11 +8,13 @@ import { useElapsedTime } from "./useElapsedTime";
 interface ReAnalyzeButtonProps {
   rcfaId: string;
   hasAnsweredQuestions: boolean;
+  hasNewAnswers: boolean;
 }
 
 export default function ReAnalyzeButton({
   rcfaId,
   hasAnsweredQuestions,
+  hasNewAnswers,
 }: ReAnalyzeButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -49,11 +51,13 @@ export default function ReAnalyzeButton({
     <div className="flex items-center gap-3">
       <button
         onClick={handleReAnalyze}
-        disabled={loading || !hasAnsweredQuestions}
+        disabled={loading || !hasNewAnswers}
         title={
           !hasAnsweredQuestions
             ? "Answer at least one follow-up question before re-analyzing"
-            : undefined
+            : !hasNewAnswers
+              ? "No new or updated answers since the last re-analysis"
+              : undefined
         }
         className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
       >

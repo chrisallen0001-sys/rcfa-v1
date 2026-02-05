@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 
 interface AuditEvent {
   id: string;
@@ -16,7 +17,7 @@ interface AuditLogSectionProps {
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   status_changed: "Status Changed",
-  candidate_generated: "Candidates Generated",
+  [AUDIT_EVENT_TYPES.CANDIDATE_GENERATED]: "Candidates Generated",
   promoted_to_final: "Promoted to Final",
   final_updated: "Root Cause Updated",
   final_deleted: "Root Cause Deleted",
@@ -94,7 +95,7 @@ function formatPayloadSummary(
   switch (eventType) {
     case "status_changed":
       return `${payload.from} → ${payload.to}`;
-    case "candidate_generated": {
+    case AUDIT_EVENT_TYPES.CANDIDATE_GENERATED: {
       const parts: string[] = [];
       if (payload.rootCauseCandidateCount) {
         parts.push(`${payload.rootCauseCandidateCount} root causes`);
@@ -105,7 +106,7 @@ function formatPayloadSummary(
       if (payload.followUpQuestionCount) {
         parts.push(`${payload.followUpQuestionCount} questions`);
       }
-      const source = payload.source === "ai_reanalysis" ? "Re-analysis" : "Initial analysis";
+      const source = payload.source === AUDIT_SOURCES.AI_REANALYSIS ? "Re-analysis" : "Initial analysis";
       return parts.length > 0 ? `${source}: ${parts.join(", ")}` : source;
     }
     case "promoted_to_final":

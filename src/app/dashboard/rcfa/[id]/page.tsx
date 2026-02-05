@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import { formatRcfaNumber } from "@/lib/rcfa-utils";
+import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
@@ -166,6 +167,22 @@ export default async function RcfaDetailPage({
   const hasAnsweredQuestions = rcfa.followupQuestions.some(
     (q) => q.answerText !== null
   );
+
+  // Find the latest re-analysis audit event (events are ordered desc by createdAt)
+  const lastReanalysis = rcfa.auditEvents.find(
+    (e) =>
+      e.eventType === AUDIT_EVENT_TYPES.CANDIDATE_GENERATED &&
+      (e.eventPayload as Record<string, unknown>)?.source ===
+        AUDIT_SOURCES.AI_REANALYSIS
+  );
+
+  // Enable Re-Analyze only when answers have changed since the last re-analysis
+  const hasNewAnswers = lastReanalysis
+    ? rcfa.followupQuestions.some(
+        (q) => q.answeredAt !== null && q.answeredAt > lastReanalysis.createdAt
+      )
+    : hasAnsweredQuestions;
+
   const promotedCandidateIds = new Set(
     rcfa.rootCauseFinals
       .map((f) => f.selectedFromCandidateId)
@@ -275,6 +292,7 @@ export default async function RcfaDetailPage({
           <ReAnalyzeButton
             rcfaId={rcfa.id}
             hasAnsweredQuestions={hasAnsweredQuestions}
+            hasNewAnswers={hasNewAnswers}
           />
         )}
 
