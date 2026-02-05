@@ -430,10 +430,10 @@ export async function POST(
       });
     });
 
-    // Return only the fields the client needs (materialityReasoning is for internal observability)
     return NextResponse.json(
       {
         noMaterialChange: result.noMaterialChange,
+        materialityReasoning: materialityReasoning ?? null,
         rootCauseCandidates: result.rootCauseCandidates,
         actionItems: result.actionItems,
       },
