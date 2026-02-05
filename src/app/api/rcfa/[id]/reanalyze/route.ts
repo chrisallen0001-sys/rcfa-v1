@@ -6,6 +6,8 @@ import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import type {
   Rcfa,
   RcfaFollowupQuestion,
+  RcfaRootCauseCandidate,
+  RcfaActionItemCandidate,
   ConfidenceLabel,
   Priority,
 } from "@/generated/prisma/client";
@@ -13,15 +15,31 @@ import type {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
-const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions. Re-analyze using both the original intake data AND the follow-up answers to produce updated, more precise results.
+const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions.
 
-IMPORTANT: First evaluate whether the follow-up answers materially change the analysis. A material change means:
-- A new root cause candidate should be added or an existing one removed
+The user message contains:
+1. Original intake data
+2. Follow-up questions and answers
+3. The EXISTING root cause candidates and action item candidates currently on file
+
+Your task has two steps:
+
+STEP 1 — Re-derive your analysis from scratch using all available evidence (intake data + follow-up answers). Form your own independent conclusions before looking at the existing candidates.
+
+STEP 2 — Compare your re-derived analysis against the EXISTING candidates provided. Determine whether a material change is warranted.
+
+A material change means ANY of the following:
+- A new root cause should be added that is not substantively covered by any existing candidate
+- An existing root cause should be removed because evidence now contradicts it
 - The confidence level of a root cause candidate should change
-- The ranking/priority of candidates should shift
-- New action items are warranted or existing ones should be modified
+- A new category of action item is warranted that is not covered by existing items
+- An existing action item is no longer relevant given the new evidence
+- The priority of an action item should change significantly
 
-If the follow-up answers do NOT materially change the analysis (i.e., the existing root cause candidates and action items remain the most defensible explanation), set "noMaterialChange" to true and return empty arrays.
+The following do NOT constitute material change:
+- Cosmetic rewording or minor rephrasing of existing candidates
+- Reordering candidates without changing their substance
+- Slight variations in rationale text that reach the same conclusion
 
 Return valid JSON only with the following structure:
 
@@ -36,7 +54,7 @@ Return valid JSON only with the following structure:
 }
 
 Requirements:
-- noMaterialChange: Set to true if the follow-up answers do not warrant changes to the existing analysis. When true, rootCauseCandidates and actionItems should be empty arrays.
+- noMaterialChange: Set to true ONLY when your re-derived analysis is substantively the same as the existing candidates. When true, rootCauseCandidates and actionItems should be empty arrays.
 - When noMaterialChange is false: rootCauseCandidates should have 3 to 6 items, actionItems should have 5 to 10 items.
 - rootCauseCandidates: Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
 - actionItems: Include priority, a concrete timeframe, and measurable success criteria.
@@ -106,7 +124,9 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
 
 function buildReAnalyzePrompt(
   rcfa: Rcfa,
-  allQuestions: RcfaFollowupQuestion[]
+  allQuestions: RcfaFollowupQuestion[],
+  rootCauseCandidates: RcfaRootCauseCandidate[],
+  actionItemCandidates: RcfaActionItemCandidate[]
 ): string {
   const intakeLines = [
     `Equipment Description: ${rcfa.equipmentDescription}`,
@@ -131,12 +151,34 @@ function buildReAnalyzePrompt(
       : `Q: ${q.questionText}\nA: (Not yet answered)`
   );
 
+  const rcLines =
+    rootCauseCandidates.length > 0
+      ? rootCauseCandidates.map(
+          (c, i) =>
+            `[${i + 1}] (${c.generatedBy}) ${c.causeText} | Confidence: ${c.confidenceLabel}${c.rationaleText ? ` | Rationale: ${c.rationaleText}` : ""}`
+        )
+      : ["(none)"];
+
+  const aiLines =
+    actionItemCandidates.length > 0
+      ? actionItemCandidates.map(
+          (a, i) =>
+            `[${i + 1}] (${a.generatedBy}) ${a.actionText} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${a.timeframeText}` : ""}${a.rationaleText ? ` | Rationale: ${a.rationaleText}` : ""}${a.successCriteria ? ` | Success Criteria: ${a.successCriteria}` : ""}`
+        )
+      : ["(none)"];
+
   return [
     "=== ORIGINAL INTAKE DATA ===",
     intakeLines.filter(Boolean).join("\n"),
     "",
     "=== FOLLOW-UP QUESTIONS & ANSWERS ===",
     qaLines.join("\n\n"),
+    "",
+    "=== EXISTING ROOT CAUSE CANDIDATES ===",
+    rcLines.join("\n"),
+    "",
+    "=== EXISTING ACTION ITEM CANDIDATES ===",
+    aiLines.join("\n"),
   ].join("\n");
 }
 
@@ -173,6 +215,8 @@ export async function POST(
       where: { id },
       include: {
         followupQuestions: { orderBy: [{ generatedAt: "asc" }, { id: "asc" }] },
+        rootCauseCandidates: { orderBy: { generatedAt: "asc" } },
+        actionItemCandidates: { orderBy: { generatedAt: "asc" } },
       },
     });
 
@@ -228,7 +272,12 @@ export async function POST(
       }
     }
 
-    const userPrompt = buildReAnalyzePrompt(rcfa, rcfa.followupQuestions);
+    const userPrompt = buildReAnalyzePrompt(
+      rcfa,
+      rcfa.followupQuestions,
+      rcfa.rootCauseCandidates,
+      rcfa.actionItemCandidates
+    );
 
     let result: ReAnalysisResult;
     try {
