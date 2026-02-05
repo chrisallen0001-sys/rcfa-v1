@@ -61,7 +61,7 @@ export default async function ActionItemsPage({
 
   const where = { rcfa: { deletedAt: null } } as const;
 
-  const [items, total, users] = await Promise.all([
+  const [items, total, mineTotal, users] = await Promise.all([
     prisma.rcfaActionItem.findMany({
       where,
       skip: (pageNum - 1) * ITEMS_PER_PAGE,
@@ -73,6 +73,9 @@ export default async function ActionItemsPage({
       orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
     }),
     prisma.rcfaActionItem.count({ where }),
+    prisma.rcfaActionItem.count({
+      where: { AND: [where, { ownerUserId: userId }] },
+    }),
     prisma.appUser.findMany({
       select: { id: true, displayName: true },
       orderBy: { displayName: "asc" },
@@ -109,6 +112,7 @@ export default async function ActionItemsPage({
       <ActionItemsFilter
         items={rows}
         totalItems={total}
+        mineTotal={mineTotal}
         currentUserId={userId}
         users={users}
         priorityLabels={PRIORITY_LABELS}
