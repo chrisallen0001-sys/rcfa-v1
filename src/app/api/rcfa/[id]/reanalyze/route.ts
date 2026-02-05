@@ -24,11 +24,19 @@ The user message contains:
 
 Your task has two steps:
 
-STEP 1 — Re-derive your analysis from scratch using all available evidence (intake data + follow-up answers). Form your own independent conclusions before looking at the existing candidates.
+STEP 1 — MATERIALITY ASSESSMENT. Review the follow-up answers alongside the EXISTING root cause candidates and action items. Your goal is to determine whether the new or updated answers introduce any information that would materially alter the existing candidates. Focus on whether the engineering conclusions and failure hypotheses change — not on whether the answer text itself looks different.
 
-STEP 2 — Compare your re-derived analysis against the EXISTING candidates provided. Determine whether a material change is warranted.
+Ask yourself these specific questions:
+  a) Does any answer reveal a NEW failure mechanism not already captured by an existing candidate?
+  b) Does any answer CONTRADICT an existing candidate with evidence that disproves it?
+  c) Does any answer shift the relative likelihood of root causes enough to change confidence levels?
+  d) Does any answer make an existing action item irrelevant or demand a new category of action?
 
-A material change means ANY of the following:
+If the answer to ALL of the above is "no," set noMaterialChange to true and return empty arrays.
+
+STEP 2 — FULL RE-ANALYSIS (only if Step 1 determined material change exists). If and only if Step 1 identified a genuine material change, produce a complete updated set of root cause candidates and action items incorporating the new evidence.
+
+A material change requires that the ENGINEERING CONCLUSIONS change, not merely that the answer text looks different. Specifically, a material change means ANY of the following:
 - A new root cause should be added that is not substantively covered by any existing candidate
 - An existing root cause should be removed because evidence now contradicts it
 - The confidence level of a root cause candidate should change
@@ -36,14 +44,31 @@ A material change means ANY of the following:
 - An existing action item is no longer relevant given the new evidence
 - The priority of an action item should change significantly
 
-The following do NOT constitute material change:
+The following do NOT constitute material change — when any of these are the ONLY differences, you MUST return noMaterialChange: true:
+
+FORMAT CHANGES:
+- An answer reformatted from bullet points to prose paragraphs, or vice versa, that conveys the same information
+- Changes in answer structure, headings, or organization that do not alter the technical content
+- Addition of narrative context or explanatory prose around the same data points
+
+NUMERIC / MEASUREMENT VARIANCE:
+- Small variations in reported measurement values (e.g., 190 ppm vs 210 ppm, or 240 ppm vs 260 ppm) where both values fall within the same diagnostic category and lead to the same engineering conclusion
+- Rounding differences or approximation differences (e.g., "~190 ppm" vs "210 ppm" vs "approximately 200 ppm")
+- Slightly different numeric ranges that describe the same condition (e.g., "1,500-1,800 ppm" vs "1,600-1,900 ppm" when both indicate the same severity of contamination)
+
+TEXTUAL EQUIVALENCE:
 - Cosmetic rewording or minor rephrasing of existing candidates
 - Reordering candidates without changing their substance
 - Slight variations in rationale text that reach the same conclusion
+- More verbose or more concise expression of the same technical finding
+- Paraphrasing of the same evidence using different terminology (e.g., "elevated moisture" vs "significantly elevated Karl Fischer water content" when referring to the same condition)
+
+IMPORTANT: Before deciding on noMaterialChange, summarize in one sentence what NEW engineering insight (if any) the updated answers provide that was not already reflected in the existing candidates. If you cannot identify a specific new insight that would change a root cause hypothesis or action item, the answer is noMaterialChange: true.
 
 Return valid JSON only with the following structure:
 
 {
+  "materialityReasoning": "string",
   "noMaterialChange": true | false,
   "rootCauseCandidates": [
     { "causeText": "string", "rationaleText": "string", "confidenceLabel": "low|medium|high" }
@@ -54,13 +79,15 @@ Return valid JSON only with the following structure:
 }
 
 Requirements:
-- noMaterialChange: Set to true ONLY when your re-derived analysis is substantively the same as the existing candidates. When true, rootCauseCandidates and actionItems should be empty arrays. If no existing candidates are on file (both sections show "(none)"), you MUST set noMaterialChange to false and provide your full analysis.
+- materialityReasoning: A single sentence explaining what new engineering insight (if any) the updated answers provide. If there is no new insight, state that explicitly (e.g., "The updated answers convey the same failure evidence and diagnostic conclusions as previously provided.").
+- noMaterialChange: Set to true when the existing candidates already correctly capture the root cause hypotheses and action items supported by the evidence. The bar for material change is HIGH: the new answers must introduce a genuinely new failure hypothesis, contradict an existing one with evidence, or shift confidence/priority levels. Reformatting, paraphrasing, or minor numeric variance in answers that reach the same engineering conclusions is NEVER material change. When true, rootCauseCandidates and actionItems should be empty arrays. If no existing candidates are on file (both sections show "(none)"), you MUST set noMaterialChange to false and provide your full analysis.
 - When noMaterialChange is false: rootCauseCandidates should have 3 to 6 items, actionItems should have 5 to 10 items.
 - rootCauseCandidates: Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
 - actionItems: Include priority, a concrete timeframe, and measurable success criteria.
 - Return ONLY valid JSON. No markdown, no commentary.`;
 
 interface ReAnalysisResult {
+  materialityReasoning?: string;
   noMaterialChange: boolean;
   rootCauseCandidates: {
     causeText: string;
@@ -89,6 +116,10 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
   }
 
   const noMaterialChange = obj.noMaterialChange === true;
+  const materialityReasoning =
+    typeof obj.materialityReasoning === "string"
+      ? obj.materialityReasoning
+      : undefined;
 
   if (noMaterialChange && (obj.rootCauseCandidates.length > 0 || obj.actionItems.length > 0)) {
     console.warn("AI returned noMaterialChange=true with non-empty arrays; discarding candidates");
@@ -122,6 +153,7 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
   }
 
   return {
+    materialityReasoning,
     noMaterialChange,
     rootCauseCandidates: noMaterialChange ? [] : obj.rootCauseCandidates,
     actionItems: noMaterialChange ? [] : obj.actionItems,
@@ -129,7 +161,7 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
 }
 
 /** Truncate a text field to a safe length for inclusion in the LLM prompt. */
-function truncateField(text: string | null, maxLen = 500): string {
+function truncateField(text: string | null, maxLen = 1000): string {
   if (!text) return "";
   if (text.length <= maxLen) return text;
   return text.slice(0, maxLen) + "…";
@@ -311,6 +343,13 @@ export async function POST(
       }
     }
 
+    if (result.materialityReasoning) {
+      console.log(
+        `POST /api/rcfa/${id}/reanalyze materiality reasoning:`,
+        result.materialityReasoning
+      );
+    }
+
     if (result.noMaterialChange) {
       // No material change — preserve existing candidates, log for traceability.
       // No transaction needed: we are only inserting a single audit row and not
@@ -322,6 +361,7 @@ export async function POST(
           eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
             source: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
+            materialityReasoning: result.materialityReasoning ?? null,
             rootCauseCandidateCount: 0,
             actionItemCandidateCount: 0,
           },
@@ -376,6 +416,7 @@ export async function POST(
           eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
             source: AUDIT_SOURCES.AI_REANALYSIS,
+            materialityReasoning: result.materialityReasoning ?? null,
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
           },
@@ -383,7 +424,15 @@ export async function POST(
       });
     });
 
-    return NextResponse.json(result, { status: 200 });
+    // Return only the fields the client needs (materialityReasoning is for internal observability)
+    return NextResponse.json(
+      {
+        noMaterialChange: result.noMaterialChange,
+        rootCauseCandidates: result.rootCauseCandidates,
+        actionItems: result.actionItems,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     if (
       error instanceof Error &&
