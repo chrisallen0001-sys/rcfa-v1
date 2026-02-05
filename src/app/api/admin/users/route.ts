@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         displayName: user.displayName,
         role: user.role,
+        status: user.status,
       },
       { status: 201 }
     );

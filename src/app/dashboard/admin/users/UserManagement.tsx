@@ -27,6 +27,7 @@ export default function UserManagement({
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const [confirmDisable, setConfirmDisable] = useState<User | null>(null);
+  const [confirmReject, setConfirmReject] = useState<User | null>(null);
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -126,14 +127,15 @@ export default function UserManagement({
     }
   }
 
-  async function handleApprove(user: User) {
+  async function handleUpdateStatus(user: User, newStatus: "active" | "disabled", errorMessage: string) {
     setTogglingId(user.id);
     setActionError("");
+    setConfirmReject(null);
 
     const res = await fetch(`/api/admin/users/${user.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "active" }),
+      body: JSON.stringify({ status: newStatus }),
     });
 
     if (res.ok) {
@@ -145,33 +147,21 @@ export default function UserManagement({
       );
     } else {
       const body = await res.json();
-      setActionError(body.error || "Failed to approve user");
+      setActionError(body.error || errorMessage);
     }
     setTogglingId(null);
   }
 
-  async function handleReject(user: User) {
-    setTogglingId(user.id);
-    setActionError("");
+  function handleApprove(user: User) {
+    handleUpdateStatus(user, "active", "Failed to approve user");
+  }
 
-    const res = await fetch(`/api/admin/users/${user.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "disabled" }),
-    });
+  function handleRejectClick(user: User) {
+    setConfirmReject(user);
+  }
 
-    if (res.ok) {
-      const updated = await res.json();
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === user.id ? { ...u, role: updated.role, status: updated.status } : u
-        )
-      );
-    } else {
-      const body = await res.json();
-      setActionError(body.error || "Failed to reject user");
-    }
-    setTogglingId(null);
+  function handleRejectConfirm(user: User) {
+    handleUpdateStatus(user, "disabled", "Failed to reject user");
   }
 
   return (
@@ -221,6 +211,45 @@ export default function UserManagement({
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
               >
                 Disable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject confirmation modal */}
+      {confirmReject && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reject-modal-title"
+          onKeyDown={(e) => e.key === "Escape" && setConfirmReject(null)}
+        >
+          <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h3
+              id="reject-modal-title"
+              className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+            >
+              Reject User Registration
+            </h3>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              Are you sure you want to reject{" "}
+              <span className="font-medium">{confirmReject.displayName}</span>&apos;s
+              registration? Their account will be disabled.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmReject(null)}
+                className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRejectConfirm(confirmReject)}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Reject
               </button>
             </div>
           </div>
@@ -337,7 +366,7 @@ export default function UserManagement({
                             {togglingId === user.id ? "Saving..." : "Approve"}
                           </button>
                           <button
-                            onClick={() => handleReject(user)}
+                            onClick={() => handleRejectClick(user)}
                             disabled={togglingId === user.id}
                             className="rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
                           >
