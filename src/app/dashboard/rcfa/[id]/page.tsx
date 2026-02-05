@@ -169,11 +169,16 @@ export default async function RcfaDetailPage({
   );
 
   // Find the latest re-analysis audit event (events are ordered desc by createdAt)
+  const reanalysisSources: Set<string> = new Set([
+    AUDIT_SOURCES.AI_REANALYSIS,
+    AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
+  ]);
   const lastReanalysis = rcfa.auditEvents.find(
     (e) =>
       e.eventType === AUDIT_EVENT_TYPES.CANDIDATE_GENERATED &&
-      (e.eventPayload as Record<string, unknown>)?.source ===
-        AUDIT_SOURCES.AI_REANALYSIS
+      reanalysisSources.has(
+        (e.eventPayload as Record<string, unknown>)?.source as string
+      )
   );
 
   // Enable Re-Analyze only when answers have changed since the last re-analysis

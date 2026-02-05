@@ -106,7 +106,12 @@ function formatPayloadSummary(
       if (payload.followUpQuestionCount) {
         parts.push(`${payload.followUpQuestionCount} questions`);
       }
-      const source = payload.source === AUDIT_SOURCES.AI_REANALYSIS ? "Re-analysis" : "Initial analysis";
+      const source =
+        payload.source === AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE
+          ? "Re-analysis (no material change)"
+          : payload.source === AUDIT_SOURCES.AI_REANALYSIS
+            ? "Re-analysis"
+            : "Initial analysis";
       return parts.length > 0 ? `${source}: ${parts.join(", ")}` : source;
     }
     case "promoted_to_final":

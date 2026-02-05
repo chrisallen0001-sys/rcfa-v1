@@ -15,9 +15,18 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
 const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions. Re-analyze using both the original intake data AND the follow-up answers to produce updated, more precise results.
 
+IMPORTANT: First evaluate whether the follow-up answers materially change the analysis. A material change means:
+- A new root cause candidate should be added or an existing one removed
+- The confidence level of a root cause candidate should change
+- The ranking/priority of candidates should shift
+- New action items are warranted or existing ones should be modified
+
+If the follow-up answers do NOT materially change the analysis (i.e., the existing root cause candidates and action items remain the most defensible explanation), set "noMaterialChange" to true and return empty arrays.
+
 Return valid JSON only with the following structure:
 
 {
+  "noMaterialChange": true | false,
   "rootCauseCandidates": [
     { "causeText": "string", "rationaleText": "string", "confidenceLabel": "low|medium|high" }
   ],
@@ -27,11 +36,14 @@ Return valid JSON only with the following structure:
 }
 
 Requirements:
-- rootCauseCandidates: 3 to 6 items. Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
-- actionItems: 5 to 10 items. Include priority, a concrete timeframe, and measurable success criteria.
+- noMaterialChange: Set to true if the follow-up answers do not warrant changes to the existing analysis. When true, rootCauseCandidates and actionItems should be empty arrays.
+- When noMaterialChange is false: rootCauseCandidates should have 3 to 6 items, actionItems should have 5 to 10 items.
+- rootCauseCandidates: Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
+- actionItems: Include priority, a concrete timeframe, and measurable success criteria.
 - Return ONLY valid JSON. No markdown, no commentary.`;
 
 interface ReAnalysisResult {
+  noMaterialChange: boolean;
   rootCauseCandidates: {
     causeText: string;
     rationaleText: string;
@@ -58,25 +70,34 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
     throw new Error("Malformed re-analysis structure");
   }
 
-  for (const c of obj.rootCauseCandidates) {
-    if (!c?.causeText || typeof c.causeText !== "string") {
-      throw new Error("Malformed rootCauseCandidate: missing causeText");
+  const noMaterialChange = obj.noMaterialChange === true;
+
+  // When noMaterialChange is true, empty arrays are expected
+  if (!noMaterialChange) {
+    for (const c of obj.rootCauseCandidates) {
+      if (!c?.causeText || typeof c.causeText !== "string") {
+        throw new Error("Malformed rootCauseCandidate: missing causeText");
+      }
+      if (!VALID_CONFIDENCE_LABELS.includes(c.confidenceLabel)) {
+        throw new Error(`Invalid confidenceLabel: ${c.confidenceLabel}`);
+      }
     }
-    if (!VALID_CONFIDENCE_LABELS.includes(c.confidenceLabel)) {
-      throw new Error(`Invalid confidenceLabel: ${c.confidenceLabel}`);
+
+    for (const a of obj.actionItems) {
+      if (!a?.actionText || typeof a.actionText !== "string") {
+        throw new Error("Malformed actionItem: missing actionText");
+      }
+      if (!VALID_PRIORITIES.includes(a.priority)) {
+        throw new Error(`Invalid priority: ${a.priority}`);
+      }
     }
   }
 
-  for (const a of obj.actionItems) {
-    if (!a?.actionText || typeof a.actionText !== "string") {
-      throw new Error("Malformed actionItem: missing actionText");
-    }
-    if (!VALID_PRIORITIES.includes(a.priority)) {
-      throw new Error(`Invalid priority: ${a.priority}`);
-    }
-  }
-
-  return obj as unknown as ReAnalysisResult;
+  return {
+    noMaterialChange,
+    rootCauseCandidates: noMaterialChange ? [] : obj.rootCauseCandidates,
+    actionItems: noMaterialChange ? [] : obj.actionItems,
+  } as ReAnalysisResult;
 }
 
 function buildReAnalyzePrompt(
@@ -182,7 +203,10 @@ export async function POST(
       where: {
         rcfaId: id,
         eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
-        eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS },
+        OR: [
+          { eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS } },
+          { eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE } },
+        ],
       },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
@@ -219,6 +243,22 @@ export async function POST(
           { status: 502 }
         );
       }
+    }
+
+    if (result.noMaterialChange) {
+      // No material change — preserve existing candidates, log for traceability
+      await prisma.rcfaAuditEvent.create({
+        data: {
+          rcfaId: id,
+          actorUserId: userId,
+          eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
+          eventPayload: {
+            source: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
+          },
+        },
+      });
+
+      return NextResponse.json({ noMaterialChange: true }, { status: 200 });
     }
 
     // Replace old AI-generated candidates with new ones in a transaction
