@@ -22,7 +22,7 @@ export async function POST(
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
     }
 
-    if (rcfa.createdByUserId !== userId && role !== "admin") {
+    if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
