@@ -257,7 +257,7 @@ export default function UserManagement({
       )}
 
       {/* User table */}
-      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+      <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
             <tr>
