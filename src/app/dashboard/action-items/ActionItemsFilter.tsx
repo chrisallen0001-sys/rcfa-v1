@@ -8,6 +8,7 @@ import ActionItemCard from "./ActionItemCard";
 type Props = {
   items: ActionItemRow[];
   totalItems: number;
+  mineTotal: number;
   currentUserId: string;
   users: UserOption[];
   priorityLabels: Record<Priority, string>;
@@ -18,6 +19,7 @@ type Props = {
 export default function ActionItemsFilter({
   items,
   totalItems,
+  mineTotal,
   currentUserId,
   users,
   priorityLabels,
@@ -42,10 +44,10 @@ export default function ActionItemsFilter({
     <>
       <div className="mb-4 flex gap-2">
         <button onClick={() => setFilter("mine")} className={btnClass(filter === "mine")}>
-          Assigned to me
+          Assigned to me ({mineTotal})
         </button>
         <button onClick={() => setFilter("all")} className={btnClass(filter === "all")}>
-          All
+          All ({totalItems})
         </button>
       </div>
 
@@ -53,21 +55,31 @@ export default function ActionItemsFilter({
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {totalItems === 0
             ? "No action items yet. Create an RCFA to get started."
-            : "No action items match the current filter."}
+            : filter === "mine" && mineTotal === 0
+              ? "No action items are assigned to you."
+              : "No action items match the current filter."}
         </p>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((item) => (
-            <ActionItemCard
-              key={item.id}
-              item={item}
-              users={users}
-              priorityLabels={priorityLabels}
-              priorityColors={priorityColors}
-              statusLabels={statusLabels}
-            />
-          ))}
-        </div>
+        <>
+          {filtered.length < (filter === "mine" ? mineTotal : totalItems) && (
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+              Showing {filtered.length} of{" "}
+              {filter === "mine" ? mineTotal : totalItems} on this page
+            </p>
+          )}
+          <div className="space-y-3">
+            {filtered.map((item) => (
+              <ActionItemCard
+                key={item.id}
+                item={item}
+                users={users}
+                priorityLabels={priorityLabels}
+                priorityColors={priorityColors}
+                statusLabels={statusLabels}
+              />
+            ))}
+          </div>
+        </>
       )}
     </>
   );
