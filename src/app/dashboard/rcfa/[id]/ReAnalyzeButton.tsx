@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
 import { useElapsedTime } from "./useElapsedTime";
@@ -11,7 +18,15 @@ interface ReAnalyzeButtonProps {
   hasNewAnswers: boolean;
 }
 
-function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
+function InfoDialog({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
   const titleId = useId();
   const modalRef = useRef<HTMLDivElement>(null);
   const okButtonRef = useRef<HTMLButtonElement>(null);
@@ -66,22 +81,17 @@ function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
     >
       <div
         ref={modalRef}
-        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
+        className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
       >
         <h2
           id={titleId}
           className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
         >
-          No Material Change
+          {title}
         </h2>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-          The additional information provided does not materially change the
-          evidence supporting the current top root cause contenders or associated
-          action items. Based on the available data, the existing root causes
-          remain the most defensible explanation of the failure mechanism and
-          contributing factors. Click OK to acknowledge and continue, or provide
-          additional evidence if you believe a different conclusion is warranted.
-        </p>
+        <div className="mt-4 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+          {children}
+        </div>
         <div className="mt-6 flex justify-end">
           <button
             ref={okButtonRef}
@@ -96,90 +106,10 @@ function NoMaterialChangeDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function MaterialChangeDialog({
-  reasoning,
-  onClose,
-}: {
-  reasoning: string;
-  onClose: () => void;
-}) {
-  const titleId = useId();
-  const modalRef = useRef<HTMLDivElement>(null);
-  const okButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    okButtonRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (e.key === "Tab" && modalRef.current) {
-        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-    >
-      <div
-        ref={modalRef}
-        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
-      >
-        <h2
-          id={titleId}
-          className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
-        >
-          Material Change Identified
-        </h2>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-          {reasoning}
-        </p>
-        <div className="mt-6 flex justify-end">
-          <button
-            ref={okButtonRef}
-            onClick={onClose}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+type DialogState =
+  | { kind: "none" }
+  | { kind: "noChange" }
+  | { kind: "materialChange"; reasoning: string };
 
 export default function ReAnalyzeButton({
   rcfaId,
@@ -189,8 +119,7 @@ export default function ReAnalyzeButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showNoChangeDialog, setShowNoChangeDialog] = useState(false);
-  const [materialChangeReasoning, setMaterialChangeReasoning] = useState<string | null>(null);
+  const [dialogState, setDialogState] = useState<DialogState>({ kind: "none" });
   const pendingRef = useRef(false);
   const elapsed = useElapsedTime(loading);
 
@@ -213,9 +142,11 @@ export default function ReAnalyzeButton({
       const data = await res.json();
 
       if (data.noMaterialChange) {
-        setShowNoChangeDialog(true);
+        setDialogState({ kind: "noChange" });
+      } else if (data.materialityReasoning) {
+        setDialogState({ kind: "materialChange", reasoning: data.materialityReasoning });
       } else {
-        setMaterialChangeReasoning(data.materialityReasoning ?? null);
+        router.refresh();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to re-analyze");
@@ -226,8 +157,7 @@ export default function ReAnalyzeButton({
   }
 
   const handleDialogClose = useCallback(() => {
-    setShowNoChangeDialog(false);
-    setMaterialChangeReasoning(null);
+    setDialogState({ kind: "none" });
     router.refresh();
   }, [router]);
 
@@ -259,14 +189,20 @@ export default function ReAnalyzeButton({
           <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
         )}
       </div>
-      {showNoChangeDialog && (
-        <NoMaterialChangeDialog onClose={handleDialogClose} />
+      {dialogState.kind === "noChange" && (
+        <InfoDialog title="No Material Change" onClose={handleDialogClose}>
+          The additional information provided does not materially change the
+          evidence supporting the current top root cause contenders or associated
+          action items. Based on the available data, the existing root causes
+          remain the most defensible explanation of the failure mechanism and
+          contributing factors. Click OK to acknowledge and continue, or provide
+          additional evidence if you believe a different conclusion is warranted.
+        </InfoDialog>
       )}
-      {materialChangeReasoning !== null && (
-        <MaterialChangeDialog
-          reasoning={materialChangeReasoning}
-          onClose={handleDialogClose}
-        />
+      {dialogState.kind === "materialChange" && (
+        <InfoDialog title="Material Change Identified" onClose={handleDialogClose}>
+          {dialogState.reasoning}
+        </InfoDialog>
       )}
     </>
   );

@@ -374,7 +374,10 @@ export async function POST(
         },
       });
 
-      return NextResponse.json({ noMaterialChange: true }, { status: 200 });
+      return NextResponse.json(
+        { noMaterialChange: true, materialityReasoning: materialityReasoning ?? null },
+        { status: 200 }
+      );
     }
 
     // Replace old AI-generated candidates with new ones in a transaction
