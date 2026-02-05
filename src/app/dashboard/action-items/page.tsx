@@ -98,16 +98,15 @@ export default async function ActionItemsPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-2">
+      <h1 className="mb-6 flex items-baseline gap-2 text-2xl font-semibold tracking-tight">
         <Link
           href="/dashboard"
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+          className="text-sm font-medium text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
         >
-          &larr; Dashboard
+          RCFAs
         </Link>
-      </div>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-        Action Items
+        <span className="text-zinc-300 dark:text-zinc-600" aria-hidden="true">/</span>
+        <span className="text-zinc-900 dark:text-zinc-50">Action Items</span>
       </h1>
       <ActionItemsFilter
         items={rows}
