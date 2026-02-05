@@ -51,6 +51,14 @@ interface AnalysisResult {
   }[];
 }
 
+const VALID_QUESTION_CATEGORIES: QuestionCategory[] = [
+  "failure_mode",
+  "evidence",
+  "operating_context",
+  "maintenance_history",
+  "safety",
+  "other",
+];
 const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["low", "medium", "high"];
 const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
 
@@ -67,6 +75,10 @@ function validateAnalysisResult(parsed: unknown): AnalysisResult {
   for (const q of obj.followUpQuestions) {
     if (!q?.questionText || typeof q.questionText !== "string") {
       throw new Error("Malformed followUpQuestion: missing questionText");
+    }
+    // Category is non-critical; fall back gracefully rather than rejecting the entire analysis
+    if (!VALID_QUESTION_CATEGORIES.includes(q.questionCategory)) {
+      q.questionCategory = "other";
     }
   }
 
@@ -183,7 +195,7 @@ export async function POST(
         data: result.followUpQuestions.map((q) => ({
           rcfaId: id,
           questionText: q.questionText,
-          questionCategory: "other" as const,
+          questionCategory: q.questionCategory,
           generatedBy: "ai" as const,
         })),
       });

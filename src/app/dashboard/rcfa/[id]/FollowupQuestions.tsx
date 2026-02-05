@@ -2,11 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { QuestionCategory } from "@/generated/prisma/client";
+
+const CATEGORY_LABELS: Record<QuestionCategory, string> = {
+  failure_mode: "Failure Mode",
+  evidence: "Evidence",
+  operating_context: "Operating Context",
+  maintenance_history: "Maintenance History",
+  safety: "Safety",
+  other: "Other",
+};
 
 interface FollowupQuestion {
   id: string;
   questionText: string;
-  questionCategory: string;
+  questionCategory: QuestionCategory;
   answerText: string | null;
   answeredAt: string | null;
   answeredBy: { email: string } | null;
@@ -80,7 +90,7 @@ function QuestionCard({
       </p>
       <div className="mt-1 flex items-center gap-2">
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          {question.questionCategory}
+          {CATEGORY_LABELS[question.questionCategory] ?? question.questionCategory}
         </span>
       </div>
 
