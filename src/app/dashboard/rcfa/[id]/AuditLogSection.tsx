@@ -56,6 +56,7 @@ const FIELD_LABELS: Record<string, string> = {
   actionItemCandidateCount: "Action Item Candidates",
   followUpQuestionCount: "Follow-up Questions",
   source: "Source",
+  materialityReasoning: "Materiality Reasoning",
   finalId: "Root Cause ID",
   actionItemId: "Action Item ID",
   candidateId: "Candidate ID",

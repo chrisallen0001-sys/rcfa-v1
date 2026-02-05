@@ -31,6 +31,7 @@ Ask yourself these specific questions:
   b) Does any answer CONTRADICT an existing candidate with evidence that disproves it?
   c) Does any answer shift the relative likelihood of root causes enough to change confidence levels?
   d) Does any answer make an existing action item irrelevant or demand a new category of action?
+  e) Does any answer shift the priority or urgency of an existing action item?
 
 If the answer to ALL of the above is "no," set noMaterialChange to true and return empty arrays.
 
@@ -343,6 +344,11 @@ export async function POST(
       }
     }
 
+    // Cap materialityReasoning for audit storage (prompt asks for one sentence)
+    const materialityReasoning = result.materialityReasoning
+      ? truncateField(result.materialityReasoning, 500)
+      : null;
+
     if (result.materialityReasoning) {
       console.log(
         `POST /api/rcfa/${id}/reanalyze materiality reasoning:`,
@@ -361,7 +367,7 @@ export async function POST(
           eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
             source: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
-            materialityReasoning: result.materialityReasoning ?? null,
+            materialityReasoning,
             rootCauseCandidateCount: 0,
             actionItemCandidateCount: 0,
           },
@@ -416,7 +422,7 @@ export async function POST(
           eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
             source: AUDIT_SOURCES.AI_REANALYSIS,
-            materialityReasoning: result.materialityReasoning ?? null,
+            materialityReasoning,
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
           },
