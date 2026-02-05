@@ -22,19 +22,7 @@ export default function AppHeader({ displayName, role }: AppHeaderProps) {
             priority
           />
         </Link>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/dashboard/intake"
-            aria-label="New RCFA"
-            className="flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            <span className="hidden sm:inline">New RCFA</span>
-          </Link>
-          <UserMenu displayName={displayName} role={role} />
-        </div>
+        <UserMenu displayName={displayName} role={role} />
       </div>
     </header>
   );
