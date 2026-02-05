@@ -6,6 +6,8 @@ import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import type {
   Rcfa,
   RcfaFollowupQuestion,
+  RcfaRootCauseCandidate,
+  RcfaActionItemCandidate,
   ConfidenceLabel,
   Priority,
 } from "@/generated/prisma/client";
@@ -13,11 +15,62 @@ import type {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
-const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions. Re-analyze using both the original intake data AND the follow-up answers to produce updated, more precise results.
+const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions.
+
+The user message contains:
+1. Original intake data
+2. Follow-up questions and answers
+3. The EXISTING root cause candidates and action item candidates currently on file
+
+Your task has two steps:
+
+STEP 1 — MATERIALITY ASSESSMENT. Review the follow-up answers alongside the EXISTING root cause candidates and action items. Your goal is to determine whether the new or updated answers introduce any information that would materially alter the existing candidates. Focus on whether the engineering conclusions and failure hypotheses change — not on whether the answer text itself looks different.
+
+Ask yourself these specific questions:
+  a) Does any answer reveal a NEW failure mechanism not already captured by an existing candidate?
+  b) Does any answer CONTRADICT an existing candidate with evidence that disproves it?
+  c) Does any answer shift the relative likelihood of root causes enough to change confidence levels?
+  d) Does any answer make an existing action item irrelevant or demand a new category of action?
+  e) Does any answer shift the priority or urgency of an existing action item?
+
+If the answer to ALL of the above is "no," set noMaterialChange to true and return empty arrays.
+
+STEP 2 — FULL RE-ANALYSIS (only if Step 1 determined material change exists). If and only if Step 1 identified a genuine material change, produce a complete updated set of root cause candidates and action items incorporating the new evidence.
+
+A material change requires that the ENGINEERING CONCLUSIONS change, not merely that the answer text looks different. Specifically, a material change means ANY of the following:
+- A new root cause should be added that is not substantively covered by any existing candidate
+- An existing root cause should be removed because evidence now contradicts it
+- The confidence level of a root cause candidate should change
+- A new category of action item is warranted that is not covered by existing items
+- An existing action item is no longer relevant given the new evidence
+- The priority of an action item should change significantly
+
+The following do NOT constitute material change — when any of these are the ONLY differences, you MUST return noMaterialChange: true:
+
+FORMAT CHANGES:
+- An answer reformatted from bullet points to prose paragraphs, or vice versa, that conveys the same information
+- Changes in answer structure, headings, or organization that do not alter the technical content
+- Addition of narrative context or explanatory prose around the same data points
+
+NUMERIC / MEASUREMENT VARIANCE:
+- Small variations in reported measurement values (e.g., 190 ppm vs 210 ppm, or 240 ppm vs 260 ppm) where both values fall within the same diagnostic category and lead to the same engineering conclusion
+- Rounding differences or approximation differences (e.g., "~190 ppm" vs "210 ppm" vs "approximately 200 ppm")
+- Slightly different numeric ranges that describe the same condition (e.g., "1,500-1,800 ppm" vs "1,600-1,900 ppm" when both indicate the same severity of contamination)
+
+TEXTUAL EQUIVALENCE:
+- Cosmetic rewording or minor rephrasing of existing candidates
+- Reordering candidates without changing their substance
+- Slight variations in rationale text that reach the same conclusion
+- More verbose or more concise expression of the same technical finding
+- Paraphrasing of the same evidence using different terminology (e.g., "elevated moisture" vs "significantly elevated Karl Fischer water content" when referring to the same condition)
+
+IMPORTANT: Before deciding on noMaterialChange, summarize in one sentence what NEW engineering insight (if any) the updated answers provide that was not already reflected in the existing candidates. If you cannot identify a specific new insight that would change a root cause hypothesis or action item, the answer is noMaterialChange: true.
 
 Return valid JSON only with the following structure:
 
 {
+  "materialityReasoning": "string",
+  "noMaterialChange": true | false,
   "rootCauseCandidates": [
     { "causeText": "string", "rationaleText": "string", "confidenceLabel": "low|medium|high" }
   ],
@@ -27,11 +80,16 @@ Return valid JSON only with the following structure:
 }
 
 Requirements:
-- rootCauseCandidates: 3 to 6 items. Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
-- actionItems: 5 to 10 items. Include priority, a concrete timeframe, and measurable success criteria.
+- materialityReasoning: A single sentence explaining what new engineering insight (if any) the updated answers provide. If there is no new insight, state that explicitly (e.g., "The updated answers convey the same failure evidence and diagnostic conclusions as previously provided.").
+- noMaterialChange: Set to true when the existing candidates already correctly capture the root cause hypotheses and action items supported by the evidence. The bar for material change is HIGH: the new answers must introduce a genuinely new failure hypothesis, contradict an existing one with evidence, or shift confidence/priority levels. Reformatting, paraphrasing, or minor numeric variance in answers that reach the same engineering conclusions is NEVER material change. When true, rootCauseCandidates and actionItems should be empty arrays. If no existing candidates are on file (both sections show "(none)"), you MUST set noMaterialChange to false and provide your full analysis.
+- When noMaterialChange is false: rootCauseCandidates should have 3 to 6 items, actionItems should have 5 to 10 items.
+- rootCauseCandidates: Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
+- actionItems: Include priority, a concrete timeframe, and measurable success criteria.
 - Return ONLY valid JSON. No markdown, no commentary.`;
 
 interface ReAnalysisResult {
+  materialityReasoning?: string;
+  noMaterialChange: boolean;
   rootCauseCandidates: {
     causeText: string;
     rationaleText: string;
@@ -58,30 +116,63 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
     throw new Error("Malformed re-analysis structure");
   }
 
-  for (const c of obj.rootCauseCandidates) {
-    if (!c?.causeText || typeof c.causeText !== "string") {
-      throw new Error("Malformed rootCauseCandidate: missing causeText");
+  const noMaterialChange = obj.noMaterialChange === true;
+  const materialityReasoning =
+    typeof obj.materialityReasoning === "string"
+      ? obj.materialityReasoning
+      : undefined;
+
+  if (noMaterialChange && (obj.rootCauseCandidates.length > 0 || obj.actionItems.length > 0)) {
+    console.warn("AI returned noMaterialChange=true with non-empty arrays; discarding candidates");
+  }
+
+  // When noMaterialChange is true, empty arrays are expected
+  if (!noMaterialChange) {
+    if (obj.rootCauseCandidates.length === 0 || obj.actionItems.length === 0) {
+      throw new Error(
+        "AI returned noMaterialChange=false but provided empty candidates; aborting to prevent data loss"
+      );
     }
-    if (!VALID_CONFIDENCE_LABELS.includes(c.confidenceLabel)) {
-      throw new Error(`Invalid confidenceLabel: ${c.confidenceLabel}`);
+
+    for (const c of obj.rootCauseCandidates) {
+      if (!c?.causeText || typeof c.causeText !== "string") {
+        throw new Error("Malformed rootCauseCandidate: missing causeText");
+      }
+      if (!VALID_CONFIDENCE_LABELS.includes(c.confidenceLabel)) {
+        throw new Error(`Invalid confidenceLabel: ${c.confidenceLabel}`);
+      }
+    }
+
+    for (const a of obj.actionItems) {
+      if (!a?.actionText || typeof a.actionText !== "string") {
+        throw new Error("Malformed actionItem: missing actionText");
+      }
+      if (!VALID_PRIORITIES.includes(a.priority)) {
+        throw new Error(`Invalid priority: ${a.priority}`);
+      }
     }
   }
 
-  for (const a of obj.actionItems) {
-    if (!a?.actionText || typeof a.actionText !== "string") {
-      throw new Error("Malformed actionItem: missing actionText");
-    }
-    if (!VALID_PRIORITIES.includes(a.priority)) {
-      throw new Error(`Invalid priority: ${a.priority}`);
-    }
-  }
+  return {
+    materialityReasoning,
+    noMaterialChange,
+    rootCauseCandidates: noMaterialChange ? [] : obj.rootCauseCandidates,
+    actionItems: noMaterialChange ? [] : obj.actionItems,
+  } as ReAnalysisResult;
+}
 
-  return obj as unknown as ReAnalysisResult;
+/** Truncate a text field to a safe length for inclusion in the LLM prompt. */
+function truncateField(text: string | null, maxLen = 1000): string {
+  if (!text) return "";
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + "…";
 }
 
 function buildReAnalyzePrompt(
   rcfa: Rcfa,
-  allQuestions: RcfaFollowupQuestion[]
+  allQuestions: RcfaFollowupQuestion[],
+  rootCauseCandidates: RcfaRootCauseCandidate[],
+  actionItemCandidates: RcfaActionItemCandidate[]
 ): string {
   const intakeLines = [
     `Equipment Description: ${rcfa.equipmentDescription}`,
@@ -106,12 +197,34 @@ function buildReAnalyzePrompt(
       : `Q: ${q.questionText}\nA: (Not yet answered)`
   );
 
+  const rcLines =
+    rootCauseCandidates.length > 0
+      ? rootCauseCandidates.map(
+          (c, i) =>
+            `[${i + 1}] (existing) ${truncateField(c.causeText)} | Confidence: ${c.confidenceLabel}${c.rationaleText ? ` | Rationale: ${truncateField(c.rationaleText)}` : ""}`
+        )
+      : ["(none)"];
+
+  const aiLines =
+    actionItemCandidates.length > 0
+      ? actionItemCandidates.map(
+          (a, i) =>
+            `[${i + 1}] (existing) ${truncateField(a.actionText)} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${truncateField(a.timeframeText)}` : ""}${a.rationaleText ? ` | Rationale: ${truncateField(a.rationaleText)}` : ""}${a.successCriteria ? ` | Success Criteria: ${truncateField(a.successCriteria)}` : ""}`
+        )
+      : ["(none)"];
+
   return [
     "=== ORIGINAL INTAKE DATA ===",
     intakeLines.filter(Boolean).join("\n"),
     "",
     "=== FOLLOW-UP QUESTIONS & ANSWERS ===",
     qaLines.join("\n\n"),
+    "",
+    "=== EXISTING ROOT CAUSE CANDIDATES ===",
+    rcLines.join("\n"),
+    "",
+    "=== EXISTING ACTION ITEM CANDIDATES ===",
+    aiLines.join("\n"),
   ].join("\n");
 }
 
@@ -148,6 +261,8 @@ export async function POST(
       where: { id },
       include: {
         followupQuestions: { orderBy: [{ generatedAt: "asc" }, { id: "asc" }] },
+        rootCauseCandidates: { orderBy: { generatedAt: "asc" } },
+        actionItemCandidates: { orderBy: { generatedAt: "asc" } },
       },
     });
 
@@ -182,7 +297,10 @@ export async function POST(
       where: {
         rcfaId: id,
         eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
-        eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS },
+        OR: [
+          { eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS } },
+          { eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE } },
+        ],
       },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
@@ -200,7 +318,12 @@ export async function POST(
       }
     }
 
-    const userPrompt = buildReAnalyzePrompt(rcfa, rcfa.followupQuestions);
+    const userPrompt = buildReAnalyzePrompt(
+      rcfa,
+      rcfa.followupQuestions,
+      rcfa.rootCauseCandidates,
+      rcfa.actionItemCandidates
+    );
 
     let result: ReAnalysisResult;
     try {
@@ -219,6 +342,42 @@ export async function POST(
           { status: 502 }
         );
       }
+    }
+
+    // Cap materialityReasoning for audit storage (prompt asks for one sentence)
+    const materialityReasoning = result.materialityReasoning
+      ? truncateField(result.materialityReasoning, 500)
+      : null;
+
+    if (result.materialityReasoning) {
+      console.log(
+        `POST /api/rcfa/${id}/reanalyze materiality reasoning:`,
+        result.materialityReasoning
+      );
+    }
+
+    if (result.noMaterialChange) {
+      // No material change — preserve existing candidates, log for traceability.
+      // No transaction needed: we are only inserting a single audit row and not
+      // modifying candidates, so there is no multi-table consistency concern.
+      await prisma.rcfaAuditEvent.create({
+        data: {
+          rcfaId: id,
+          actorUserId: userId,
+          eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
+          eventPayload: {
+            source: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
+            materialityReasoning,
+            rootCauseCandidateCount: 0,
+            actionItemCandidateCount: 0,
+          },
+        },
+      });
+
+      return NextResponse.json(
+        { noMaterialChange: true, materialityReasoning: materialityReasoning ?? null },
+        { status: 200 }
+      );
     }
 
     // Replace old AI-generated candidates with new ones in a transaction
@@ -266,6 +425,7 @@ export async function POST(
           eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
           eventPayload: {
             source: AUDIT_SOURCES.AI_REANALYSIS,
+            materialityReasoning,
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
           },
@@ -273,7 +433,15 @@ export async function POST(
       });
     });
 
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(
+      {
+        noMaterialChange: result.noMaterialChange,
+        materialityReasoning: materialityReasoning ?? null,
+        rootCauseCandidates: result.rootCauseCandidates,
+        actionItems: result.actionItems,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     if (
       error instanceof Error &&
