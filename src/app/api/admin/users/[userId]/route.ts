@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { UserStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+
+const VALID_STATUSES: UserStatus[] = ["active", "disabled"];
 
 export async function PATCH(
   request: NextRequest,
@@ -12,7 +15,7 @@ export async function PATCH(
 
     const { userId } = await params;
 
-    let body: { role?: string };
+    let body: { role?: string; status?: string };
     try {
       body = await request.json();
     } catch {
@@ -22,19 +25,44 @@ export async function PATCH(
       );
     }
 
-    const { role: newRole } = body;
+    const { role: newRole, status: newStatus } = body;
 
-    if (!newRole || (newRole !== "admin" && newRole !== "user")) {
+    // Validate that at least one field is provided
+    if (!newRole && !newStatus) {
+      return NextResponse.json(
+        { error: "At least one of role or status is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate role if provided
+    if (newRole && newRole !== "admin" && newRole !== "user") {
       return NextResponse.json(
         { error: "role must be 'admin' or 'user'" },
         { status: 400 }
       );
     }
 
+    // Validate status if provided
+    if (newStatus && !VALID_STATUSES.includes(newStatus as UserStatus)) {
+      return NextResponse.json(
+        { error: "status must be 'active' or 'disabled'" },
+        { status: 400 }
+      );
+    }
+
     // Prevent self-demotion
-    if (userId === currentUserId && newRole !== "admin") {
+    if (userId === currentUserId && newRole && newRole !== "admin") {
       return NextResponse.json(
         { error: "Cannot demote yourself" },
+        { status: 400 }
+      );
+    }
+
+    // Prevent self-disable
+    if (userId === currentUserId && newStatus && newStatus !== "active") {
+      return NextResponse.json(
+        { error: "Cannot disable yourself" },
         { status: 400 }
       );
     }
@@ -48,14 +76,23 @@ export async function PATCH(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const updateData: { role?: "admin" | "user"; status?: UserStatus } = {};
+    if (newRole) {
+      updateData.role = newRole as "admin" | "user";
+    }
+    if (newStatus) {
+      updateData.status = newStatus as UserStatus;
+    }
+
     const updated = await prisma.appUser.update({
       where: { id: userId },
-      data: { role: newRole as "admin" | "user" },
+      data: updateData,
       select: {
         id: true,
         email: true,
         displayName: true,
         role: true,
+        status: true,
       },
     });
 

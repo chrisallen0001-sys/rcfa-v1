@@ -7,20 +7,26 @@ type User = {
   email: string;
   displayName: string;
   role: string;
+  status: string;
   createdAt: string;
 };
 
+interface UserManagementProps {
+  initialUsers: User[];
+  currentUserId: string;
+}
+
 export default function UserManagement({
   initialUsers,
-}: {
-  initialUsers: User[];
-}) {
+  currentUserId,
+}: UserManagementProps) {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [showForm, setShowForm] = useState(false);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [roleError, setRoleError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [confirmDisable, setConfirmDisable] = useState<User | null>(null);
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -50,7 +56,11 @@ export default function UserManagement({
     const created = await res.json();
     setUsers((prev) => [
       ...prev,
-      { ...created, createdAt: new Date().toISOString().slice(0, 10) },
+      {
+        ...created,
+        status: created.status || "active",
+        createdAt: new Date().toISOString().slice(0, 10),
+      },
     ]);
     setShowForm(false);
     setSaving(false);
@@ -59,7 +69,7 @@ export default function UserManagement({
 
   async function handleToggleRole(user: User) {
     setTogglingId(user.id);
-    setRoleError("");
+    setActionError("");
     const newRole = user.role === "admin" ? "user" : "admin";
 
     const res = await fetch(`/api/admin/users/${user.id}`, {
@@ -71,28 +81,95 @@ export default function UserManagement({
     if (res.ok) {
       const updated = await res.json();
       setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, role: updated.role } : u))
+        prev.map((u) =>
+          u.id === user.id ? { ...u, role: updated.role, status: updated.status } : u
+        )
       );
     } else {
       const body = await res.json();
-      setRoleError(body.error || "Failed to update role");
+      setActionError(body.error || "Failed to update role");
     }
     setTogglingId(null);
   }
 
+  async function handleToggleStatus(user: User) {
+    setTogglingId(user.id);
+    setActionError("");
+    setConfirmDisable(null);
+    const newStatus = user.status === "active" ? "disabled" : "active";
+
+    const res = await fetch(`/api/admin/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+
+    if (res.ok) {
+      const updated = await res.json();
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id ? { ...u, role: updated.role, status: updated.status } : u
+        )
+      );
+    } else {
+      const body = await res.json();
+      setActionError(body.error || "Failed to update status");
+    }
+    setTogglingId(null);
+  }
+
+  function handleDisableClick(user: User) {
+    if (user.status === "active") {
+      setConfirmDisable(user);
+    } else {
+      handleToggleStatus(user);
+    }
+  }
+
   return (
     <>
-      {roleError && (
+      {actionError && (
         <div className="mb-3 flex items-center justify-between rounded-md bg-red-50 px-3 py-2 dark:bg-red-900/20">
-          <p className="text-sm text-red-600 dark:text-red-400">{roleError}</p>
+          <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p>
           <button
-            onClick={() => setRoleError("")}
+            onClick={() => setActionError("")}
             className="ml-2 text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
           >
             Dismiss
           </button>
         </div>
       )}
+
+      {/* Disable confirmation modal */}
+      {confirmDisable && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+              Disable User Account
+            </h3>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              Are you sure you want to disable{" "}
+              <span className="font-medium">{confirmDisable.displayName}</span>? They
+              will be unable to log in.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDisable(null)}
+                className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleToggleStatus(confirmDisable)}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Disable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* User table */}
       <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
         <table className="w-full text-left text-sm">
@@ -108,6 +185,9 @@ export default function UserManagement({
                 Role
               </th>
               <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+                Status
+              </th>
+              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Created
               </th>
               <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
@@ -116,46 +196,107 @@ export default function UserManagement({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
-            {users.map((user) => (
-              <tr
-                key={user.id}
-                className="bg-white dark:bg-zinc-900"
-              >
-                <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">
-                  {user.email}
-                </td>
-                <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
-                  {user.displayName}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      user.role === "admin"
-                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                        : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+            {users.map((user) => {
+              const isCurrentUser = user.id === currentUserId;
+              const isDisabled = user.status === "disabled";
+
+              return (
+                <tr
+                  key={user.id}
+                  className={`${
+                    isDisabled
+                      ? "bg-zinc-50 dark:bg-zinc-900/50"
+                      : "bg-white dark:bg-zinc-900"
+                  }`}
+                >
+                  <td
+                    className={`px-4 py-3 ${
+                      isDisabled
+                        ? "text-zinc-400 dark:text-zinc-500"
+                        : "text-zinc-900 dark:text-zinc-100"
                     }`}
                   >
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
-                  {user.createdAt}
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => handleToggleRole(user)}
-                    disabled={togglingId === user.id}
-                    className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    {user.email}
+                  </td>
+                  <td
+                    className={`px-4 py-3 ${
+                      isDisabled
+                        ? "text-zinc-400 dark:text-zinc-500"
+                        : "text-zinc-700 dark:text-zinc-300"
+                    }`}
                   >
-                    {togglingId === user.id
-                      ? "Saving..."
-                      : user.role === "admin"
-                        ? "Demote to user"
-                        : "Promote to admin"}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    {user.displayName}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        user.role === "admin"
+                          ? isDisabled
+                            ? "bg-purple-50 text-purple-400 dark:bg-purple-900/20 dark:text-purple-500"
+                            : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                          : isDisabled
+                            ? "bg-zinc-50 text-zinc-400 dark:bg-zinc-800/50 dark:text-zinc-500"
+                            : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                      }`}
+                    >
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        isDisabled
+                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      }`}
+                    >
+                      {isDisabled ? "Disabled" : "Active"}
+                    </span>
+                  </td>
+                  <td
+                    className={`px-4 py-3 ${
+                      isDisabled
+                        ? "text-zinc-400 dark:text-zinc-500"
+                        : "text-zinc-500 dark:text-zinc-400"
+                    }`}
+                  >
+                    {user.createdAt}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleToggleRole(user)}
+                        disabled={togglingId === user.id || isCurrentUser}
+                        className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      >
+                        {togglingId === user.id
+                          ? "Saving..."
+                          : user.role === "admin"
+                            ? "Demote"
+                            : "Promote"}
+                      </button>
+                      {!isCurrentUser && (
+                        <button
+                          onClick={() => handleDisableClick(user)}
+                          disabled={togglingId === user.id}
+                          className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                            isDisabled
+                              ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                              : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                          }`}
+                        >
+                          {togglingId === user.id
+                            ? "Saving..."
+                            : isDisabled
+                              ? "Enable"
+                              : "Disable"}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

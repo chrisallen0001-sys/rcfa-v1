@@ -16,6 +16,11 @@ enum AppUserRole {
   user
 }
 
+enum UserStatus {
+  active
+  disabled
+}
+
 enum RcfaStatus {
   draft
   investigation
@@ -74,6 +79,7 @@ model AppUser {
   email        String   @unique
   displayName  String   @map("display_name")
   role         AppUserRole @default(user)
+  status       UserStatus  @default(active)
   passwordHash String   @map("password_hash")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz

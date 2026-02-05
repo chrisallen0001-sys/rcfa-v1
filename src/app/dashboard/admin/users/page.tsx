@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminUsersPage() {
-  const { role } = await getAuthContext();
+  const { userId, role } = await getAuthContext();
   if (role !== "admin") {
     notFound();
   }
@@ -21,6 +21,7 @@ export default async function AdminUsersPage() {
       email: true,
       displayName: true,
       role: true,
+      status: true,
       createdAt: true,
     },
     orderBy: { createdAt: "asc" },
@@ -31,6 +32,7 @@ export default async function AdminUsersPage() {
     email: u.email,
     displayName: u.displayName,
     role: u.role as string,
+    status: u.status as string,
     createdAt: u.createdAt.toISOString().slice(0, 10),
   }));
 
@@ -47,7 +49,7 @@ export default async function AdminUsersPage() {
           &larr; Dashboard
         </Link>
       </div>
-      <UserManagement initialUsers={serialized} />
+      <UserManagement initialUsers={serialized} currentUserId={userId} />
     </div>
   );
 }

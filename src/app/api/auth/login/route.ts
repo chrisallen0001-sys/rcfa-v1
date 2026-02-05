@@ -46,6 +46,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if account is disabled
+    if (user.status !== "active") {
+      return NextResponse.json(
+        { error: "Your account has been disabled. Contact an administrator." },
+        { status: 403 }
+      );
+    }
+
     const token = await createToken({
       sub: user.id,
       email: user.email,
