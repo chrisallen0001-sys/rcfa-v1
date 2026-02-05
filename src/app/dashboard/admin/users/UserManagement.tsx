@@ -142,9 +142,18 @@ export default function UserManagement({
 
       {/* Disable confirmation modal */}
       {confirmDisable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="disable-modal-title"
+          onKeyDown={(e) => e.key === "Escape" && setConfirmDisable(null)}
+        >
           <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+            <h3
+              id="disable-modal-title"
+              className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+            >
               Disable User Account
             </h3>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
