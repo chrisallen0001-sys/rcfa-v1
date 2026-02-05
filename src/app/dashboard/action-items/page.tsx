@@ -59,7 +59,7 @@ export default async function ActionItemsPage({
   const { page } = await searchParams;
   const pageNum = Math.max(1, parseInt(page ?? "1", 10) || 1);
 
-  const where = { rcfa: { createdByUserId: userId, deletedAt: null } } as const;
+  const where = { rcfa: { deletedAt: null } } as const;
 
   const [items, total, users] = await Promise.all([
     prisma.rcfaActionItem.findMany({

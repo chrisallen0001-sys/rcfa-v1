@@ -8,17 +8,20 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; questionId: string }> }
 ) {
   try {
-    const { userId } = await getAuthContext();
+    const { userId, role } = await getAuthContext();
     const { id: rcfaId, questionId } = await params;
 
-    // Verify the RCFA belongs to this user and is in investigation status
     const rcfa = await prisma.rcfa.findUnique({
       where: { id: rcfaId },
       select: { createdByUserId: true, status: true },
     });
 
-    if (!rcfa || rcfa.createdByUserId !== userId) {
+    if (!rcfa) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (rcfa.createdByUserId !== userId && role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Only allow edits during investigation phase (GxP compliance)

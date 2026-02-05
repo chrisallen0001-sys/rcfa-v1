@@ -15,7 +15,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; actionItemId: string }> }
 ) {
   try {
-    const { userId } = await getAuthContext();
+    const { userId, role } = await getAuthContext();
     const { id, actionItemId } = await params;
 
     if (!UUID_RE.test(id) || !UUID_RE.test(actionItemId)) {
@@ -73,7 +73,7 @@ export async function PATCH(
     if (!rcfa) {
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
     }
-    if (rcfa.createdByUserId !== userId) {
+    if (rcfa.createdByUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (rcfa.status !== "investigation") {
@@ -161,7 +161,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; actionItemId: string }> }
 ) {
   try {
-    const { userId } = await getAuthContext();
+    const { userId, role } = await getAuthContext();
     const { id, actionItemId } = await params;
 
     if (!UUID_RE.test(id) || !UUID_RE.test(actionItemId)) {
@@ -172,7 +172,7 @@ export async function DELETE(
     if (!rcfa) {
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
     }
-    if (rcfa.createdByUserId !== userId) {
+    if (rcfa.createdByUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (rcfa.status !== "investigation") {

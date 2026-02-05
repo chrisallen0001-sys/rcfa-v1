@@ -152,8 +152,8 @@ export default async function RcfaDetailPage({
 
   const isOwner = rcfa?.ownerUserId === userId;
   const isAdmin = role === "admin";
-  // Return 404 if RCFA doesn't exist, is soft-deleted, or user lacks access
-  if (!rcfa || rcfa.deletedAt || (!isOwner && !isAdmin)) {
+  const canEdit = isOwner || isAdmin;
+  if (!rcfa || rcfa.deletedAt) {
     notFound();
   }
 
@@ -210,7 +210,7 @@ export default async function RcfaDetailPage({
         </div>
       )}
 
-      {rcfa.status === "draft" && (
+      {rcfa.status === "draft" && canEdit && (
         <div className="mb-6">
           <StartInvestigationButton rcfaId={rcfa.id} />
         </div>
@@ -264,13 +264,13 @@ export default async function RcfaDetailPage({
                 answeredAt: q.answeredAt?.toISOString() ?? null,
                 answeredBy: q.answeredBy,
               }))}
-              isInvestigation={rcfa.status === "investigation"}
+              isInvestigation={rcfa.status === "investigation" && canEdit}
             />
           </Section>
         )}
 
         {/* Re-Analyze Button */}
-        {rcfa.status === "investigation" && (
+        {rcfa.status === "investigation" && canEdit && (
           <ReAnalyzeButton
             rcfaId={rcfa.id}
             hasAnsweredQuestions={hasAnsweredQuestions}
@@ -300,7 +300,7 @@ export default async function RcfaDetailPage({
                       {c.rationaleText}
                     </p>
                   )}
-                  {rcfa.status === "investigation" &&
+                  {rcfa.status === "investigation" && canEdit &&
                     !promotedCandidateIds.has(c.id) && (
                       <div className="mt-3">
                         <PromoteRootCauseButton
@@ -333,10 +333,10 @@ export default async function RcfaDetailPage({
                   evidenceSummary={f.evidenceSummary}
                   selectedByEmail={f.selectedBy.email}
                   selectedAt={f.selectedAt.toISOString().slice(0, 10)}
-                  isInvestigation={rcfa.status === "investigation"}
+                  isInvestigation={rcfa.status === "investigation" && canEdit}
                 />
               ))}
-              {rcfa.status === "investigation" && (
+              {rcfa.status === "investigation" && canEdit && (
                 <AddRootCauseForm rcfaId={rcfa.id} />
               )}
             </div>
@@ -344,7 +344,7 @@ export default async function RcfaDetailPage({
         )}
 
         {/* Finalize Investigation Button */}
-        {rcfa.status === "investigation" && (
+        {rcfa.status === "investigation" && canEdit && (
           <FinalizeInvestigationButton rcfaId={rcfa.id} />
         )}
 
@@ -377,7 +377,7 @@ export default async function RcfaDetailPage({
                       <span>Success: {a.successCriteria}</span>
                     )}
                   </div>
-                  {rcfa.status === "investigation" &&
+                  {rcfa.status === "investigation" && canEdit &&
                     !promotedActionCandidateIds.has(a.id) && (
                       <div className="mt-3">
                         <PromoteActionItemButton
@@ -413,10 +413,10 @@ export default async function RcfaDetailPage({
                   dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
-                  isInvestigation={rcfa.status === "investigation"}
+                  isInvestigation={rcfa.status === "investigation" && canEdit}
                 />
               ))}
-              {rcfa.status === "investigation" && (
+              {rcfa.status === "investigation" && canEdit && (
                 <AddActionItemForm rcfaId={rcfa.id} />
               )}
             </div>
@@ -424,7 +424,7 @@ export default async function RcfaDetailPage({
         )}
 
         {/* Close RCFA Button */}
-        {rcfa.status === "actions_open" && (
+        {rcfa.status === "actions_open" && canEdit && (
           <CloseRcfaButton rcfaId={rcfa.id} />
         )}
 

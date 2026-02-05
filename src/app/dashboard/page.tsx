@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { getAuthContext } from "@/lib/auth-context";
 import type { RcfaStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -85,25 +84,15 @@ function sanitizeHighlight(raw: string): string {
 
 async function searchRcfas(
   query: string,
-  userId: string,
-  isAdmin: boolean,
   pageNum: number,
 ): Promise<{ rows: RcfaRow[]; total: number }> {
-  // Params: [query, owner (null for admin), limit, offset] => $1, $2, $3, $4
   const offset = (pageNum - 1) * ITEMS_PER_PAGE;
-  const ownerParam = isAdmin ? null : userId;
-  const params: (string | number | null)[] = [
+  const params: (string | number)[] = [
     query,
-    ownerParam,
     ITEMS_PER_PAGE,
     offset,
   ];
 
-  // Use a CTE so we can count total matches while also returning ranked rows.
-  // Note: equipment_description and failure_description are NOT NULL by schema
-  // constraint, so COALESCE is unnecessary for to_tsvector calls.
-  // Tautology WHERE ($2::uuid IS NULL OR ...) lets admins see all rows without
-  // conditional SQL string building.
   const sql = `
     WITH matches AS (
       SELECT
@@ -127,7 +116,6 @@ async function searchRcfas(
         to_tsvector('english', r.equipment_description) ||
         to_tsvector('english', r.failure_description)
       ) @@ plainto_tsquery('english', $1)
-      AND ($2::uuid IS NULL OR r.owner_user_id = $2::uuid)
       AND r.deleted_at IS NULL
     )
     SELECT
@@ -140,7 +128,7 @@ async function searchRcfas(
     FROM matches m
     JOIN rcfa_summary s ON s.id = m.id
     ORDER BY m.rank DESC, m.created_at DESC
-    LIMIT $3 OFFSET $4
+    LIMIT $2 OFFSET $3
   `;
   const results = await prisma.$queryRawUnsafe<SearchResultRow[]>(
     sql,
@@ -172,30 +160,23 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ page?: string; q?: string }>;
 }) {
-  const { userId, role } = await getAuthContext();
   const { page, q } = await searchParams;
   const pageNum = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const searchQuery = q?.trim() ?? "";
-
-  const isAdmin = role === "admin";
 
   let rows: RcfaRow[];
   let totalPages: number;
   let searchTotal = 0;
 
   if (searchQuery) {
-    const result = await searchRcfas(searchQuery, userId, isAdmin, pageNum);
+    const result = await searchRcfas(searchQuery, pageNum);
     rows = result.rows;
     searchTotal = result.total;
     totalPages = Math.max(1, Math.ceil(result.total / ITEMS_PER_PAGE));
   } else {
-    // Use a tautology WHERE clause so the query shape is always the same:
-    // pass null for admins (matches all rows), or the userId for non-admins.
-    const ownerParam = isAdmin ? null : userId;
-    const browseParams: (string | number | null)[] = [
+    const browseParams: (string | number)[] = [
       ITEMS_PER_PAGE,
       (pageNum - 1) * ITEMS_PER_PAGE,
-      ownerParam,
     ];
 
     const browseSql = `
@@ -212,7 +193,6 @@ export default async function DashboardPage({
         s.open_action_item_count,
         COUNT(*) OVER() AS total_count
       FROM rcfa_summary s
-      WHERE ($3::uuid IS NULL OR s.owner_user_id = $3::uuid)
       ORDER BY s.created_at DESC
       LIMIT $1 OFFSET $2
     `;

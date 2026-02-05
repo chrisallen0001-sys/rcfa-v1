@@ -21,7 +21,7 @@ export async function PATCH(
   { params }: { params: Promise<{ actionItemId: string }> }
 ) {
   try {
-    const { userId } = await getAuthContext();
+    const { userId, role } = await getAuthContext();
     const { actionItemId } = await params;
 
     if (!UUID_RE.test(actionItemId)) {
@@ -107,7 +107,8 @@ export async function PATCH(
 
     if (
       existing.rcfa.createdByUserId !== userId &&
-      existing.ownerUserId !== userId
+      existing.ownerUserId !== userId &&
+      role !== "admin"
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await getAuthContext();
+    const { userId, role } = await getAuthContext();
     const { id } = await params;
 
     if (!UUID_RE.test(id)) {
@@ -22,7 +22,7 @@ export async function POST(
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
     }
 
-    if (rcfa.createdByUserId !== userId) {
+    if (rcfa.createdByUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
