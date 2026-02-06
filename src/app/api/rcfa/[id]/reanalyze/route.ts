@@ -280,9 +280,9 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (rcfa.status !== "investigation") {
+    if (rcfa.status !== "investigation" && rcfa.status !== "actions_open") {
       return NextResponse.json(
-        { error: "Only RCFAs in investigation status can be re-analyzed" },
+        { error: "Only RCFAs in investigation or actions_open status can be re-analyzed" },
         { status: 409 }
       );
     }
@@ -398,8 +398,8 @@ export async function POST(
     await prisma.$transaction(async (tx) => {
       // Re-read with row lock to prevent race conditions
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
-      if (locked.status !== "investigation") {
-        throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      if (locked.status !== "investigation" && locked.status !== "actions_open") {
+        throw new Error("RCFA_STATUS_INVALID");
       }
 
       // Insert new candidates (keeping existing ones - they can be identified by generatedAt timestamp)
@@ -451,10 +451,10 @@ export async function POST(
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message === "RCFA_NOT_IN_INVESTIGATION"
+      error.message === "RCFA_STATUS_INVALID"
     ) {
       return NextResponse.json(
-        { error: "Only RCFAs in investigation status can be re-analyzed" },
+        { error: "Only RCFAs in investigation or actions_open status can be re-analyzed" },
         { status: 409 }
       );
     }

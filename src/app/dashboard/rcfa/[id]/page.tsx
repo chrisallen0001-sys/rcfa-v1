@@ -16,6 +16,7 @@ import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
 import CloseRcfaButton from "./CloseRcfaButton";
+import BackToInvestigationButton from "./BackToInvestigationButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
@@ -218,6 +219,16 @@ export default async function RcfaDetailPage({
   const isNewCandidate = (generatedAt: Date): boolean =>
     previousAnalysisTimestamp !== null && generatedAt > previousAnalysisTimestamp;
 
+  // Action items progress tracking
+  const completedActionItems = rcfa.actionItems.filter(
+    (a) => a.status === "done" || a.status === "canceled"
+  ).length;
+  const totalActionItems = rcfa.actionItems.length;
+  const allActionItemsComplete = totalActionItems > 0 && completedActionItems === totalActionItems;
+
+  // Helper for statuses that allow action item editing
+  const canEditActionItems = (rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit;
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-2">
@@ -352,16 +363,16 @@ export default async function RcfaDetailPage({
           </Section>
         )}
 
-        {/* Add Information Section */}
-        {rcfa.status === "investigation" && canEdit && (
+        {/* Add Information Section - available in investigation and actions_open */}
+        {(rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit && (
           <AddInformationSection
             rcfaId={rcfa.id}
             initialNotes={rcfa.investigationNotes}
           />
         )}
 
-        {/* Re-Analyze Button */}
-        {rcfa.status === "investigation" && canEdit && (
+        {/* Re-Analyze Button - available in investigation and actions_open */}
+        {(rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit && (
           <ReAnalyzeButton
             rcfaId={rcfa.id}
             hasAnsweredQuestions={hasAnsweredQuestions}
@@ -518,8 +529,26 @@ export default async function RcfaDetailPage({
         )}
 
         {/* Tracked Action Items */}
-        {hasAnalysis && (rcfa.actionItems.length > 0 || rcfa.status === "investigation") && (
-          <Section title="Tracked Action Items">
+        {hasAnalysis && (rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
+          <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Tracked Action Items
+              </h2>
+              {totalActionItems > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div
+                      className="h-2 rounded-full bg-green-500 transition-all"
+                      style={{ width: `${(completedActionItems / totalActionItems) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {completedActionItems} of {totalActionItems} complete
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="space-y-4">
               {rcfa.actionItems.map((a) => (
                 <EditableActionItem
@@ -535,19 +564,29 @@ export default async function RcfaDetailPage({
                   ownerName={a.owner?.displayName ?? null}
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
-                  isInvestigation={rcfa.status === "investigation" && canEdit}
+                  isInvestigation={canEditActionItems}
                 />
               ))}
-              {rcfa.status === "investigation" && canEdit && (
+              {canEditActionItems && (
                 <AddActionItemForm rcfaId={rcfa.id} />
               )}
             </div>
-          </Section>
+          </section>
         )}
 
-        {/* Close RCFA Button */}
+        {/* Actions Open Phase Controls */}
         {rcfa.status === "actions_open" && canEdit && (
-          <CloseRcfaButton rcfaId={rcfa.id} />
+          <div className="flex flex-wrap items-center gap-4">
+            <BackToInvestigationButton rcfaId={rcfa.id} />
+            {allActionItemsComplete && (
+              <CloseRcfaButton rcfaId={rcfa.id} />
+            )}
+            {!allActionItemsComplete && totalActionItems > 0 && (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Complete all action items to close this RCFA
+              </p>
+            )}
+          </div>
         )}
 
         {/* Audit Log */}

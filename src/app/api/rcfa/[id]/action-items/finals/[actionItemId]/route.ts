@@ -82,17 +82,17 @@ export async function PATCH(
     if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (rcfa.status !== "investigation") {
+    if (rcfa.status !== "investigation" && rcfa.status !== "actions_open") {
       return NextResponse.json(
-        { error: "RCFA must be in investigation status" },
+        { error: "RCFA must be in investigation or actions_open status" },
         { status: 409 }
       );
     }
 
     const updated = await prisma.$transaction(async (tx) => {
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
-      if (locked.status !== "investigation") {
-        throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      if (locked.status !== "investigation" && locked.status !== "actions_open") {
+        throw new Error("RCFA_STATUS_INVALID");
       }
 
       const existing = await tx.rcfaActionItem.findUnique({
@@ -141,9 +141,9 @@ export async function PATCH(
     return NextResponse.json({ id: updated.id });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === "RCFA_NOT_IN_INVESTIGATION") {
+      if (error.message === "RCFA_STATUS_INVALID") {
         return NextResponse.json(
-          { error: "RCFA must be in investigation status" },
+          { error: "RCFA must be in investigation or actions_open status" },
           { status: 409 }
         );
       }
@@ -184,17 +184,17 @@ export async function DELETE(
     if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (rcfa.status !== "investigation") {
+    if (rcfa.status !== "investigation" && rcfa.status !== "actions_open") {
       return NextResponse.json(
-        { error: "RCFA must be in investigation status" },
+        { error: "RCFA must be in investigation or actions_open status" },
         { status: 409 }
       );
     }
 
     await prisma.$transaction(async (tx) => {
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
-      if (locked.status !== "investigation") {
-        throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      if (locked.status !== "investigation" && locked.status !== "actions_open") {
+        throw new Error("RCFA_STATUS_INVALID");
       }
 
       const existing = await tx.rcfaActionItem.findUnique({
@@ -223,9 +223,9 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === "RCFA_NOT_IN_INVESTIGATION") {
+      if (error.message === "RCFA_STATUS_INVALID") {
         return NextResponse.json(
-          { error: "RCFA must be in investigation status" },
+          { error: "RCFA must be in investigation or actions_open status" },
           { status: 409 }
         );
       }

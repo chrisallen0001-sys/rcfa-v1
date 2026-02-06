@@ -172,11 +172,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Handle investigation notes updates (allowed during investigation status)
+    // Handle investigation notes updates (allowed during investigation or actions_open status)
     if (hasInvestigationFieldUpdates) {
-      if (rcfa.status !== "investigation") {
+      if (rcfa.status !== "investigation" && rcfa.status !== "actions_open") {
         return NextResponse.json(
-          { error: "Investigation notes can only be updated during investigation status" },
+          { error: "Investigation notes can only be updated during investigation or actions_open status" },
           { status: 409 }
         );
       }
