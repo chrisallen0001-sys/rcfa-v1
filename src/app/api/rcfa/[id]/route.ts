@@ -6,6 +6,8 @@ import type { RcfaStatus } from "@/generated/prisma/client";
 import {
   validateStatusTransition,
   RCFA_STATUS_LABELS,
+  PATCH_ALLOWED_TRANSITIONS,
+  ALL_RCFA_STATUSES,
 } from "@/lib/rcfa-utils";
 
 const UUID_RE =
@@ -108,26 +110,19 @@ export async function PATCH(
       );
     }
 
-    const validStatuses: RcfaStatus[] = [
-      "draft",
-      "investigation",
-      "actions_open",
-      "closed",
-    ];
-    if (!validStatuses.includes(newStatus)) {
+    if (!ALL_RCFA_STATUSES.includes(newStatus)) {
       return NextResponse.json(
         { error: `Invalid status value: ${newStatus}` },
         { status: 400 }
       );
     }
 
-    const rcfa = await prisma.rcfa.findUnique({
-      where: { id },
+    const rcfa = await prisma.rcfa.findFirst({
+      where: { id, deletedAt: null },
       select: {
         id: true,
         status: true,
         ownerUserId: true,
-        deletedAt: true,
       },
     });
 
@@ -135,20 +130,18 @@ export async function PATCH(
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
     }
 
-    if (rcfa.deletedAt) {
-      return NextResponse.json(
-        { error: "Cannot update a deleted RCFA" },
-        { status: 400 }
-      );
-    }
-
     // Check permission: owner or admin
     if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Validate the status transition
-    const validation = validateStatusTransition(rcfa.status, newStatus);
+    // Validate the status transition (PATCH only allows backward transitions)
+    // Forward transitions must use dedicated endpoints: /start-investigation, /finalize, /close
+    const validation = validateStatusTransition(
+      rcfa.status,
+      newStatus,
+      PATCH_ALLOWED_TRANSITIONS
+    );
     if (!validation.valid) {
       return NextResponse.json(
         {
@@ -174,7 +167,11 @@ export async function PATCH(
     await prisma.$transaction(async (tx) => {
       // Re-check status inside transaction to prevent race conditions
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
-      const revalidation = validateStatusTransition(locked.status, newStatus);
+      const revalidation = validateStatusTransition(
+        locked.status,
+        newStatus,
+        PATCH_ALLOWED_TRANSITIONS
+      );
       if (!revalidation.valid) {
         throw new Error("TRANSITION_INVALID");
       }

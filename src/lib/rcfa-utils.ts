@@ -43,6 +43,26 @@ export const VALID_STATUS_TRANSITIONS: Record<RcfaStatus, RcfaStatus[]> = {
   closed: ["actions_open"],
 };
 
+/**
+ * Transitions allowed via the generic PATCH endpoint.
+ * Forward transitions (draft→investigation, investigation→actions_open, actions_open→closed)
+ * must use their dedicated endpoints which enforce business rules:
+ * - /start-investigation: draft → investigation
+ * - /finalize: investigation → actions_open (requires root causes)
+ * - /close: actions_open → closed (requires action items complete)
+ */
+export const PATCH_ALLOWED_TRANSITIONS: Record<RcfaStatus, RcfaStatus[]> = {
+  draft: [],                        // Use /start-investigation
+  investigation: ["draft"],         // Back only; use /finalize to go forward
+  actions_open: ["investigation"],  // Back only; use /close to go forward
+  closed: ["actions_open"],         // Reopen allowed via PATCH
+};
+
+/**
+ * All valid RCFA status values.
+ */
+export const ALL_RCFA_STATUSES = Object.keys(VALID_STATUS_TRANSITIONS) as RcfaStatus[];
+
 export type StatusTransitionResult =
   | { valid: true }
   | { valid: false; error: string; allowedTransitions: RcfaStatus[] };
@@ -51,17 +71,19 @@ export type StatusTransitionResult =
  * Validates whether a status transition is allowed.
  * @param from - Current status
  * @param to - Target status
+ * @param transitionMap - Optional custom transition map (defaults to VALID_STATUS_TRANSITIONS)
  * @returns Validation result with error message if invalid
  */
 export function validateStatusTransition(
   from: RcfaStatus,
-  to: RcfaStatus
+  to: RcfaStatus,
+  transitionMap: Record<RcfaStatus, RcfaStatus[]> = VALID_STATUS_TRANSITIONS
 ): StatusTransitionResult {
   if (from === to) {
     return { valid: true };
   }
 
-  const allowed = VALID_STATUS_TRANSITIONS[from];
+  const allowed = transitionMap[from];
 
   if (allowed.includes(to)) {
     return { valid: true };
