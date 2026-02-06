@@ -6,7 +6,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -16,6 +16,12 @@ export async function POST(
     if (!UUID_RE.test(id)) {
       return NextResponse.json({ error: "Invalid RCFA id" }, { status: 400 });
     }
+
+    const body = await request.json().catch(() => ({}));
+    const closingNotes =
+      typeof body.closingNotes === "string"
+        ? body.closingNotes.trim() || null
+        : null;
 
     const rcfa = await prisma.rcfa.findUnique({ where: { id } });
     if (!rcfa) {
@@ -58,7 +64,12 @@ export async function POST(
 
       await tx.rcfa.update({
         where: { id },
-        data: { status: "closed", closedAt: new Date() },
+        data: {
+          status: "closed",
+          closedAt: new Date(),
+          closedByUserId: userId,
+          closingNotes,
+        },
       });
 
       await tx.rcfaAuditEvent.create({
@@ -66,7 +77,11 @@ export async function POST(
           rcfaId: id,
           actorUserId: userId,
           eventType: "status_changed",
-          eventPayload: { from: "actions_open", to: "closed" },
+          eventPayload: {
+            from: "actions_open",
+            to: "closed",
+            closingNotes,
+          },
         },
       });
     });
