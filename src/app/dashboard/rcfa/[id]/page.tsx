@@ -214,6 +214,10 @@ export default async function RcfaDetailPage({
       ? candidateGeneratedEvents[1].createdAt
       : null;
 
+  // Helper to determine if a candidate was added in the latest re-analysis
+  const isNewCandidate = (generatedAt: Date): boolean =>
+    previousAnalysisTimestamp !== null && generatedAt > previousAnalysisTimestamp;
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-2">
@@ -370,9 +374,7 @@ export default async function RcfaDetailPage({
           <Section title="Root Cause Candidates">
             <div className="space-y-4">
               {sortedRootCauseCandidates.map((c) => {
-                const isNew =
-                  previousAnalysisTimestamp !== null &&
-                  c.generatedAt > previousAnalysisTimestamp;
+                const isNew = isNewCandidate(c.generatedAt);
                 return (
                   <div
                     key={c.id}
@@ -457,9 +459,7 @@ export default async function RcfaDetailPage({
           <Section title="Action Item Candidates">
             <div className="space-y-4">
               {rcfa.actionItemCandidates.map((a) => {
-                const isNew =
-                  previousAnalysisTimestamp !== null &&
-                  a.generatedAt > previousAnalysisTimestamp;
+                const isNew = isNewCandidate(a.generatedAt);
                 return (
                   <div
                     key={a.id}

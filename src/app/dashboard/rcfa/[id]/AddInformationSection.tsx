@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 interface AddInformationSectionProps {
@@ -22,6 +22,7 @@ export default function AddInformationSection({
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const pendingRef = useRef(false);
 
   const hasChanges = notes !== (initialNotes ?? "");
 
@@ -34,6 +35,8 @@ export default function AddInformationSection({
   );
 
   const handleSave = async () => {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setIsSaving(true);
     setFeedback(null);
 
@@ -60,6 +63,7 @@ export default function AddInformationSection({
       });
     } finally {
       setIsSaving(false);
+      pendingRef.current = false;
     }
   };
 

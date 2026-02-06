@@ -36,7 +36,7 @@ Ask yourself these specific questions:
 
 If the answer to ALL of the above is "no," set noMaterialChange to true and return empty arrays.
 
-STEP 2 — FULL RE-ANALYSIS (only if Step 1 determined material change exists). If and only if Step 1 identified a genuine material change, produce a complete updated set of root cause candidates and action items incorporating the new evidence.
+STEP 2 — PRODUCE ONLY NEW CANDIDATES (only if Step 1 determined material change exists). If and only if Step 1 identified a genuine material change, produce ONLY NEW root cause candidates and action items that differ from the existing ones. Do NOT repeat or rephrase existing candidates. The new candidates you provide will be APPENDED to the existing list, so only include genuinely new hypotheses or actions that are not already captured.
 
 A material change requires that the ENGINEERING CONCLUSIONS change, not merely that the answer text looks different. Specifically, a material change means ANY of the following:
 - A new root cause should be added that is not substantively covered by any existing candidate
@@ -193,7 +193,7 @@ function buildReAnalyzePrompt(
   ];
 
   const investigationNotesSection = rcfa.investigationNotes
-    ? `\n=== INVESTIGATION NOTES (NEW FINDINGS) ===\n${rcfa.investigationNotes}`
+    ? `\n=== INVESTIGATION NOTES (NEW FINDINGS) ===\n${truncateField(rcfa.investigationNotes, 2000)}`
     : "";
 
   const qaLines = allQuestions.map((q) =>
