@@ -3,18 +3,20 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
+import { useElapsedTime } from "./useElapsedTime";
 
-interface StartInvestigationButtonProps {
+interface AnalyzeWithAIButtonProps {
   rcfaId: string;
 }
 
-export default function StartInvestigationButton({
+export default function AnalyzeWithAIButton({
   rcfaId,
-}: StartInvestigationButtonProps) {
+}: AnalyzeWithAIButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingRef = useRef(false);
+  const elapsed = useElapsedTime(loading);
 
   async function handleClick() {
     if (pendingRef.current) return;
@@ -23,19 +25,19 @@ export default function StartInvestigationButton({
     setError(null);
 
     try {
-      const res = await fetch(`/api/rcfa/${rcfaId}/start-investigation`, {
+      const res = await fetch(`/api/rcfa/${rcfaId}/analyze`, {
         method: "POST",
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to start investigation");
+        throw new Error(data.error ?? "Failed to analyze with AI");
       }
 
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to start investigation"
+        err instanceof Error ? err.message : "Failed to analyze with AI"
       );
     } finally {
       pendingRef.current = false;
@@ -48,15 +50,15 @@ export default function StartInvestigationButton({
       <button
         onClick={handleClick}
         disabled={loading}
-        className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-500 dark:hover:bg-purple-400"
       >
         {loading ? (
           <span className="flex items-center gap-2">
             <Spinner />
-            Starting...
+            Analyzing with AI... {elapsed}s
           </span>
         ) : (
-          "Start Without AI"
+          "Analyze with AI"
         )}
       </button>
       {error && (

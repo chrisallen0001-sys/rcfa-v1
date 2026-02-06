@@ -7,6 +7,7 @@ import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
+import AnalyzeWithAIButton from "./AnalyzeWithAIButton";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
@@ -108,14 +109,11 @@ function Badge({ label, colorClass }: { label: string; colorClass: string }) {
 
 export default async function RcfaDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ analyzeError?: string }>;
 }) {
   const { userId, role } = await getAuthContext();
   const { id } = await params;
-  const { analyzeError } = await searchParams;
 
   if (!UUID_RE.test(id)) {
     notFound();
@@ -225,14 +223,10 @@ export default async function RcfaDetailPage({
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
-      {analyzeError && (
-        <div className="mb-6 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-          AI analysis could not be completed. Your RCFA has been saved as a draft.
-        </div>
-      )}
-
       {rcfa.status === "draft" && canEdit && (
-        <div className="mb-6">
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <AnalyzeWithAIButton rcfaId={rcfa.id} />
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
           <StartInvestigationButton rcfaId={rcfa.id} />
         </div>
       )}
