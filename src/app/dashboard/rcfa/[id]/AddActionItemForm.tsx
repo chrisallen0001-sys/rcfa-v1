@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
+import { useUsers } from "./useUsers";
 
 interface AddActionItemFormProps {
   rcfaId: string;
@@ -15,6 +16,8 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
   const [priority, setPriority] = useState("medium");
   const [successCriteria, setSuccessCriteria] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [ownerUserId, setOwnerUserId] = useState("");
+  const { users, loading: loadingUsers } = useUsers(open);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingRef = useRef(false);
@@ -35,6 +38,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
           priority,
           successCriteria,
           dueDate: dueDate || null,
+          ownerUserId: ownerUserId || null,
         }),
       });
 
@@ -47,6 +51,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
       setPriority("medium");
       setSuccessCriteria("");
       setDueDate("");
+      setOwnerUserId("");
       setOpen(false);
       router.refresh();
     } catch (err) {
@@ -111,6 +116,30 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
             <option value="high">High</option>
           </select>
         </div>
+        <div>
+          <label
+            htmlFor="ownerUserId"
+            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            Assigned Owner
+          </label>
+          <select
+            id="ownerUserId"
+            value={ownerUserId}
+            onChange={(e) => setOwnerUserId(e.target.value)}
+            disabled={loadingUsers}
+            className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          >
+            <option value="">{loadingUsers ? "Loading..." : "Unassigned"}</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
         <DateInput
           id="dueDate"
           label="Due Date"
@@ -154,6 +183,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
             setPriority("medium");
             setSuccessCriteria("");
             setDueDate("");
+            setOwnerUserId("");
             setError(null);
           }}
           className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"

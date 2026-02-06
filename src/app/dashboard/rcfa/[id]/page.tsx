@@ -2,11 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
+import AnalyzeWithAIButton from "./AnalyzeWithAIButton";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
@@ -18,28 +19,14 @@ import CloseRcfaButton from "./CloseRcfaButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
+import EditableIntakeForm from "./EditableIntakeForm";
 import type {
-  RcfaStatus,
   ConfidenceLabel,
   Priority,
   OperatingContext,
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const STATUS_LABELS: Record<RcfaStatus, string> = {
-  draft: "Draft",
-  investigation: "Investigation",
-  actions_open: "Actions Open",
-  closed: "Closed",
-};
-
-const STATUS_COLORS: Record<RcfaStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  investigation: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  actions_open: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  closed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-};
 
 const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
   low: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -122,14 +109,11 @@ function Badge({ label, colorClass }: { label: string; colorClass: string }) {
 
 export default async function RcfaDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ analyzeError?: string }>;
 }) {
   const { userId, role } = await getAuthContext();
   const { id } = await params;
-  const { analyzeError } = await searchParams;
 
   if (!UUID_RE.test(id)) {
     notFound();
@@ -151,7 +135,10 @@ export default async function RcfaDetailPage({
       actionItemCandidates: { orderBy: { generatedAt: "asc" } },
       actionItems: {
         orderBy: { createdAt: "asc" },
-        include: { createdBy: { select: { email: true } } },
+        include: {
+          createdBy: { select: { email: true } },
+          owner: { select: { id: true, displayName: true } },
+        },
       },
       auditEvents: {
         orderBy: { createdAt: "desc" },
@@ -228,71 +215,101 @@ export default async function RcfaDetailPage({
           </h1>
         </div>
         <Badge
-          label={STATUS_LABELS[rcfa.status]}
-          colorClass={STATUS_COLORS[rcfa.status]}
+          label={RCFA_STATUS_LABELS[rcfa.status]}
+          colorClass={RCFA_STATUS_COLORS[rcfa.status]}
         />
       </div>
       <div className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
-      {analyzeError && (
-        <div className="mb-6 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-          AI analysis could not be completed. Your RCFA has been saved as a draft.
-        </div>
-      )}
-
       {rcfa.status === "draft" && canEdit && (
         <div className="mb-6">
-          <StartInvestigationButton rcfaId={rcfa.id} />
+          <div className="flex flex-wrap items-center gap-3">
+            <AnalyzeWithAIButton rcfaId={rcfa.id} />
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
+            <StartInvestigationButton rcfaId={rcfa.id} />
+          </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            AI analysis generates follow-up questions, root cause candidates, and action items. You can also start without AI and add these manually.
+          </p>
         </div>
       )}
 
       <div className="space-y-6">
-        {/* Intake Summary */}
-        <Section title="Intake Summary">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <Field label="Equipment Description" value={rcfa.equipmentDescription} />
-            <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
-            <Field label="Make" value={rcfa.equipmentMake} />
-            <Field label="Model" value={rcfa.equipmentModel} />
-            <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
-            <Field
-              label="Equipment Age (years)"
-              value={rcfa.equipmentAgeYears?.toString() ?? null}
-            />
-            <Field
-              label="Downtime (minutes)"
-              value={rcfa.downtimeMinutes?.toString() ?? null}
-            />
-            <Field
-              label="Production Cost (USD)"
-              value={formatUsd(rcfa.productionCostUsd)}
-            />
-            <Field
-              label="Maintenance Cost (USD)"
-              value={formatUsd(rcfa.maintenanceCostUsd)}
-            />
-            <Field
-              label="Total Cost (USD)"
-              value={
-                rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
-                  ? formatUsd(
-                      Number(rcfa.productionCostUsd ?? 0) +
-                        Number(rcfa.maintenanceCostUsd ?? 0)
-                    )
-                  : null
-              }
-            />
-          </dl>
-          <dl className="mt-4 grid gap-4">
-            <Field label="Failure Description" value={rcfa.failureDescription} />
-            <Field label="Pre-Failure Conditions" value={rcfa.preFailureConditions} />
-            <Field label="Work History Summary" value={rcfa.workHistorySummary} />
-            <Field label="Active PMs Summary" value={rcfa.activePmsSummary} />
-            <Field label="Additional Notes" value={rcfa.additionalNotes} />
-          </dl>
-        </Section>
+        {/* Intake Summary - editable when draft */}
+        {rcfa.status === "draft" && canEdit ? (
+          <EditableIntakeForm
+            rcfaId={rcfa.id}
+            initialData={{
+              title: rcfa.title,
+              equipmentDescription: rcfa.equipmentDescription,
+              operatingContext: rcfa.operatingContext,
+              equipmentMake: rcfa.equipmentMake,
+              equipmentModel: rcfa.equipmentModel,
+              equipmentSerialNumber: rcfa.equipmentSerialNumber,
+              equipmentAgeYears: rcfa.equipmentAgeYears
+                ? Number(rcfa.equipmentAgeYears)
+                : null,
+              downtimeMinutes: rcfa.downtimeMinutes,
+              productionCostUsd: rcfa.productionCostUsd
+                ? Number(rcfa.productionCostUsd)
+                : null,
+              maintenanceCostUsd: rcfa.maintenanceCostUsd
+                ? Number(rcfa.maintenanceCostUsd)
+                : null,
+              failureDescription: rcfa.failureDescription,
+              preFailureConditions: rcfa.preFailureConditions,
+              workHistorySummary: rcfa.workHistorySummary,
+              activePmsSummary: rcfa.activePmsSummary,
+              additionalNotes: rcfa.additionalNotes,
+            }}
+          />
+        ) : (
+          <Section title="Intake Summary">
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <Field label="Equipment Description" value={rcfa.equipmentDescription} />
+              <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
+              <Field label="Make" value={rcfa.equipmentMake} />
+              <Field label="Model" value={rcfa.equipmentModel} />
+              <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
+              <Field
+                label="Equipment Age (years)"
+                value={rcfa.equipmentAgeYears?.toString() ?? null}
+              />
+              <Field
+                label="Downtime (minutes)"
+                value={rcfa.downtimeMinutes?.toString() ?? null}
+              />
+              <Field
+                label="Production Cost (USD)"
+                value={formatUsd(rcfa.productionCostUsd)}
+              />
+              <Field
+                label="Maintenance Cost (USD)"
+                value={formatUsd(rcfa.maintenanceCostUsd)}
+              />
+              <Field
+                label="Total Cost (USD)"
+                value={
+                  rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
+                    ? formatUsd(
+                        Number(rcfa.productionCostUsd ?? 0) +
+                          Number(rcfa.maintenanceCostUsd ?? 0)
+                      )
+                    : null
+                }
+              />
+            </dl>
+            <dl className="mt-4 grid gap-4">
+              <Field label="Failure Description" value={rcfa.failureDescription} />
+              <Field label="Pre-Failure Conditions" value={rcfa.preFailureConditions} />
+              <Field label="Work History Summary" value={rcfa.workHistorySummary} />
+              <Field label="Active PMs Summary" value={rcfa.activePmsSummary} />
+              <Field label="Additional Notes" value={rcfa.additionalNotes} />
+            </dl>
+          </Section>
+        )}
 
         {/* Follow-up Questions */}
         {hasAnalysis && rcfa.followupQuestions.length > 0 && (
@@ -455,6 +472,8 @@ export default async function RcfaDetailPage({
                   status={a.status}
                   successCriteria={a.successCriteria}
                   dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
+                  ownerUserId={a.owner?.id ?? null}
+                  ownerName={a.owner?.displayName ?? null}
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
                   isInvestigation={rcfa.status === "investigation" && canEdit}
