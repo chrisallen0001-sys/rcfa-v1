@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
@@ -19,27 +19,12 @@ import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
 import type {
-  RcfaStatus,
   ConfidenceLabel,
   Priority,
   OperatingContext,
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const STATUS_LABELS: Record<RcfaStatus, string> = {
-  draft: "Draft",
-  investigation: "Investigation",
-  actions_open: "Actions Open",
-  closed: "Closed",
-};
-
-const STATUS_COLORS: Record<RcfaStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  investigation: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  actions_open: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  closed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-};
 
 const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
   low: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -228,8 +213,8 @@ export default async function RcfaDetailPage({
           </h1>
         </div>
         <Badge
-          label={STATUS_LABELS[rcfa.status]}
-          colorClass={STATUS_COLORS[rcfa.status]}
+          label={RCFA_STATUS_LABELS[rcfa.status]}
+          colorClass={RCFA_STATUS_COLORS[rcfa.status]}
         />
       </div>
       <div className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
