@@ -1,18 +1,33 @@
 import { prisma } from "@/lib/prisma";
-import { RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
 import type { RcfaStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import RcfaListFilter from "./RcfaListFilter";
 import SearchInput from "./SearchInput";
-import { NewRcfaButton } from "@/components/NewRcfaButton";
 
 export const metadata: Metadata = {
   title: "Dashboard – RCFA",
 };
 
 const ITEMS_PER_PAGE = 50;
+
+const STATUS_LABELS: Record<RcfaStatus, string> = {
+  draft: "Draft",
+  investigation: "Investigation",
+  actions_open: "Actions Open",
+  closed: "Closed",
+};
+
+const STATUS_COLORS: Record<RcfaStatus, string> = {
+  draft: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  investigation:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  actions_open:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  closed:
+    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+};
 
 export type RcfaRow = {
   id: string;
@@ -217,7 +232,15 @@ export default async function DashboardPage({
             Action Items
           </Link>
         </h1>
-        <NewRcfaButton />
+        <Link
+          href="/dashboard/intake"
+          className="flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          New RCFA
+        </Link>
       </div>
       <Suspense>
         <SearchInput />
@@ -230,8 +253,8 @@ export default async function DashboardPage({
       )}
       <RcfaListFilter
         items={rows}
-        statusLabels={RCFA_STATUS_LABELS}
-        statusColors={RCFA_STATUS_COLORS}
+        statusLabels={STATUS_LABELS}
+        statusColors={STATUS_COLORS}
         isSearching={!!searchQuery}
       />
       {totalPages > 1 && (

@@ -18,7 +18,7 @@ export default function FinalizeInvestigationButton({
   async function handleClick() {
     if (pendingRef.current) return;
     const ok = window.confirm(
-      "Finalize investigation? This will move the RCFA to Action Items in Progress and lock root cause editing."
+      "Finalize investigation? This will move the RCFA to Actions Open and lock root cause editing."
     );
     if (!ok) return;
     pendingRef.current = true;

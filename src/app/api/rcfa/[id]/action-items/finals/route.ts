@@ -38,10 +38,6 @@ export async function POST(
       typeof body.dueDate === "string" && ISO_DATE_RE.test(body.dueDate)
         ? new Date(body.dueDate + "T00:00:00Z")
         : null;
-    const ownerUserId =
-      typeof body.ownerUserId === "string" && UUID_RE.test(body.ownerUserId)
-        ? body.ownerUserId
-        : null;
 
     if (!actionText) {
       return NextResponse.json(
@@ -89,7 +85,6 @@ export async function POST(
           successCriteria,
           priority,
           dueDate,
-          ownerUserId,
           selectedFromCandidateId: null,
           createdByUserId: userId,
           status: "open",
@@ -107,7 +102,6 @@ export async function POST(
             priority,
             successCriteria,
             dueDate,
-            ownerUserId,
           },
         },
       });

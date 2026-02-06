@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Spinner } from "@/components/Spinner";
+import { useElapsedTime } from "../rcfa/[id]/useElapsedTime";
 
 const OPERATING_CONTEXTS = [
   { value: "unknown", label: "Unknown" },
@@ -53,8 +54,10 @@ export default function IntakePage() {
   const router = useRouter();
   const [form, setForm] = useState<IntakeFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof IntakeFormData, string>>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "creating" | "analyzing">("idle");
+  const submitting = submitPhase !== "idle";
   const [submitError, setSubmitError] = useState("");
+  const elapsed = useElapsedTime(submitPhase === "analyzing");
 
   function updateField(field: keyof IntakeFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -107,7 +110,7 @@ export default function IntakePage() {
 
     if (!validate()) return;
 
-    setSubmitting(true);
+    setSubmitPhase("creating");
     try {
       const createRes = await fetch("/api/rcfa", {
         method: "POST",
@@ -138,11 +141,22 @@ export default function IntakePage() {
       }
 
       const { id } = await createRes.json();
+
+      setSubmitPhase("analyzing");
+      const analyzeRes = await fetch(`/api/rcfa/${id}/analyze`, {
+        method: "POST",
+      });
+
+      if (!analyzeRes.ok) {
+        router.push(`/dashboard/rcfa/${id}?analyzeError=1`);
+        return;
+      }
+
       router.push(`/dashboard/rcfa/${id}`);
     } catch {
       setSubmitError("Something went wrong. Please try again.");
     } finally {
-      setSubmitting(false);
+      setSubmitPhase("idle");
     }
   }
 
@@ -459,10 +473,15 @@ export default function IntakePage() {
             disabled={submitting}
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            {submitting ? (
+            {submitPhase === "creating" ? (
               <span className="flex items-center gap-2">
                 <Spinner />
                 Creating...
+              </span>
+            ) : submitPhase === "analyzing" ? (
+              <span className="flex items-center gap-2">
+                <Spinner />
+                Analyzing... {elapsed}s
               </span>
             ) : (
               "Create RCFA"

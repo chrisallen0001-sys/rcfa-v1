@@ -5,7 +5,6 @@ import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
 import ActionItemsFilter from "./ActionItemsFilter";
-import { NewRcfaButton } from "@/components/NewRcfaButton";
 
 export const metadata: Metadata = {
   title: "Action Items – RCFA",
@@ -110,7 +109,15 @@ export default async function ActionItemsPage({
           <span className="text-zinc-300 dark:text-zinc-600" aria-hidden="true">/</span>
           <span className="text-zinc-900 dark:text-zinc-50">Action Items</span>
         </h1>
-        <NewRcfaButton />
+        <Link
+          href="/dashboard/intake"
+          className="flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          New RCFA
+        </Link>
       </div>
       <ActionItemsFilter
         items={rows}

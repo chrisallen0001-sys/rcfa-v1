@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
+import { useElapsedTime } from "./useElapsedTime";
 
 interface StartInvestigationButtonProps {
   rcfaId: string;
@@ -15,6 +16,7 @@ export default function StartInvestigationButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingRef = useRef(false);
+  const elapsed = useElapsedTime(loading);
 
   async function handleClick() {
     if (pendingRef.current) return;
@@ -48,16 +50,15 @@ export default function StartInvestigationButton({
       <button
         onClick={handleClick}
         disabled={loading}
-        title="Start investigation manually without AI suggestions. You can add root causes and action items yourself."
-        className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
       >
         {loading ? (
           <span className="flex items-center gap-2">
             <Spinner />
-            Starting...
+            Analyzing... {elapsed}s
           </span>
         ) : (
-          "Start Without AI"
+          "Start Investigation"
         )}
       </button>
       {error && (
