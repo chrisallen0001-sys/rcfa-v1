@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { OperatingContext } from "@/generated/prisma/client";
+import type { OperatingContext } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-
-const VALID_OPERATING_CONTEXTS: OperatingContext[] = [
-  "running",
-  "startup",
-  "shutdown",
-  "maintenance",
-  "unknown",
-];
+import { VALID_OPERATING_CONTEXTS } from "@/lib/rcfa-utils";
 
 /**
  * POST /api/rcfa - Create a new RCFA

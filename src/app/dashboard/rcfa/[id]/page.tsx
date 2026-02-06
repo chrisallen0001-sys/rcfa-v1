@@ -18,6 +18,7 @@ import CloseRcfaButton from "./CloseRcfaButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
+import EditableIntakeForm from "./EditableIntakeForm";
 import type {
   ConfidenceLabel,
   Priority,
@@ -234,50 +235,79 @@ export default async function RcfaDetailPage({
       )}
 
       <div className="space-y-6">
-        {/* Intake Summary */}
-        <Section title="Intake Summary">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <Field label="Equipment Description" value={rcfa.equipmentDescription} />
-            <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
-            <Field label="Make" value={rcfa.equipmentMake} />
-            <Field label="Model" value={rcfa.equipmentModel} />
-            <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
-            <Field
-              label="Equipment Age (years)"
-              value={rcfa.equipmentAgeYears?.toString() ?? null}
-            />
-            <Field
-              label="Downtime (minutes)"
-              value={rcfa.downtimeMinutes?.toString() ?? null}
-            />
-            <Field
-              label="Production Cost (USD)"
-              value={formatUsd(rcfa.productionCostUsd)}
-            />
-            <Field
-              label="Maintenance Cost (USD)"
-              value={formatUsd(rcfa.maintenanceCostUsd)}
-            />
-            <Field
-              label="Total Cost (USD)"
-              value={
-                rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
-                  ? formatUsd(
-                      Number(rcfa.productionCostUsd ?? 0) +
-                        Number(rcfa.maintenanceCostUsd ?? 0)
-                    )
-                  : null
-              }
-            />
-          </dl>
-          <dl className="mt-4 grid gap-4">
-            <Field label="Failure Description" value={rcfa.failureDescription} />
-            <Field label="Pre-Failure Conditions" value={rcfa.preFailureConditions} />
-            <Field label="Work History Summary" value={rcfa.workHistorySummary} />
-            <Field label="Active PMs Summary" value={rcfa.activePmsSummary} />
-            <Field label="Additional Notes" value={rcfa.additionalNotes} />
-          </dl>
-        </Section>
+        {/* Intake Summary - editable when draft */}
+        {rcfa.status === "draft" && canEdit ? (
+          <EditableIntakeForm
+            rcfaId={rcfa.id}
+            initialData={{
+              title: rcfa.title,
+              equipmentDescription: rcfa.equipmentDescription,
+              operatingContext: rcfa.operatingContext,
+              equipmentMake: rcfa.equipmentMake,
+              equipmentModel: rcfa.equipmentModel,
+              equipmentSerialNumber: rcfa.equipmentSerialNumber,
+              equipmentAgeYears: rcfa.equipmentAgeYears
+                ? Number(rcfa.equipmentAgeYears)
+                : null,
+              downtimeMinutes: rcfa.downtimeMinutes,
+              productionCostUsd: rcfa.productionCostUsd
+                ? Number(rcfa.productionCostUsd)
+                : null,
+              maintenanceCostUsd: rcfa.maintenanceCostUsd
+                ? Number(rcfa.maintenanceCostUsd)
+                : null,
+              failureDescription: rcfa.failureDescription,
+              preFailureConditions: rcfa.preFailureConditions,
+              workHistorySummary: rcfa.workHistorySummary,
+              activePmsSummary: rcfa.activePmsSummary,
+              additionalNotes: rcfa.additionalNotes,
+            }}
+          />
+        ) : (
+          <Section title="Intake Summary">
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <Field label="Equipment Description" value={rcfa.equipmentDescription} />
+              <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
+              <Field label="Make" value={rcfa.equipmentMake} />
+              <Field label="Model" value={rcfa.equipmentModel} />
+              <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
+              <Field
+                label="Equipment Age (years)"
+                value={rcfa.equipmentAgeYears?.toString() ?? null}
+              />
+              <Field
+                label="Downtime (minutes)"
+                value={rcfa.downtimeMinutes?.toString() ?? null}
+              />
+              <Field
+                label="Production Cost (USD)"
+                value={formatUsd(rcfa.productionCostUsd)}
+              />
+              <Field
+                label="Maintenance Cost (USD)"
+                value={formatUsd(rcfa.maintenanceCostUsd)}
+              />
+              <Field
+                label="Total Cost (USD)"
+                value={
+                  rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
+                    ? formatUsd(
+                        Number(rcfa.productionCostUsd ?? 0) +
+                          Number(rcfa.maintenanceCostUsd ?? 0)
+                      )
+                    : null
+                }
+              />
+            </dl>
+            <dl className="mt-4 grid gap-4">
+              <Field label="Failure Description" value={rcfa.failureDescription} />
+              <Field label="Pre-Failure Conditions" value={rcfa.preFailureConditions} />
+              <Field label="Work History Summary" value={rcfa.workHistorySummary} />
+              <Field label="Active PMs Summary" value={rcfa.activePmsSummary} />
+              <Field label="Additional Notes" value={rcfa.additionalNotes} />
+            </dl>
+          </Section>
+        )}
 
         {/* Follow-up Questions */}
         {hasAnalysis && rcfa.followupQuestions.length > 0 && (
