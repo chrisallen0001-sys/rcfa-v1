@@ -17,6 +17,7 @@ import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
 import CloseRcfaButton from "./CloseRcfaButton";
 import BackToInvestigationButton from "./BackToInvestigationButton";
+import ReopenRcfaButton from "./ReopenRcfaButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
@@ -125,6 +126,7 @@ export default async function RcfaDetailPage({
     where: { id },
     include: {
       owner: { select: { id: true, displayName: true } },
+      closedBy: { select: { email: true } },
       followupQuestions: {
         orderBy: [{ generatedAt: "asc" }, { id: "asc" }],
         include: { answeredBy: { select: { email: true } } },
@@ -592,6 +594,36 @@ export default async function RcfaDetailPage({
               </p>
             )}
           </div>
+        )}
+
+        {/* Closed RCFA Info */}
+        {rcfa.status === "closed" && (
+          <Section title="Closed">
+            <div className="space-y-3">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                This RCFA was closed on{" "}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  {rcfa.closedAt?.toISOString().slice(0, 10) ?? "—"}
+                </span>
+                {rcfa.closedBy && (
+                  <> by <span className="font-medium text-zinc-900 dark:text-zinc-100">{rcfa.closedBy.email}</span></>
+                )}
+              </p>
+              {rcfa.closingNotes && (
+                <div className="rounded-md border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Closing Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
+                    {rcfa.closingNotes}
+                  </p>
+                </div>
+              )}
+              {isAdmin && (
+                <div className="pt-2">
+                  <ReopenRcfaButton rcfaId={rcfa.id} />
+                </div>
+              )}
+            </div>
+          </Section>
         )}
 
         {/* Audit Log */}
