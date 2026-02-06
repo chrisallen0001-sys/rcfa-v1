@@ -56,7 +56,14 @@ export async function POST(
           rcfaId: id,
           actorUserId: userId,
           eventType: "status_changed",
-          eventPayload: { from: "closed", to: "actions_open", reason: "reopened" },
+          eventPayload: {
+            from: "closed",
+            to: "actions_open",
+            reason: "reopened",
+            previousClosedAt: locked.closedAt,
+            previousClosedByUserId: locked.closedByUserId,
+            previousClosingNotes: locked.closingNotes,
+          },
         },
       });
     });

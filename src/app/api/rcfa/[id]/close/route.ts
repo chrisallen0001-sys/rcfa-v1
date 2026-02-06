@@ -20,7 +20,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const closingNotes =
       typeof body.closingNotes === "string"
-        ? body.closingNotes.trim() || null
+        ? body.closingNotes.trim().slice(0, 2000) || null
         : null;
 
     const rcfa = await prisma.rcfa.findUnique({ where: { id } });
