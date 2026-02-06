@@ -564,7 +564,7 @@ export default async function RcfaDetailPage({
                   ownerName={a.owner?.displayName ?? null}
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
-                  isInvestigation={canEditActionItems}
+                  canEdit={canEditActionItems}
                 />
               ))}
               {canEditActionItems && (
@@ -584,6 +584,11 @@ export default async function RcfaDetailPage({
             {!allActionItemsComplete && totalActionItems > 0 && (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Complete all action items to close this RCFA
+              </p>
+            )}
+            {totalActionItems === 0 && (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Add at least one action item to close this RCFA
               </p>
             )}
           </div>

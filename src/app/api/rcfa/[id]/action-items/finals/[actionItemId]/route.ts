@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import type { Priority } from "@/generated/prisma/client";
+import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
+
+const VALID_STATUSES: ActionItemStatus[] = [
+  "open",
+  "in_progress",
+  "blocked",
+  "done",
+  "canceled",
+];
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -55,6 +63,20 @@ export async function PATCH(
         : body.ownerUserId === null
           ? null
           : undefined;
+    if (
+      typeof body.status === "string" &&
+      !VALID_STATUSES.includes(body.status as ActionItemStatus)
+    ) {
+      return NextResponse.json(
+        { error: "status must be open, in_progress, blocked, done, or canceled" },
+        { status: 400 }
+      );
+    }
+    const status: ActionItemStatus | undefined =
+      typeof body.status === "string" &&
+      VALID_STATUSES.includes(body.status as ActionItemStatus)
+        ? (body.status as ActionItemStatus)
+        : undefined;
 
     if (!actionText) {
       return NextResponse.json(
@@ -110,6 +132,7 @@ export async function PATCH(
           priority,
           ...(dueDate !== undefined && { dueDate }),
           ...(ownerUserId !== undefined && { ownerUserId }),
+          ...(status !== undefined && { status }),
           updatedByUserId: userId,
         },
       });
@@ -126,11 +149,13 @@ export async function PATCH(
             previousSuccessCriteria: existing.successCriteria,
             previousDueDate: existing.dueDate,
             previousOwnerUserId: existing.ownerUserId,
+            previousStatus: existing.status,
             actionText,
             priority,
             successCriteria,
             dueDate,
             ownerUserId,
+            status,
           },
         },
       });
