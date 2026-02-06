@@ -42,7 +42,7 @@ interface EditableActionItemProps {
   ownerName: string | null;
   createdByEmail: string;
   createdAt: string;
-  isInvestigation: boolean;
+  canEdit: boolean;
 }
 
 export default function EditableActionItem({
@@ -57,12 +57,13 @@ export default function EditableActionItem({
   ownerName,
   createdByEmail,
   createdAt,
-  isInvestigation,
+  canEdit,
 }: EditableActionItemProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [actionText, setActionText] = useState(initialActionText);
   const [priority, setPriority] = useState(initialPriority);
+  const [editStatus, setEditStatus] = useState(status);
   const [successCriteria, setSuccessCriteria] = useState(
     initialSuccessCriteria ?? ""
   );
@@ -90,6 +91,7 @@ export default function EditableActionItem({
           body: JSON.stringify({
             actionText,
             priority,
+            status: editStatus,
             successCriteria,
             dueDate: dueDate || null,
             ownerUserId: ownerUserId || null,
@@ -163,7 +165,7 @@ export default function EditableActionItem({
               className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Priority
@@ -176,6 +178,22 @@ export default function EditableActionItem({
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Status
+              </label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="blocked">Blocked</option>
+                <option value="done">Done</option>
+                <option value="canceled">Canceled</option>
               </select>
             </div>
             <div>
@@ -234,6 +252,7 @@ export default function EditableActionItem({
                 setEditing(false);
                 setActionText(initialActionText);
                 setPriority(initialPriority);
+                setEditStatus(status);
                 setSuccessCriteria(initialSuccessCriteria ?? "");
                 setDueDate(initialDueDate ?? "");
                 setOwnerUserId(initialOwnerUserId ?? "");
@@ -286,7 +305,7 @@ export default function EditableActionItem({
       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
         Created by {createdByEmail} on {createdAt}
       </p>
-      {isInvestigation && (
+      {canEdit && (
         <div className="mt-3 flex items-center gap-2">
           <button
             onClick={() => setEditing(true)}
