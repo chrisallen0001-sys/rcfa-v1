@@ -8,15 +8,8 @@ import {
   RCFA_STATUS_LABELS,
   PATCH_ALLOWED_TRANSITIONS,
   ALL_RCFA_STATUSES,
+  VALID_OPERATING_CONTEXTS,
 } from "@/lib/rcfa-utils";
-
-const VALID_OPERATING_CONTEXTS: OperatingContext[] = [
-  "running",
-  "startup",
-  "shutdown",
-  "maintenance",
-  "unknown",
-];
 
 /** Fields that can be updated via PATCH when status is draft */
 const EDITABLE_DRAFT_FIELDS = [

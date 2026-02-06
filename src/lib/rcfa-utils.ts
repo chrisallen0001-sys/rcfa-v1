@@ -1,4 +1,15 @@
-import type { RcfaStatus } from "@/generated/prisma/client";
+import type { RcfaStatus, OperatingContext } from "@/generated/prisma/client";
+
+/**
+ * Valid operating context values for RCFA equipment.
+ */
+export const VALID_OPERATING_CONTEXTS: OperatingContext[] = [
+  "running",
+  "startup",
+  "shutdown",
+  "maintenance",
+  "unknown",
+];
 
 /**
  * Formats an RCFA number for display.
