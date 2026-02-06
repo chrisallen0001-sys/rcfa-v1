@@ -49,6 +49,12 @@ export async function PATCH(
         : body.dueDate === null
           ? null
           : undefined;
+    const ownerUserId =
+      typeof body.ownerUserId === "string" && UUID_RE.test(body.ownerUserId)
+        ? body.ownerUserId
+        : body.ownerUserId === null
+          ? null
+          : undefined;
 
     if (!actionText) {
       return NextResponse.json(
@@ -103,6 +109,7 @@ export async function PATCH(
           successCriteria,
           priority,
           ...(dueDate !== undefined && { dueDate }),
+          ...(ownerUserId !== undefined && { ownerUserId }),
           updatedByUserId: userId,
         },
       });
@@ -118,10 +125,12 @@ export async function PATCH(
             previousPriority: existing.priority,
             previousSuccessCriteria: existing.successCriteria,
             previousDueDate: existing.dueDate,
+            previousOwnerUserId: existing.ownerUserId,
             actionText,
             priority,
             successCriteria,
             dueDate,
+            ownerUserId,
           },
         },
       });

@@ -137,7 +137,10 @@ export default async function RcfaDetailPage({
       actionItemCandidates: { orderBy: { generatedAt: "asc" } },
       actionItems: {
         orderBy: { createdAt: "asc" },
-        include: { createdBy: { select: { email: true } } },
+        include: {
+          createdBy: { select: { email: true } },
+          owner: { select: { id: true, displayName: true } },
+        },
       },
       auditEvents: {
         orderBy: { createdAt: "desc" },
@@ -470,6 +473,8 @@ export default async function RcfaDetailPage({
                   status={a.status}
                   successCriteria={a.successCriteria}
                   dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
+                  ownerUserId={a.owner?.id ?? null}
+                  ownerName={a.owner?.displayName ?? null}
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
                   isInvestigation={rcfa.status === "investigation" && canEdit}
