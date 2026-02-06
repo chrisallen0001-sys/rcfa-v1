@@ -19,12 +19,13 @@ const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root 
 
 The user message contains:
 1. Original intake data
-2. Follow-up questions and answers
-3. The EXISTING root cause candidates and action item candidates currently on file
+2. Investigation notes (new findings added during investigation)
+3. Follow-up questions and answers
+4. The EXISTING root cause candidates and action item candidates currently on file
 
 Your task has two steps:
 
-STEP 1 — MATERIALITY ASSESSMENT. Review the follow-up answers alongside the EXISTING root cause candidates and action items. Your goal is to determine whether the new or updated answers introduce any information that would materially alter the existing candidates. Focus on whether the engineering conclusions and failure hypotheses change — not on whether the answer text itself looks different.
+STEP 1 — MATERIALITY ASSESSMENT. Review the follow-up answers AND investigation notes alongside the EXISTING root cause candidates and action items. Your goal is to determine whether the new information (answers or investigation notes) introduces anything that would materially alter the existing candidates. Focus on whether the engineering conclusions and failure hypotheses change — not on whether the text itself looks different.
 
 Ask yourself these specific questions:
   a) Does any answer reveal a NEW failure mechanism not already captured by an existing candidate?
@@ -191,6 +192,10 @@ function buildReAnalyzePrompt(
     rcfa.additionalNotes && `Additional Notes: ${rcfa.additionalNotes}`,
   ];
 
+  const investigationNotesSection = rcfa.investigationNotes
+    ? `\n=== INVESTIGATION NOTES (NEW FINDINGS) ===\n${rcfa.investigationNotes}`
+    : "";
+
   const qaLines = allQuestions.map((q) =>
     q.answerText !== null
       ? `Q: ${q.questionText}\nA: ${q.answerText}`
@@ -216,6 +221,7 @@ function buildReAnalyzePrompt(
   return [
     "=== ORIGINAL INTAKE DATA ===",
     intakeLines.filter(Boolean).join("\n"),
+    investigationNotesSection,
     "",
     "=== FOLLOW-UP QUESTIONS & ANSWERS ===",
     qaLines.join("\n\n"),
@@ -285,14 +291,18 @@ export async function POST(
       (q) => q.answerText !== null
     );
 
-    if (answeredQuestions.length === 0) {
+    const hasInvestigationNotes =
+      rcfa.investigationNotes !== null && rcfa.investigationNotes.length > 0;
+
+    // Require either answered questions OR investigation notes
+    if (answeredQuestions.length === 0 && !hasInvestigationNotes) {
       return NextResponse.json(
-        { error: "At least one follow-up question must be answered before re-analyzing" },
+        { error: "Answer at least one follow-up question or add investigation notes before re-analyzing" },
         { status: 422 }
       );
     }
 
-    // Guard: reject if no answers have changed since the last re-analysis
+    // Guard: reject if no answers or investigation notes have changed since the last re-analysis
     const lastReanalysis = await prisma.rcfaAuditEvent.findFirst({
       where: {
         rcfaId: id,
@@ -310,9 +320,13 @@ export async function POST(
       const hasNewAnswers = answeredQuestions.some(
         (q) => q.answeredAt !== null && q.answeredAt > lastReanalysis.createdAt
       );
-      if (!hasNewAnswers) {
+      const hasNewInvestigationNotes =
+        rcfa.investigationNotesUpdatedAt !== null &&
+        rcfa.investigationNotesUpdatedAt > lastReanalysis.createdAt;
+
+      if (!hasNewAnswers && !hasNewInvestigationNotes) {
         return NextResponse.json(
-          { error: "No new or updated answers since the last re-analysis" },
+          { error: "No new answers or investigation notes since the last re-analysis" },
           { status: 422 }
         );
       }
@@ -380,7 +394,7 @@ export async function POST(
       );
     }
 
-    // Replace old AI-generated candidates with new ones in a transaction
+    // APPEND new AI-generated candidates (keep existing ones per issue #151)
     await prisma.$transaction(async (tx) => {
       // Re-read with row lock to prevent race conditions
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
@@ -388,15 +402,7 @@ export async function POST(
         throw new Error("RCFA_NOT_IN_INVESTIGATION");
       }
 
-      // Delete old AI-generated candidates
-      await tx.rcfaRootCauseCandidate.deleteMany({
-        where: { rcfaId: id, generatedBy: "ai" },
-      });
-      await tx.rcfaActionItemCandidate.deleteMany({
-        where: { rcfaId: id, generatedBy: "ai" },
-      });
-
-      // Insert new candidates
+      // Insert new candidates (keeping existing ones - they can be identified by generatedAt timestamp)
       await tx.rcfaRootCauseCandidate.createMany({
         data: result.rootCauseCandidates.map((c) => ({
           rcfaId: id,
