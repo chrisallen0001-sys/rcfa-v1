@@ -117,26 +117,37 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const savedIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   const formDataRef = useRef(formData);
+  const autoSaveStatusRef = useRef<AutoSaveStatus>("idle");
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Keep formDataRef in sync with formData for use in async callbacks
+  // Keep refs in sync with state for use in async callbacks
   useEffect(() => {
     formDataRef.current = formData;
   }, [formData]);
 
-  // Cleanup timers on unmount
+  useEffect(() => {
+    autoSaveStatusRef.current = autoSaveStatus;
+  }, [autoSaveStatus]);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
       if (savedIndicatorTimerRef.current) {
         clearTimeout(savedIndicatorTimerRef.current);
       }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
 
   // Perform the actual save
-  const performSave = useCallback(async (data: FormData): Promise<boolean> => {
+  const performSave = useCallback(async (data: FormData, signal?: AbortSignal): Promise<void> => {
     const payload: Record<string, unknown> = {
       title: data.title,
       equipmentDescription: data.equipmentDescription,
@@ -159,14 +170,13 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal,
     });
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || "Failed to save changes");
     }
-
-    return true;
   }, [rcfaId]);
 
   // Debounced auto-save function
@@ -181,34 +191,50 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
       clearTimeout(savedIndicatorTimerRef.current);
     }
 
-    // Reset to idle if we were showing "saved"
-    if (autoSaveStatus === "saved") {
+    // Reset to idle if we were showing "saved" (use ref to avoid stale closure)
+    if (autoSaveStatusRef.current === "saved") {
       setAutoSaveStatus("idle");
     }
 
     // Set up new debounce timer
     debounceTimerRef.current = setTimeout(async () => {
+      if (!isMountedRef.current) return;
+
+      // Cancel any in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       setAutoSaveStatus("saving");
       setAutoSaveError(null);
 
       try {
-        await performSave(formDataRef.current);
+        await performSave(formDataRef.current, abortControllerRef.current.signal);
+        if (!isMountedRef.current) return;
+
         setAutoSaveStatus("saved");
 
         // Hide "saved" indicator after 2 seconds
         savedIndicatorTimerRef.current = setTimeout(() => {
-          setAutoSaveStatus("idle");
+          if (isMountedRef.current) {
+            setAutoSaveStatus("idle");
+          }
         }, SAVED_INDICATOR_DURATION_MS);
 
         router.refresh();
       } catch (err) {
+        if (!isMountedRef.current) return;
+        // Ignore abort errors
+        if (err instanceof Error && err.name === "AbortError") return;
+
         setAutoSaveStatus("error");
         setAutoSaveError(
           err instanceof Error ? err.message : "Failed to save"
         );
       }
     }, AUTO_SAVE_DELAY_MS);
-  }, [autoSaveStatus, performSave, router]);
+  }, [performSave, router]);
 
   const handleChange = useCallback(
     (
@@ -226,12 +252,18 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
     [triggerAutoSave]
   );
 
-  // Manual save (also used as retry for auto-save errors)
+  // Manual save
   const handleSave = async () => {
     // Cancel any pending auto-save
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+
+    // Cancel any in-flight auto-save request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     setIsSaving(true);
     setFeedback(null);
@@ -239,24 +271,62 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
     setAutoSaveError(null);
 
     try {
-      await performSave(formData);
+      await performSave(formData, abortControllerRef.current.signal);
+      if (!isMountedRef.current) return;
       setFeedback({ type: "success", message: "Changes saved" });
       router.refresh();
     } catch (err) {
+      if (!isMountedRef.current) return;
+      if (err instanceof Error && err.name === "AbortError") return;
       setFeedback({
         type: "error",
         message: err instanceof Error ? err.message : "Failed to save changes",
       });
     } finally {
-      setIsSaving(false);
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
     }
   };
 
-  // Retry failed auto-save
-  const handleRetry = () => {
-    setAutoSaveStatus("idle");
+  // Retry failed auto-save - performs immediate save (no debounce delay)
+  const handleRetry = async () => {
+    // Cancel any pending debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setAutoSaveStatus("saving");
     setAutoSaveError(null);
-    triggerAutoSave();
+
+    try {
+      await performSave(formDataRef.current, abortControllerRef.current.signal);
+      if (!isMountedRef.current) return;
+
+      setAutoSaveStatus("saved");
+
+      savedIndicatorTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setAutoSaveStatus("idle");
+        }
+      }, SAVED_INDICATOR_DURATION_MS);
+
+      router.refresh();
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      if (err instanceof Error && err.name === "AbortError") return;
+
+      setAutoSaveStatus("error");
+      setAutoSaveError(
+        err instanceof Error ? err.message : "Failed to save"
+      );
+    }
   };
 
   return (
