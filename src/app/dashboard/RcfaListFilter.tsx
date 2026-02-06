@@ -71,7 +71,7 @@ export default function RcfaListFilter({
           {isSearching
             ? "No RCFAs match your search."
             : items.length === 0
-              ? "No RCFAs yet. Create one from the intake form to get started."
+              ? "No RCFAs yet. Click 'New RCFA' to get started."
               : "No RCFAs match the selected filter."}
         </p>
       ) : (
