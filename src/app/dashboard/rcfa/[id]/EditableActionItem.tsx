@@ -1,13 +1,9 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
-
-type User = {
-  id: string;
-  displayName: string;
-};
+import { useUsers } from "./useUsers";
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -72,27 +68,11 @@ export default function EditableActionItem({
   );
   const [dueDate, setDueDate] = useState(initialDueDate ?? "");
   const [ownerUserId, setOwnerUserId] = useState(initialOwnerUserId ?? "");
-  const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const { users, loading: loadingUsers } = useUsers(editing);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const pendingRef = useRef(false);
-
-  useEffect(() => {
-    if (editing && users.length === 0) {
-      setLoadingUsers(true);
-      fetch("/api/users")
-        .then((res) => res.ok ? res.json() : [])
-        .then((data) => {
-          if (Array.isArray(data)) {
-            setUsers(data);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoadingUsers(false));
-    }
-  }, [editing, users.length]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

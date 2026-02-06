@@ -1,13 +1,9 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
-
-type User = {
-  id: string;
-  displayName: string;
-};
+import { useUsers } from "./useUsers";
 
 interface AddActionItemFormProps {
   rcfaId: string;
@@ -21,26 +17,10 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
   const [successCriteria, setSuccessCriteria] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
-  const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const { users, loading: loadingUsers } = useUsers(open);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingRef = useRef(false);
-
-  useEffect(() => {
-    if (open && users.length === 0) {
-      setLoadingUsers(true);
-      fetch("/api/users")
-        .then((res) => res.ok ? res.json() : [])
-        .then((data) => {
-          if (Array.isArray(data)) {
-            setUsers(data);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoadingUsers(false));
-    }
-  }, [open, users.length]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
