@@ -14,12 +14,12 @@ export default function AppHeader({ displayName, role }: AppHeaderProps) {
       <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center">
           <Image
-            src="/aletheia_logo.png"
+            src="/aletheia-logo.svg"
             alt="Aletheia"
             width={120}
             height={40}
             className="h-8 w-auto dark:invert"
-            priority
+            unoptimized
           />
         </Link>
         <UserMenu displayName={displayName} role={role} />
