@@ -3,13 +3,13 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-interface FinalizeInvestigationButtonProps {
+interface BackToInvestigationButtonProps {
   rcfaId: string;
 }
 
-export default function FinalizeInvestigationButton({
+export default function BackToInvestigationButton({
   rcfaId,
-}: FinalizeInvestigationButtonProps) {
+}: BackToInvestigationButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export default function FinalizeInvestigationButton({
   async function handleClick() {
     if (pendingRef.current) return;
     const ok = window.confirm(
-      "Finalize investigation? This will move the RCFA to Action Items in Progress and lock root cause editing."
+      "Return to Investigation? This will allow you to modify root causes and continue the investigation."
     );
     if (!ok) return;
     pendingRef.current = true;
@@ -26,13 +26,15 @@ export default function FinalizeInvestigationButton({
     setError(null);
 
     try {
-      const res = await fetch(`/api/rcfa/${rcfaId}/finalize`, {
-        method: "POST",
+      const res = await fetch(`/api/rcfa/${rcfaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "investigation" }),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to finalize investigation");
+        throw new Error(data.error ?? "Failed to return to investigation");
       }
 
       router.refresh();
@@ -40,7 +42,7 @@ export default function FinalizeInvestigationButton({
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to finalize investigation"
+          : "Failed to return to investigation"
       );
     } finally {
       pendingRef.current = false;
@@ -53,7 +55,7 @@ export default function FinalizeInvestigationButton({
       <button
         onClick={handleClick}
         disabled={loading}
-        className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-400"
+        className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -77,10 +79,10 @@ export default function FinalizeInvestigationButton({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            Finalizing...
+            Returning...
           </span>
         ) : (
-          "Finalize Root Causes"
+          "Back to Investigation"
         )}
       </button>
       {error && (

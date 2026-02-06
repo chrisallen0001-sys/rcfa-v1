@@ -3,13 +3,11 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-interface FinalizeInvestigationButtonProps {
+interface ReopenRcfaButtonProps {
   rcfaId: string;
 }
 
-export default function FinalizeInvestigationButton({
-  rcfaId,
-}: FinalizeInvestigationButtonProps) {
+export default function ReopenRcfaButton({ rcfaId }: ReopenRcfaButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +16,7 @@ export default function FinalizeInvestigationButton({
   async function handleClick() {
     if (pendingRef.current) return;
     const ok = window.confirm(
-      "Finalize investigation? This will move the RCFA to Action Items in Progress and lock root cause editing."
+      "Reopen this RCFA? This will allow modifying action items and will require closing again when complete."
     );
     if (!ok) return;
     pendingRef.current = true;
@@ -26,21 +24,19 @@ export default function FinalizeInvestigationButton({
     setError(null);
 
     try {
-      const res = await fetch(`/api/rcfa/${rcfaId}/finalize`, {
+      const res = await fetch(`/api/rcfa/${rcfaId}/reopen`, {
         method: "POST",
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to finalize investigation");
+        throw new Error(data.error ?? "Failed to reopen RCFA");
       }
 
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to finalize investigation"
+        err instanceof Error ? err.message : "Failed to reopen RCFA"
       );
     } finally {
       pendingRef.current = false;
@@ -53,7 +49,7 @@ export default function FinalizeInvestigationButton({
       <button
         onClick={handleClick}
         disabled={loading}
-        className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-400"
+        className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -77,10 +73,10 @@ export default function FinalizeInvestigationButton({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            Finalizing...
+            Reopening...
           </span>
         ) : (
-          "Finalize Root Causes"
+          "Reopen RCFA"
         )}
       </button>
       {error && (

@@ -38,6 +38,10 @@ export async function POST(
       typeof body.dueDate === "string" && ISO_DATE_RE.test(body.dueDate)
         ? new Date(body.dueDate + "T00:00:00Z")
         : null;
+    const ownerUserId =
+      typeof body.ownerUserId === "string" && UUID_RE.test(body.ownerUserId)
+        ? body.ownerUserId
+        : null;
 
     if (!actionText) {
       return NextResponse.json(
@@ -65,17 +69,17 @@ export async function POST(
     if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (rcfa.status !== "investigation") {
+    if (rcfa.status !== "investigation" && rcfa.status !== "actions_open") {
       return NextResponse.json(
-        { error: "RCFA must be in investigation status" },
+        { error: "RCFA must be in investigation or actions_open status" },
         { status: 409 }
       );
     }
 
     const created = await prisma.$transaction(async (tx) => {
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
-      if (locked.status !== "investigation") {
-        throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      if (locked.status !== "investigation" && locked.status !== "actions_open") {
+        throw new Error("RCFA_STATUS_INVALID");
       }
 
       const record = await tx.rcfaActionItem.create({
@@ -85,6 +89,7 @@ export async function POST(
           successCriteria,
           priority,
           dueDate,
+          ownerUserId,
           selectedFromCandidateId: null,
           createdByUserId: userId,
           status: "open",
@@ -102,6 +107,7 @@ export async function POST(
             priority,
             successCriteria,
             dueDate,
+            ownerUserId,
           },
         },
       });
@@ -113,10 +119,10 @@ export async function POST(
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message === "RCFA_NOT_IN_INVESTIGATION"
+      error.message === "RCFA_STATUS_INVALID"
     ) {
       return NextResponse.json(
-        { error: "RCFA must be in investigation status" },
+        { error: "RCFA must be in investigation or actions_open status" },
         { status: 409 }
       );
     }

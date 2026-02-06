@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
+import { useUsers } from "./useUsers";
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -37,9 +38,11 @@ interface EditableActionItemProps {
   status: string;
   successCriteria: string | null;
   dueDate: string | null;
+  ownerUserId: string | null;
+  ownerName: string | null;
   createdByEmail: string;
   createdAt: string;
-  isInvestigation: boolean;
+  canEdit: boolean;
 }
 
 export default function EditableActionItem({
@@ -50,18 +53,23 @@ export default function EditableActionItem({
   status,
   successCriteria: initialSuccessCriteria,
   dueDate: initialDueDate,
+  ownerUserId: initialOwnerUserId,
+  ownerName,
   createdByEmail,
   createdAt,
-  isInvestigation,
+  canEdit,
 }: EditableActionItemProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [actionText, setActionText] = useState(initialActionText);
   const [priority, setPriority] = useState(initialPriority);
+  const [editStatus, setEditStatus] = useState(status);
   const [successCriteria, setSuccessCriteria] = useState(
     initialSuccessCriteria ?? ""
   );
   const [dueDate, setDueDate] = useState(initialDueDate ?? "");
+  const [ownerUserId, setOwnerUserId] = useState(initialOwnerUserId ?? "");
+  const { users, loading: loadingUsers } = useUsers(editing);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -83,8 +91,10 @@ export default function EditableActionItem({
           body: JSON.stringify({
             actionText,
             priority,
+            status: editStatus,
             successCriteria,
             dueDate: dueDate || null,
+            ownerUserId: ownerUserId || null,
           }),
         }
       );
@@ -155,7 +165,7 @@ export default function EditableActionItem({
               className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Priority
@@ -170,6 +180,42 @@ export default function EditableActionItem({
                 <option value="high">High</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Status
+              </label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="blocked">Blocked</option>
+                <option value="done">Done</option>
+                <option value="canceled">Canceled</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Assigned Owner
+              </label>
+              <select
+                value={ownerUserId}
+                onChange={(e) => setOwnerUserId(e.target.value)}
+                disabled={loadingUsers}
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                <option value="">{loadingUsers ? "Loading..." : "Unassigned"}</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
             <DateInput
               label="Due Date"
               value={dueDate}
@@ -206,8 +252,10 @@ export default function EditableActionItem({
                 setEditing(false);
                 setActionText(initialActionText);
                 setPriority(initialPriority);
+                setEditStatus(status);
                 setSuccessCriteria(initialSuccessCriteria ?? "");
                 setDueDate(initialDueDate ?? "");
+                setOwnerUserId(initialOwnerUserId ?? "");
                 setError(null);
               }}
               className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -249,10 +297,15 @@ export default function EditableActionItem({
           Due: {initialDueDate}
         </p>
       )}
+      {ownerName && (
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Owner: {ownerName}
+        </p>
+      )}
       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
         Created by {createdByEmail} on {createdAt}
       </p>
-      {isInvestigation && (
+      {canEdit && (
         <div className="mt-3 flex items-center gap-2">
           <button
             onClick={() => setEditing(true)}

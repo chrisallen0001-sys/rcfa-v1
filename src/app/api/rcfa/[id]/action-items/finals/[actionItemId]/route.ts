@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import type { Priority } from "@/generated/prisma/client";
+import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
+
+const VALID_STATUSES: ActionItemStatus[] = [
+  "open",
+  "in_progress",
+  "blocked",
+  "done",
+  "canceled",
+];
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -49,6 +57,26 @@ export async function PATCH(
         : body.dueDate === null
           ? null
           : undefined;
+    const ownerUserId =
+      typeof body.ownerUserId === "string" && UUID_RE.test(body.ownerUserId)
+        ? body.ownerUserId
+        : body.ownerUserId === null
+          ? null
+          : undefined;
+    if (
+      typeof body.status === "string" &&
+      !VALID_STATUSES.includes(body.status as ActionItemStatus)
+    ) {
+      return NextResponse.json(
+        { error: "status must be open, in_progress, blocked, done, or canceled" },
+        { status: 400 }
+      );
+    }
+    const status: ActionItemStatus | undefined =
+      typeof body.status === "string" &&
+      VALID_STATUSES.includes(body.status as ActionItemStatus)
+        ? (body.status as ActionItemStatus)
+        : undefined;
 
     if (!actionText) {
       return NextResponse.json(
@@ -76,17 +104,17 @@ export async function PATCH(
     if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (rcfa.status !== "investigation") {
+    if (rcfa.status !== "investigation" && rcfa.status !== "actions_open") {
       return NextResponse.json(
-        { error: "RCFA must be in investigation status" },
+        { error: "RCFA must be in investigation or actions_open status" },
         { status: 409 }
       );
     }
 
     const updated = await prisma.$transaction(async (tx) => {
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
-      if (locked.status !== "investigation") {
-        throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      if (locked.status !== "investigation" && locked.status !== "actions_open") {
+        throw new Error("RCFA_STATUS_INVALID");
       }
 
       const existing = await tx.rcfaActionItem.findUnique({
@@ -103,6 +131,8 @@ export async function PATCH(
           successCriteria,
           priority,
           ...(dueDate !== undefined && { dueDate }),
+          ...(ownerUserId !== undefined && { ownerUserId }),
+          ...(status !== undefined && { status }),
           updatedByUserId: userId,
         },
       });
@@ -118,10 +148,14 @@ export async function PATCH(
             previousPriority: existing.priority,
             previousSuccessCriteria: existing.successCriteria,
             previousDueDate: existing.dueDate,
+            previousOwnerUserId: existing.ownerUserId,
+            previousStatus: existing.status,
             actionText,
             priority,
             successCriteria,
             dueDate,
+            ownerUserId,
+            status,
           },
         },
       });
@@ -132,9 +166,9 @@ export async function PATCH(
     return NextResponse.json({ id: updated.id });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === "RCFA_NOT_IN_INVESTIGATION") {
+      if (error.message === "RCFA_STATUS_INVALID") {
         return NextResponse.json(
-          { error: "RCFA must be in investigation status" },
+          { error: "RCFA must be in investigation or actions_open status" },
           { status: 409 }
         );
       }
@@ -175,17 +209,17 @@ export async function DELETE(
     if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (rcfa.status !== "investigation") {
+    if (rcfa.status !== "investigation" && rcfa.status !== "actions_open") {
       return NextResponse.json(
-        { error: "RCFA must be in investigation status" },
+        { error: "RCFA must be in investigation or actions_open status" },
         { status: 409 }
       );
     }
 
     await prisma.$transaction(async (tx) => {
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
-      if (locked.status !== "investigation") {
-        throw new Error("RCFA_NOT_IN_INVESTIGATION");
+      if (locked.status !== "investigation" && locked.status !== "actions_open") {
+        throw new Error("RCFA_STATUS_INVALID");
       }
 
       const existing = await tx.rcfaActionItem.findUnique({
@@ -214,9 +248,9 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === "RCFA_NOT_IN_INVESTIGATION") {
+      if (error.message === "RCFA_STATUS_INVALID") {
         return NextResponse.json(
-          { error: "RCFA must be in investigation status" },
+          { error: "RCFA must be in investigation or actions_open status" },
           { status: 409 }
         );
       }

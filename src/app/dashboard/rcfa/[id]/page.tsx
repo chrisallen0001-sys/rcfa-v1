@@ -2,11 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import StartInvestigationButton from "./StartInvestigationButton";
+import AnalyzeWithAIButton from "./AnalyzeWithAIButton";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
@@ -15,31 +16,20 @@ import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
 import CloseRcfaButton from "./CloseRcfaButton";
+import BackToInvestigationButton from "./BackToInvestigationButton";
+import ReopenRcfaButton from "./ReopenRcfaButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
+import EditableIntakeForm from "./EditableIntakeForm";
+import AddInformationSection from "./AddInformationSection";
 import type {
-  RcfaStatus,
   ConfidenceLabel,
   Priority,
   OperatingContext,
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const STATUS_LABELS: Record<RcfaStatus, string> = {
-  draft: "Draft",
-  investigation: "Investigation",
-  actions_open: "Actions Open",
-  closed: "Closed",
-};
-
-const STATUS_COLORS: Record<RcfaStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  investigation: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  actions_open: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  closed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-};
 
 const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
   low: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -122,14 +112,11 @@ function Badge({ label, colorClass }: { label: string; colorClass: string }) {
 
 export default async function RcfaDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ analyzeError?: string }>;
 }) {
   const { userId, role } = await getAuthContext();
   const { id } = await params;
-  const { analyzeError } = await searchParams;
 
   if (!UUID_RE.test(id)) {
     notFound();
@@ -139,6 +126,7 @@ export default async function RcfaDetailPage({
     where: { id },
     include: {
       owner: { select: { id: true, displayName: true } },
+      closedBy: { select: { email: true } },
       followupQuestions: {
         orderBy: [{ generatedAt: "asc" }, { id: "asc" }],
         include: { answeredBy: { select: { email: true } } },
@@ -151,7 +139,10 @@ export default async function RcfaDetailPage({
       actionItemCandidates: { orderBy: { generatedAt: "asc" } },
       actionItems: {
         orderBy: { createdAt: "asc" },
-        include: { createdBy: { select: { email: true } } },
+        include: {
+          createdBy: { select: { email: true } },
+          owner: { select: { id: true, displayName: true } },
+        },
       },
       auditEvents: {
         orderBy: { createdAt: "desc" },
@@ -190,12 +181,19 @@ export default async function RcfaDetailPage({
       )
   );
 
-  // Enable Re-Analyze only when answers have changed since the last re-analysis
+  // Enable Re-Analyze when answers or investigation notes have changed since the last re-analysis
   const hasNewAnswers = lastReanalysis
     ? rcfa.followupQuestions.some(
         (q) => q.answeredAt !== null && q.answeredAt > lastReanalysis.createdAt
       )
     : hasAnsweredQuestions;
+
+  const hasNewInvestigationNotes = lastReanalysis
+    ? rcfa.investigationNotesUpdatedAt !== null &&
+      rcfa.investigationNotesUpdatedAt > lastReanalysis.createdAt
+    : rcfa.investigationNotes !== null && rcfa.investigationNotes.length > 0;
+
+  const hasNewDataForReanalysis = hasNewAnswers || hasNewInvestigationNotes;
 
   const promotedCandidateIds = new Set(
     rcfa.rootCauseFinals
@@ -207,6 +205,31 @@ export default async function RcfaDetailPage({
       .map((a) => a.selectedFromCandidateId)
       .filter(Boolean)
   );
+
+  // Find the timestamp to mark candidates as "new" (added in latest re-analysis)
+  // Candidates generated after the second-most-recent analysis are "new"
+  const candidateGeneratedEvents = rcfa.auditEvents.filter(
+    (e) => e.eventType === AUDIT_EVENT_TYPES.CANDIDATE_GENERATED
+  );
+  // Events are already ordered desc by createdAt, so [1] is the second-most-recent
+  const previousAnalysisTimestamp =
+    candidateGeneratedEvents.length > 1
+      ? candidateGeneratedEvents[1].createdAt
+      : null;
+
+  // Helper to determine if a candidate was added in the latest re-analysis
+  const isNewCandidate = (generatedAt: Date): boolean =>
+    previousAnalysisTimestamp !== null && generatedAt > previousAnalysisTimestamp;
+
+  // Action items progress tracking
+  const completedActionItems = rcfa.actionItems.filter(
+    (a) => a.status === "done" || a.status === "canceled"
+  ).length;
+  const totalActionItems = rcfa.actionItems.length;
+  const allActionItemsComplete = totalActionItems > 0 && completedActionItems === totalActionItems;
+
+  // Helper for statuses that allow action item editing
+  const canEditActionItems = (rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -228,71 +251,101 @@ export default async function RcfaDetailPage({
           </h1>
         </div>
         <Badge
-          label={STATUS_LABELS[rcfa.status]}
-          colorClass={STATUS_COLORS[rcfa.status]}
+          label={RCFA_STATUS_LABELS[rcfa.status]}
+          colorClass={RCFA_STATUS_COLORS[rcfa.status]}
         />
       </div>
       <div className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
-      {analyzeError && (
-        <div className="mb-6 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-          AI analysis could not be completed. Your RCFA has been saved as a draft.
-        </div>
-      )}
-
       {rcfa.status === "draft" && canEdit && (
         <div className="mb-6">
-          <StartInvestigationButton rcfaId={rcfa.id} />
+          <div className="flex flex-wrap items-center gap-3">
+            <AnalyzeWithAIButton rcfaId={rcfa.id} />
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
+            <StartInvestigationButton rcfaId={rcfa.id} />
+          </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            AI analysis generates follow-up questions, root cause candidates, and action items. You can also start without AI and add these manually.
+          </p>
         </div>
       )}
 
       <div className="space-y-6">
-        {/* Intake Summary */}
-        <Section title="Intake Summary">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <Field label="Equipment Description" value={rcfa.equipmentDescription} />
-            <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
-            <Field label="Make" value={rcfa.equipmentMake} />
-            <Field label="Model" value={rcfa.equipmentModel} />
-            <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
-            <Field
-              label="Equipment Age (years)"
-              value={rcfa.equipmentAgeYears?.toString() ?? null}
-            />
-            <Field
-              label="Downtime (minutes)"
-              value={rcfa.downtimeMinutes?.toString() ?? null}
-            />
-            <Field
-              label="Production Cost (USD)"
-              value={formatUsd(rcfa.productionCostUsd)}
-            />
-            <Field
-              label="Maintenance Cost (USD)"
-              value={formatUsd(rcfa.maintenanceCostUsd)}
-            />
-            <Field
-              label="Total Cost (USD)"
-              value={
-                rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
-                  ? formatUsd(
-                      Number(rcfa.productionCostUsd ?? 0) +
-                        Number(rcfa.maintenanceCostUsd ?? 0)
-                    )
-                  : null
-              }
-            />
-          </dl>
-          <dl className="mt-4 grid gap-4">
-            <Field label="Failure Description" value={rcfa.failureDescription} />
-            <Field label="Pre-Failure Conditions" value={rcfa.preFailureConditions} />
-            <Field label="Work History Summary" value={rcfa.workHistorySummary} />
-            <Field label="Active PMs Summary" value={rcfa.activePmsSummary} />
-            <Field label="Additional Notes" value={rcfa.additionalNotes} />
-          </dl>
-        </Section>
+        {/* Intake Summary - editable when draft */}
+        {rcfa.status === "draft" && canEdit ? (
+          <EditableIntakeForm
+            rcfaId={rcfa.id}
+            initialData={{
+              title: rcfa.title,
+              equipmentDescription: rcfa.equipmentDescription,
+              operatingContext: rcfa.operatingContext,
+              equipmentMake: rcfa.equipmentMake,
+              equipmentModel: rcfa.equipmentModel,
+              equipmentSerialNumber: rcfa.equipmentSerialNumber,
+              equipmentAgeYears: rcfa.equipmentAgeYears
+                ? Number(rcfa.equipmentAgeYears)
+                : null,
+              downtimeMinutes: rcfa.downtimeMinutes,
+              productionCostUsd: rcfa.productionCostUsd
+                ? Number(rcfa.productionCostUsd)
+                : null,
+              maintenanceCostUsd: rcfa.maintenanceCostUsd
+                ? Number(rcfa.maintenanceCostUsd)
+                : null,
+              failureDescription: rcfa.failureDescription,
+              preFailureConditions: rcfa.preFailureConditions,
+              workHistorySummary: rcfa.workHistorySummary,
+              activePmsSummary: rcfa.activePmsSummary,
+              additionalNotes: rcfa.additionalNotes,
+            }}
+          />
+        ) : (
+          <Section title="Intake Summary">
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <Field label="Equipment Description" value={rcfa.equipmentDescription} />
+              <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
+              <Field label="Make" value={rcfa.equipmentMake} />
+              <Field label="Model" value={rcfa.equipmentModel} />
+              <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
+              <Field
+                label="Equipment Age (years)"
+                value={rcfa.equipmentAgeYears?.toString() ?? null}
+              />
+              <Field
+                label="Downtime (minutes)"
+                value={rcfa.downtimeMinutes?.toString() ?? null}
+              />
+              <Field
+                label="Production Cost (USD)"
+                value={formatUsd(rcfa.productionCostUsd)}
+              />
+              <Field
+                label="Maintenance Cost (USD)"
+                value={formatUsd(rcfa.maintenanceCostUsd)}
+              />
+              <Field
+                label="Total Cost (USD)"
+                value={
+                  rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
+                    ? formatUsd(
+                        Number(rcfa.productionCostUsd ?? 0) +
+                          Number(rcfa.maintenanceCostUsd ?? 0)
+                      )
+                    : null
+                }
+              />
+            </dl>
+            <dl className="mt-4 grid gap-4">
+              <Field label="Failure Description" value={rcfa.failureDescription} />
+              <Field label="Pre-Failure Conditions" value={rcfa.preFailureConditions} />
+              <Field label="Work History Summary" value={rcfa.workHistorySummary} />
+              <Field label="Active PMs Summary" value={rcfa.activePmsSummary} />
+              <Field label="Additional Notes" value={rcfa.additionalNotes} />
+            </dl>
+          </Section>
+        )}
 
         {/* Follow-up Questions */}
         {hasAnalysis && rcfa.followupQuestions.length > 0 && (
@@ -312,12 +365,20 @@ export default async function RcfaDetailPage({
           </Section>
         )}
 
-        {/* Re-Analyze Button */}
-        {rcfa.status === "investigation" && canEdit && (
+        {/* Add Information Section - available in investigation and actions_open */}
+        {(rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit && (
+          <AddInformationSection
+            rcfaId={rcfa.id}
+            initialNotes={rcfa.investigationNotes}
+          />
+        )}
+
+        {/* Re-Analyze Button - available in investigation and actions_open */}
+        {(rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit && (
           <ReAnalyzeButton
             rcfaId={rcfa.id}
             hasAnsweredQuestions={hasAnsweredQuestions}
-            hasNewAnswers={hasNewAnswers}
+            hasNewAnswers={hasNewDataForReanalysis}
           />
         )}
 
@@ -325,41 +386,55 @@ export default async function RcfaDetailPage({
         {hasAnalysis && sortedRootCauseCandidates.length > 0 && (
           <Section title="Root Cause Candidates">
             <div className="space-y-4">
-              {sortedRootCauseCandidates.map((c) => (
-                <div
-                  key={c.id}
-                  className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {c.causeText}
-                    </p>
-                    <Badge
-                      label={c.confidenceLabel}
-                      colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
-                    />
-                  </div>
-                  {c.rationaleText && (
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      {c.rationaleText}
-                    </p>
-                  )}
-                  {rcfa.status === "investigation" && canEdit &&
-                    !promotedCandidateIds.has(c.id) && (
-                      <div className="mt-3">
-                        <PromoteRootCauseButton
-                          rcfaId={rcfa.id}
-                          candidateId={c.id}
-                        />
+              {sortedRootCauseCandidates.map((c) => {
+                const isNew = isNewCandidate(c.generatedAt);
+                return (
+                  <div
+                    key={c.id}
+                    className={`rounded-md border p-4 ${
+                      isNew
+                        ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
+                        : "border-zinc-100 dark:border-zinc-800"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {c.causeText}
+                        </p>
+                        {isNew && (
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                            New
+                          </span>
+                        )}
                       </div>
+                      <Badge
+                        label={c.confidenceLabel}
+                        colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
+                      />
+                    </div>
+                    {c.rationaleText && (
+                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        {c.rationaleText}
+                      </p>
                     )}
-                  {promotedCandidateIds.has(c.id) && (
-                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
-                      Promoted to final
-                    </p>
-                  )}
-                </div>
-              ))}
+                    {rcfa.status === "investigation" && canEdit &&
+                      !promotedCandidateIds.has(c.id) && (
+                        <div className="mt-3">
+                          <PromoteRootCauseButton
+                            rcfaId={rcfa.id}
+                            candidateId={c.id}
+                          />
+                        </div>
+                      )}
+                    {promotedCandidateIds.has(c.id) && (
+                      <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                        Promoted to final
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Section>
         )}
@@ -396,54 +471,86 @@ export default async function RcfaDetailPage({
         {hasAnalysis && rcfa.actionItemCandidates.length > 0 && (
           <Section title="Action Item Candidates">
             <div className="space-y-4">
-              {rcfa.actionItemCandidates.map((a) => (
-                <div
-                  key={a.id}
-                  className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {a.actionText}
-                    </p>
-                    <Badge
-                      label={a.priority}
-                      colorClass={PRIORITY_COLORS[a.priority]}
-                    />
-                  </div>
-                  {a.rationaleText && (
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      {a.rationaleText}
-                    </p>
-                  )}
-                  <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-                    {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
-                    {a.successCriteria && (
-                      <span>Success: {a.successCriteria}</span>
-                    )}
-                  </div>
-                  {rcfa.status === "investigation" && canEdit &&
-                    !promotedActionCandidateIds.has(a.id) && (
-                      <div className="mt-3">
-                        <PromoteActionItemButton
-                          rcfaId={rcfa.id}
-                          candidateId={a.id}
-                        />
+              {rcfa.actionItemCandidates.map((a) => {
+                const isNew = isNewCandidate(a.generatedAt);
+                return (
+                  <div
+                    key={a.id}
+                    className={`rounded-md border p-4 ${
+                      isNew
+                        ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
+                        : "border-zinc-100 dark:border-zinc-800"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {a.actionText}
+                        </p>
+                        {isNew && (
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                            New
+                          </span>
+                        )}
                       </div>
+                      <Badge
+                        label={a.priority}
+                        colorClass={PRIORITY_COLORS[a.priority]}
+                      />
+                    </div>
+                    {a.rationaleText && (
+                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        {a.rationaleText}
+                      </p>
                     )}
-                  {promotedActionCandidateIds.has(a.id) && (
-                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
-                      Promoted to tracked
-                    </p>
-                  )}
-                </div>
-              ))}
+                    <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
+                      {a.successCriteria && (
+                        <span>Success: {a.successCriteria}</span>
+                      )}
+                    </div>
+                    {rcfa.status === "investigation" && canEdit &&
+                      !promotedActionCandidateIds.has(a.id) && (
+                        <div className="mt-3">
+                          <PromoteActionItemButton
+                            rcfaId={rcfa.id}
+                            candidateId={a.id}
+                          />
+                        </div>
+                      )}
+                    {promotedActionCandidateIds.has(a.id) && (
+                      <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                        Promoted to tracked
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Section>
         )}
 
         {/* Tracked Action Items */}
-        {hasAnalysis && (rcfa.actionItems.length > 0 || rcfa.status === "investigation") && (
-          <Section title="Tracked Action Items">
+        {hasAnalysis && (rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
+          <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Tracked Action Items
+              </h2>
+              {totalActionItems > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div
+                      className="h-2 rounded-full bg-green-500 transition-all"
+                      style={{ width: `${(completedActionItems / totalActionItems) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {completedActionItems} of {totalActionItems} complete
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="space-y-4">
               {rcfa.actionItems.map((a) => (
                 <EditableActionItem
@@ -455,21 +562,68 @@ export default async function RcfaDetailPage({
                   status={a.status}
                   successCriteria={a.successCriteria}
                   dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
+                  ownerUserId={a.owner?.id ?? null}
+                  ownerName={a.owner?.displayName ?? null}
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
-                  isInvestigation={rcfa.status === "investigation" && canEdit}
+                  canEdit={canEditActionItems}
                 />
               ))}
-              {rcfa.status === "investigation" && canEdit && (
+              {canEditActionItems && (
                 <AddActionItemForm rcfaId={rcfa.id} />
               )}
             </div>
-          </Section>
+          </section>
         )}
 
-        {/* Close RCFA Button */}
+        {/* Actions Open Phase Controls */}
         {rcfa.status === "actions_open" && canEdit && (
-          <CloseRcfaButton rcfaId={rcfa.id} />
+          <div className="flex flex-wrap items-center gap-4">
+            <BackToInvestigationButton rcfaId={rcfa.id} />
+            {allActionItemsComplete && (
+              <CloseRcfaButton rcfaId={rcfa.id} />
+            )}
+            {!allActionItemsComplete && totalActionItems > 0 && (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Complete all action items to close this RCFA
+              </p>
+            )}
+            {totalActionItems === 0 && (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Add at least one action item to close this RCFA
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Closed RCFA Info */}
+        {rcfa.status === "closed" && (
+          <Section title="Closed">
+            <div className="space-y-3">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                This RCFA was closed on{" "}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  {rcfa.closedAt?.toISOString().slice(0, 10) ?? "—"}
+                </span>
+                {rcfa.closedBy && (
+                  <> by <span className="font-medium text-zinc-900 dark:text-zinc-100">{rcfa.closedBy.email}</span></>
+                )}
+              </p>
+              {rcfa.closingNotes && (
+                <div className="rounded-md border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Closing Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
+                    {rcfa.closingNotes}
+                  </p>
+                </div>
+              )}
+              {isAdmin && (
+                <div className="pt-2">
+                  <ReopenRcfaButton rcfaId={rcfa.id} />
+                </div>
+              )}
+            </div>
+          </Section>
         )}
 
         {/* Audit Log */}

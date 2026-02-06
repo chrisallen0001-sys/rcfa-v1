@@ -89,6 +89,7 @@ model AppUser {
   // Relations
   createdRcfas          Rcfa[]                @relation("RcfaCreatedBy")
   ownedRcfas            Rcfa[]                @relation("RcfaOwner")
+  closedRcfas           Rcfa[]                @relation("RcfaClosedBy")
   deletedRcfas          Rcfa[]                @relation("RcfaDeletedBy")
   answeredFollowups     RcfaFollowupQuestion[] @relation("FollowupAnsweredBy")
   selectedRootCauses    RcfaRootCauseFinal[]  @relation("RootCauseSelectedBy")
@@ -126,6 +127,10 @@ model Rcfa {
   activePmsSummary   String? @map("active_pms_summary")
   additionalNotes    String? @map("additional_notes")
 
+  // Investigation-phase notes (added during investigation, triggers re-analysis)
+  investigationNotes          String?   @map("investigation_notes")
+  investigationNotesUpdatedAt DateTime? @map("investigation_notes_updated_at") @db.Timestamptz
+
   downtimeMinutes    Int?     @map("downtime_minutes")
   productionCostUsd  Decimal? @map("production_cost_usd") @db.Decimal(12, 2)
   maintenanceCostUsd Decimal? @map("maintenance_cost_usd") @db.Decimal(12, 2)
@@ -137,6 +142,8 @@ model Rcfa {
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   closedAt  DateTime? @map("closed_at") @db.Timestamptz
+  closedByUserId String?   @map("closed_by_user_id") @db.Uuid
+  closingNotes   String?   @map("closing_notes")
 
   // Soft delete columns (GxP compliance - preserves audit trail)
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
@@ -145,6 +152,7 @@ model Rcfa {
   // Relations
   createdBy            AppUser                  @relation("RcfaCreatedBy", fields: [createdByUserId], references: [id])
   owner                AppUser                  @relation("RcfaOwner", fields: [ownerUserId], references: [id])
+  closedBy             AppUser?                 @relation("RcfaClosedBy", fields: [closedByUserId], references: [id])
   deletedBy            AppUser?                 @relation("RcfaDeletedBy", fields: [deletedByUserId], references: [id])
   followupQuestions    RcfaFollowupQuestion[]
   rootCauseCandidates  RcfaRootCauseCandidate[]
