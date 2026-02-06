@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
 import type { RcfaStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -11,23 +12,6 @@ export const metadata: Metadata = {
 };
 
 const ITEMS_PER_PAGE = 50;
-
-const STATUS_LABELS: Record<RcfaStatus, string> = {
-  draft: "Draft",
-  investigation: "Investigation",
-  actions_open: "Actions Open",
-  closed: "Closed",
-};
-
-const STATUS_COLORS: Record<RcfaStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  investigation:
-    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  actions_open:
-    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  closed:
-    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-};
 
 export type RcfaRow = {
   id: string;
@@ -253,8 +237,8 @@ export default async function DashboardPage({
       )}
       <RcfaListFilter
         items={rows}
-        statusLabels={STATUS_LABELS}
-        statusColors={STATUS_COLORS}
+        statusLabels={RCFA_STATUS_LABELS}
+        statusColors={RCFA_STATUS_COLORS}
         isSearching={!!searchQuery}
       />
       {totalPages > 1 && (
