@@ -19,6 +19,7 @@ export default function AppHeader({ displayName, role }: AppHeaderProps) {
             width={120}
             height={40}
             className="h-8 w-auto dark:invert"
+            priority
             unoptimized
           />
         </Link>

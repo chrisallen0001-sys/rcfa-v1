@@ -57,6 +57,7 @@ function LoginForm() {
             width={180}
             height={60}
             className="mx-auto h-12 w-auto dark:invert"
+            priority
             unoptimized
           />
           <h1 className="mt-6 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
