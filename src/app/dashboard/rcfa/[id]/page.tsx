@@ -20,6 +20,7 @@ import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
 import EditableIntakeForm from "./EditableIntakeForm";
+import AddInformationSection from "./AddInformationSection";
 import type {
   ConfidenceLabel,
   Priority,
@@ -177,12 +178,19 @@ export default async function RcfaDetailPage({
       )
   );
 
-  // Enable Re-Analyze only when answers have changed since the last re-analysis
+  // Enable Re-Analyze when answers or investigation notes have changed since the last re-analysis
   const hasNewAnswers = lastReanalysis
     ? rcfa.followupQuestions.some(
         (q) => q.answeredAt !== null && q.answeredAt > lastReanalysis.createdAt
       )
     : hasAnsweredQuestions;
+
+  const hasNewInvestigationNotes = lastReanalysis
+    ? rcfa.investigationNotesUpdatedAt !== null &&
+      rcfa.investigationNotesUpdatedAt > lastReanalysis.createdAt
+    : rcfa.investigationNotes !== null && rcfa.investigationNotes.length > 0;
+
+  const hasNewDataForReanalysis = hasNewAnswers || hasNewInvestigationNotes;
 
   const promotedCandidateIds = new Set(
     rcfa.rootCauseFinals
@@ -194,6 +202,21 @@ export default async function RcfaDetailPage({
       .map((a) => a.selectedFromCandidateId)
       .filter(Boolean)
   );
+
+  // Find the timestamp to mark candidates as "new" (added in latest re-analysis)
+  // Candidates generated after the second-most-recent analysis are "new"
+  const candidateGeneratedEvents = rcfa.auditEvents.filter(
+    (e) => e.eventType === AUDIT_EVENT_TYPES.CANDIDATE_GENERATED
+  );
+  // Events are already ordered desc by createdAt, so [1] is the second-most-recent
+  const previousAnalysisTimestamp =
+    candidateGeneratedEvents.length > 1
+      ? candidateGeneratedEvents[1].createdAt
+      : null;
+
+  // Helper to determine if a candidate was added in the latest re-analysis
+  const isNewCandidate = (generatedAt: Date): boolean =>
+    previousAnalysisTimestamp !== null && generatedAt > previousAnalysisTimestamp;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -329,12 +352,20 @@ export default async function RcfaDetailPage({
           </Section>
         )}
 
+        {/* Add Information Section */}
+        {rcfa.status === "investigation" && canEdit && (
+          <AddInformationSection
+            rcfaId={rcfa.id}
+            initialNotes={rcfa.investigationNotes}
+          />
+        )}
+
         {/* Re-Analyze Button */}
         {rcfa.status === "investigation" && canEdit && (
           <ReAnalyzeButton
             rcfaId={rcfa.id}
             hasAnsweredQuestions={hasAnsweredQuestions}
-            hasNewAnswers={hasNewAnswers}
+            hasNewAnswers={hasNewDataForReanalysis}
           />
         )}
 
@@ -342,41 +373,55 @@ export default async function RcfaDetailPage({
         {hasAnalysis && sortedRootCauseCandidates.length > 0 && (
           <Section title="Root Cause Candidates">
             <div className="space-y-4">
-              {sortedRootCauseCandidates.map((c) => (
-                <div
-                  key={c.id}
-                  className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {c.causeText}
-                    </p>
-                    <Badge
-                      label={c.confidenceLabel}
-                      colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
-                    />
-                  </div>
-                  {c.rationaleText && (
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      {c.rationaleText}
-                    </p>
-                  )}
-                  {rcfa.status === "investigation" && canEdit &&
-                    !promotedCandidateIds.has(c.id) && (
-                      <div className="mt-3">
-                        <PromoteRootCauseButton
-                          rcfaId={rcfa.id}
-                          candidateId={c.id}
-                        />
+              {sortedRootCauseCandidates.map((c) => {
+                const isNew = isNewCandidate(c.generatedAt);
+                return (
+                  <div
+                    key={c.id}
+                    className={`rounded-md border p-4 ${
+                      isNew
+                        ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
+                        : "border-zinc-100 dark:border-zinc-800"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {c.causeText}
+                        </p>
+                        {isNew && (
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                            New
+                          </span>
+                        )}
                       </div>
+                      <Badge
+                        label={c.confidenceLabel}
+                        colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
+                      />
+                    </div>
+                    {c.rationaleText && (
+                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        {c.rationaleText}
+                      </p>
                     )}
-                  {promotedCandidateIds.has(c.id) && (
-                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
-                      Promoted to final
-                    </p>
-                  )}
-                </div>
-              ))}
+                    {rcfa.status === "investigation" && canEdit &&
+                      !promotedCandidateIds.has(c.id) && (
+                        <div className="mt-3">
+                          <PromoteRootCauseButton
+                            rcfaId={rcfa.id}
+                            candidateId={c.id}
+                          />
+                        </div>
+                      )}
+                    {promotedCandidateIds.has(c.id) && (
+                      <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                        Promoted to final
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Section>
         )}
@@ -413,47 +458,61 @@ export default async function RcfaDetailPage({
         {hasAnalysis && rcfa.actionItemCandidates.length > 0 && (
           <Section title="Action Item Candidates">
             <div className="space-y-4">
-              {rcfa.actionItemCandidates.map((a) => (
-                <div
-                  key={a.id}
-                  className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {a.actionText}
-                    </p>
-                    <Badge
-                      label={a.priority}
-                      colorClass={PRIORITY_COLORS[a.priority]}
-                    />
-                  </div>
-                  {a.rationaleText && (
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      {a.rationaleText}
-                    </p>
-                  )}
-                  <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-                    {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
-                    {a.successCriteria && (
-                      <span>Success: {a.successCriteria}</span>
-                    )}
-                  </div>
-                  {rcfa.status === "investigation" && canEdit &&
-                    !promotedActionCandidateIds.has(a.id) && (
-                      <div className="mt-3">
-                        <PromoteActionItemButton
-                          rcfaId={rcfa.id}
-                          candidateId={a.id}
-                        />
+              {rcfa.actionItemCandidates.map((a) => {
+                const isNew = isNewCandidate(a.generatedAt);
+                return (
+                  <div
+                    key={a.id}
+                    className={`rounded-md border p-4 ${
+                      isNew
+                        ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
+                        : "border-zinc-100 dark:border-zinc-800"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {a.actionText}
+                        </p>
+                        {isNew && (
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                            New
+                          </span>
+                        )}
                       </div>
+                      <Badge
+                        label={a.priority}
+                        colorClass={PRIORITY_COLORS[a.priority]}
+                      />
+                    </div>
+                    {a.rationaleText && (
+                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        {a.rationaleText}
+                      </p>
                     )}
-                  {promotedActionCandidateIds.has(a.id) && (
-                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
-                      Promoted to tracked
-                    </p>
-                  )}
-                </div>
-              ))}
+                    <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
+                      {a.successCriteria && (
+                        <span>Success: {a.successCriteria}</span>
+                      )}
+                    </div>
+                    {rcfa.status === "investigation" && canEdit &&
+                      !promotedActionCandidateIds.has(a.id) && (
+                        <div className="mt-3">
+                          <PromoteActionItemButton
+                            rcfaId={rcfa.id}
+                            candidateId={a.id}
+                          />
+                        </div>
+                      )}
+                    {promotedActionCandidateIds.has(a.id) && (
+                      <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                        Promoted to tracked
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Section>
         )}

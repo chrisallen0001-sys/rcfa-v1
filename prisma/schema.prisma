@@ -126,6 +126,10 @@ model Rcfa {
   activePmsSummary   String? @map("active_pms_summary")
   additionalNotes    String? @map("additional_notes")
 
+  // Investigation-phase notes (added during investigation, triggers re-analysis)
+  investigationNotes          String?   @map("investigation_notes")
+  investigationNotesUpdatedAt DateTime? @map("investigation_notes_updated_at") @db.Timestamptz
+
   downtimeMinutes    Int?     @map("downtime_minutes")
   productionCostUsd  Decimal? @map("production_cost_usd") @db.Decimal(12, 2)
   maintenanceCostUsd Decimal? @map("maintenance_cost_usd") @db.Decimal(12, 2)

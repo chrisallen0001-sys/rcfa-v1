@@ -30,6 +30,9 @@ const EDITABLE_DRAFT_FIELDS = [
   "maintenanceCostUsd",
 ] as const;
 
+/** Fields that can be updated during investigation status */
+const EDITABLE_INVESTIGATION_FIELDS = ["investigationNotes"] as const;
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -131,6 +134,9 @@ export async function PATCH(
     const hasFieldUpdates = EDITABLE_DRAFT_FIELDS.some(
       (field) => body[field] !== undefined
     );
+    const hasInvestigationFieldUpdates = EDITABLE_INVESTIGATION_FIELDS.some(
+      (field) => body[field] !== undefined
+    );
 
     const rcfa = await prisma.rcfa.findFirst({
       where: { id, deletedAt: null },
@@ -150,6 +156,7 @@ export async function PATCH(
         workHistorySummary: true,
         activePmsSummary: true,
         additionalNotes: true,
+        investigationNotes: true,
         downtimeMinutes: true,
         productionCostUsd: true,
         maintenanceCostUsd: true,
@@ -163,6 +170,50 @@ export async function PATCH(
     // Check permission: owner or admin
     if (rcfa.ownerUserId !== userId && role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Handle investigation notes updates (allowed during investigation status)
+    if (hasInvestigationFieldUpdates) {
+      if (rcfa.status !== "investigation") {
+        return NextResponse.json(
+          { error: "Investigation notes can only be updated during investigation status" },
+          { status: 409 }
+        );
+      }
+
+      const trimmed = body.investigationNotes
+        ? String(body.investigationNotes).trim()
+        : null;
+      const current = rcfa.investigationNotes;
+
+      if (trimmed === current) {
+        return NextResponse.json({ message: "No changes" }, { status: 200 });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.rcfa.update({
+          where: { id },
+          data: {
+            investigationNotes: trimmed || null,
+            investigationNotesUpdatedAt: new Date(),
+          },
+        });
+
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId: id,
+            actorUserId: userId,
+            eventType: "investigation_notes_updated",
+            eventPayload: {
+              changes: {
+                investigationNotes: { from: current, to: trimmed || null },
+              },
+            },
+          },
+        });
+      });
+
+      return NextResponse.json({ success: true }, { status: 200 });
     }
 
     // Handle field updates (only allowed in draft status)
@@ -333,7 +384,7 @@ export async function PATCH(
     // Handle status change
     if (!newStatus) {
       return NextResponse.json(
-        { error: "Missing status field or editable fields" },
+        { error: "Missing status, intake fields, or investigation notes" },
         { status: 400 }
       );
     }
