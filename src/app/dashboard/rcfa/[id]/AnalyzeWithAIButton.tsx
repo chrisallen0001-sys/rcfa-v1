@@ -50,6 +50,7 @@ export default function AnalyzeWithAIButton({
       <button
         onClick={handleClick}
         disabled={loading}
+        title="AI will generate follow-up questions, root cause candidates, and suggested action items based on your intake data"
         className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-500 dark:hover:bg-purple-400"
       >
         {loading ? (

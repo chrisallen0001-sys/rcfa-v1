@@ -48,6 +48,7 @@ export default function StartInvestigationButton({
       <button
         onClick={handleClick}
         disabled={loading}
+        title="Start investigation manually without AI suggestions. You can add root causes and action items yourself."
         className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
       >
         {loading ? (

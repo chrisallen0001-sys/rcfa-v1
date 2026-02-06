@@ -224,10 +224,15 @@ export default async function RcfaDetailPage({
       </div>
 
       {rcfa.status === "draft" && canEdit && (
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <AnalyzeWithAIButton rcfaId={rcfa.id} />
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
-          <StartInvestigationButton rcfaId={rcfa.id} />
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <AnalyzeWithAIButton rcfaId={rcfa.id} />
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
+            <StartInvestigationButton rcfaId={rcfa.id} />
+          </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            AI analysis generates follow-up questions, root cause candidates, and action items. You can also start without AI and add these manually.
+          </p>
         </div>
       )}
 
