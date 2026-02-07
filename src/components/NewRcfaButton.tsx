@@ -16,8 +16,9 @@ export function NewRcfaButton() {
 
   // Handle Escape key to close modal
   useEffect(() => {
+    if (!showModal) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && showModal && !isCreating) {
+      if (e.key === "Escape" && !isCreating) {
         setShowModal(false);
       }
     }
@@ -123,6 +124,7 @@ export function NewRcfaButton() {
                 type="button"
                 onClick={handleCloseModal}
                 disabled={isCreating}
+                autoFocus
                 className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Cancel
