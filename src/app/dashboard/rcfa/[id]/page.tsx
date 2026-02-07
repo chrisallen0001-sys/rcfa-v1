@@ -257,7 +257,7 @@ export default async function RcfaDetailPage({
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Intake Summary - editable when draft */}
         {rcfa.status === "draft" && canEdit ? (
           <EditableIntakeForm

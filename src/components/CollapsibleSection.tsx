@@ -15,7 +15,7 @@ interface CollapsibleSectionProps {
 export default function CollapsibleSection({
   title,
   children,
-  defaultExpanded = true,
+  defaultExpanded = false,
   headerContent,
   className = "rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950",
 }: CollapsibleSectionProps) {
@@ -26,7 +26,7 @@ export default function CollapsibleSection({
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center justify-between p-6 text-left"
+        className="flex w-full items-center justify-between px-6 py-4 text-left"
         aria-expanded={isExpanded}
         aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
       >
