@@ -1,5 +1,6 @@
 export const AUDIT_EVENT_TYPES = {
   CANDIDATE_GENERATED: "candidate_generated",
+  ANSWER_SUBMITTED: "answer_submitted",
   ANSWER_UPDATED: "answer_updated",
 } as const;
 

@@ -18,6 +18,7 @@ interface AuditLogSectionProps {
 const EVENT_TYPE_LABELS: Record<string, string> = {
   status_changed: "Status Changed",
   [AUDIT_EVENT_TYPES.CANDIDATE_GENERATED]: "Candidates Generated",
+  [AUDIT_EVENT_TYPES.ANSWER_SUBMITTED]: "Answer Submitted",
   [AUDIT_EVENT_TYPES.ANSWER_UPDATED]: "Answer Updated",
   promoted_to_final: "Promoted to Final",
   final_updated: "Root Cause Updated",
@@ -153,6 +154,10 @@ function formatPayloadSummary(
         return `${payload.previousOwnerName} → ${payload.newOwnerName}`;
       }
       return "Owner reassigned";
+    case AUDIT_EVENT_TYPES.ANSWER_SUBMITTED:
+      return payload.questionText
+        ? truncate(String(payload.questionText), 60)
+        : "Answer submitted";
     case AUDIT_EVENT_TYPES.ANSWER_UPDATED:
       return payload.questionText
         ? truncate(String(payload.questionText), 60)
@@ -277,6 +282,26 @@ function getChangedFields(payload: Record<string, unknown>): Array<{
 }
 
 function PayloadDetail({ eventType, payload }: { eventType: string; payload: Record<string, unknown> }) {
+  // Special handling for answer_submitted events
+  if (eventType === AUDIT_EVENT_TYPES.ANSWER_SUBMITTED) {
+    return (
+      <dl className="space-y-3">
+        <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+          <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Question:</dt>
+          <dd className="text-zinc-700 dark:text-zinc-300 break-words">
+            {formatValue(payload.questionText)}
+          </dd>
+        </div>
+        <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+          <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Answer:</dt>
+          <dd className="text-zinc-700 dark:text-zinc-300 break-words">
+            {formatValue(payload.answerText)}
+          </dd>
+        </div>
+      </dl>
+    );
+  }
+
   // Special handling for answer_updated events
   if (eventType === AUDIT_EVENT_TYPES.ANSWER_UPDATED) {
     return (
