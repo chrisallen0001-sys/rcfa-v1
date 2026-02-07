@@ -70,10 +70,6 @@ const FIELD_LABELS: Record<string, string> = {
   previousOwnerName: "Previous Owner",
   newOwnerId: "New Owner",
   newOwnerName: "New Owner",
-  // Answer update fields
-  questionText: "Question",
-  previousAnswer: "Previous",
-  newAnswer: "New",
 };
 
 // Fields that represent "before" values for update events (previousXxx -> xxx pattern)
@@ -88,8 +84,6 @@ const PREVIOUS_FIELD_MAP: Record<string, string> = {
   previousOwnerUserId: "ownerUserId",
   // Owner change event - only show name (ID is not user-friendly)
   previousOwnerName: "newOwnerName",
-  // Answer update event
-  previousAnswer: "newAnswer",
 };
 
 function formatEventType(eventType: string): string {
@@ -286,7 +280,7 @@ function PayloadDetail({ eventType, payload }: { eventType: string; payload: Rec
   // Special handling for answer_updated events
   if (eventType === AUDIT_EVENT_TYPES.ANSWER_UPDATED) {
     return (
-      <div className="space-y-3">
+      <dl className="space-y-3">
         <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
           <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Question:</dt>
           <dd className="text-zinc-700 dark:text-zinc-300 break-words">
@@ -305,7 +299,7 @@ function PayloadDetail({ eventType, payload }: { eventType: string; payload: Rec
             {formatValue(payload.newAnswer)}
           </dd>
         </div>
-      </div>
+      </dl>
     );
   }
 
