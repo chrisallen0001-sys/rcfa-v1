@@ -69,10 +69,7 @@ export default function AddInformationSection({
   };
 
   return (
-    <CollapsibleSection
-      title="Add Information"
-      className="rounded-lg border border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20"
-    >
+    <CollapsibleSection title="Add Information">
       <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
         Add new findings, lab results, or other information discovered during investigation.
         After saving, you can re-analyze to incorporate the new data.
@@ -105,7 +102,7 @@ export default function AddInformationSection({
             type="button"
             onClick={handleSave}
             disabled={isSaving || !hasChanges}
-            className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-500 dark:hover:bg-purple-400"
+            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             {isSaving ? "Saving..." : "Save Information"}
           </button>
