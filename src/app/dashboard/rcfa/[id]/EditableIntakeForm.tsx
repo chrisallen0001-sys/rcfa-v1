@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { OperatingContext } from "@/generated/prisma/client";
+import { Spinner } from "@/components/Spinner";
+import { useElapsedTime } from "./useElapsedTime";
 
 type AutoSaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -34,6 +36,7 @@ type FormData = {
 
 type Props = {
   rcfaId: string;
+  showActionButtons?: boolean;
   initialData: {
     title: string;
     equipmentDescription: string;
@@ -85,7 +88,7 @@ const selectClass =
 const AUTO_SAVE_DELAY_MS = 2000;
 const SAVED_INDICATOR_DURATION_MS = 2000;
 
-export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
+export default function EditableIntakeForm({ rcfaId, initialData, showActionButtons = false }: Props) {
   const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     title: initialData.title,
@@ -120,6 +123,13 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
   const autoSaveStatusRef = useRef<AutoSaveStatus>("idle");
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Action button state (for Analyze with AI / Start Without AI)
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isStartingWithoutAI, setIsStartingWithoutAI] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const actionPendingRef = useRef(false);
+  const analyzeElapsed = useElapsedTime(isAnalyzing);
 
   // Keep refs in sync with state for use in async callbacks
   useEffect(() => {
@@ -329,12 +339,188 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
     }
   };
 
+  // Helper to save form before an action
+  const saveBeforeAction = async (): Promise<boolean> => {
+    // Cancel any pending debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Clear saved indicator timer
+    if (savedIndicatorTimerRef.current) {
+      clearTimeout(savedIndicatorTimerRef.current);
+    }
+
+    setAutoSaveStatus("saving");
+    setAutoSaveError(null);
+
+    try {
+      await performSave(formDataRef.current);
+      if (!isMountedRef.current) return false;
+      setAutoSaveStatus("saved");
+
+      // Hide "saved" indicator after 2 seconds
+      savedIndicatorTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setAutoSaveStatus("idle");
+        }
+      }, SAVED_INDICATOR_DURATION_MS);
+
+      return true;
+    } catch (err) {
+      if (!isMountedRef.current) return false;
+      setAutoSaveStatus("error");
+      setAutoSaveError(
+        err instanceof Error ? err.message : "Failed to save"
+      );
+      setActionError(
+        err instanceof Error ? err.message : "Failed to save changes before starting"
+      );
+      return false;
+    }
+  };
+
+  // Handle "Analyze with AI" button
+  const handleAnalyzeWithAI = async () => {
+    if (actionPendingRef.current) return;
+    actionPendingRef.current = true;
+    setIsAnalyzing(true);
+    setActionError(null);
+
+    try {
+      // Save form data first
+      const saved = await saveBeforeAction();
+      if (!saved) {
+        return;
+      }
+
+      // Then start AI analysis
+      const res = await fetch(`/api/rcfa/${rcfaId}/analyze`, {
+        method: "POST",
+      });
+
+      if (!isMountedRef.current) return;
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to analyze with AI");
+      }
+
+      router.refresh();
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setActionError(
+        err instanceof Error ? err.message : "Failed to analyze with AI"
+      );
+    } finally {
+      actionPendingRef.current = false;
+      if (isMountedRef.current) {
+        setIsAnalyzing(false);
+      }
+    }
+  };
+
+  // Handle "Start Without AI" button
+  const handleStartWithoutAI = async () => {
+    if (actionPendingRef.current) return;
+    actionPendingRef.current = true;
+    setIsStartingWithoutAI(true);
+    setActionError(null);
+
+    try {
+      // Save form data first
+      const saved = await saveBeforeAction();
+      if (!saved) {
+        return;
+      }
+
+      // Then start investigation
+      const res = await fetch(`/api/rcfa/${rcfaId}/start-investigation`, {
+        method: "POST",
+      });
+
+      if (!isMountedRef.current) return;
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to start investigation");
+      }
+
+      router.refresh();
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setActionError(
+        err instanceof Error ? err.message : "Failed to start investigation"
+      );
+    } finally {
+      actionPendingRef.current = false;
+      if (isMountedRef.current) {
+        setIsStartingWithoutAI(false);
+      }
+    }
+  };
+
+  const isActionInProgress = isAnalyzing || isStartingWithoutAI || autoSaveStatus === "saving";
+
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Intake Summary
-        </h2>
+    <>
+      {/* Action buttons for starting investigation */}
+      {showActionButtons && (
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleAnalyzeWithAI}
+              disabled={isActionInProgress}
+              title="AI will generate follow-up questions, root cause candidates, and suggested action items based on your intake data"
+              className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-500 dark:hover:bg-purple-400"
+            >
+              {isAnalyzing ? (
+                <span className="flex items-center gap-2">
+                  <Spinner />
+                  Analyzing with AI... {analyzeElapsed}s
+                </span>
+              ) : (
+                "Analyze with AI"
+              )}
+            </button>
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
+            <button
+              onClick={handleStartWithoutAI}
+              disabled={isActionInProgress}
+              title="Start investigation manually without AI suggestions. You can add root causes and action items yourself."
+              className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              {isStartingWithoutAI ? (
+                <span className="flex items-center gap-2">
+                  <Spinner />
+                  Starting...
+                </span>
+              ) : (
+                "Start Without AI"
+              )}
+            </button>
+            {actionError && (
+              <span className="text-sm text-red-600 dark:text-red-400">
+                {actionError}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            AI analysis generates follow-up questions, root cause candidates, and action items. You can also start without AI and add these manually.
+          </p>
+        </div>
+      )}
+
+      <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Intake Summary
+          </h2>
         <div className="flex items-center gap-3">
           {/* Auto-save status indicator */}
           {autoSaveStatus === "saving" && (
@@ -599,5 +785,6 @@ export default function EditableIntakeForm({ rcfaId, initialData }: Props) {
         </FormField>
       </div>
     </section>
+    </>
   );
 }
