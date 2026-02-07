@@ -1,0 +1,256 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Spinner } from "@/components/Spinner";
+import { useElapsedTime } from "./useElapsedTime";
+import ReAnalyzeButton from "./ReAnalyzeButton";
+import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
+import BackToInvestigationButton from "./BackToInvestigationButton";
+import CloseRcfaButton from "./CloseRcfaButton";
+import ReopenRcfaButton from "./ReopenRcfaButton";
+
+type RcfaStatus = "draft" | "investigation" | "actions_open" | "closed";
+
+interface RcfaActionBarProps {
+  rcfaId: string;
+  status: RcfaStatus;
+  canEdit: boolean;
+  isAdmin: boolean;
+  // For draft state
+  onSaveForm?: () => Promise<boolean>;
+  // For investigation/actions_open state
+  hasAnsweredQuestions?: boolean;
+  hasNewDataForReanalysis?: boolean;
+  // For actions_open state
+  allActionItemsComplete?: boolean;
+  totalActionItems?: number;
+}
+
+function AnalyzeWithAIButton({
+  rcfaId,
+  onSaveForm,
+  disabled,
+}: {
+  rcfaId: string;
+  onSaveForm?: () => Promise<boolean>;
+  disabled?: boolean;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pendingRef = useRef(false);
+  const elapsed = useElapsedTime(loading);
+
+  async function handleClick() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Save form first if callback provided
+      if (onSaveForm) {
+        const saved = await onSaveForm();
+        if (!saved) {
+          setError("Failed to save form before analyzing");
+          return;
+        }
+      }
+
+      const res = await fetch(`/api/rcfa/${rcfaId}/analyze`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to analyze with AI");
+      }
+
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze with AI");
+    } finally {
+      pendingRef.current = false;
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={handleClick}
+        disabled={loading || disabled}
+        title="AI will generate follow-up questions, root cause candidates, and suggested action items"
+        className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-500 dark:hover:bg-purple-400"
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <Spinner />
+            Analyzing... {elapsed}s
+          </span>
+        ) : (
+          "Analyze with AI"
+        )}
+      </button>
+      {error && (
+        <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+      )}
+    </div>
+  );
+}
+
+function StartWithoutAIButton({
+  rcfaId,
+  onSaveForm,
+  disabled,
+}: {
+  rcfaId: string;
+  onSaveForm?: () => Promise<boolean>;
+  disabled?: boolean;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pendingRef = useRef(false);
+
+  async function handleClick() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Save form first if callback provided
+      if (onSaveForm) {
+        const saved = await onSaveForm();
+        if (!saved) {
+          setError("Failed to save form before starting");
+          return;
+        }
+      }
+
+      const res = await fetch(`/api/rcfa/${rcfaId}/start-investigation`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to start investigation");
+      }
+
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start investigation");
+    } finally {
+      pendingRef.current = false;
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={handleClick}
+        disabled={loading || disabled}
+        title="Start investigation manually without AI suggestions"
+        className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <Spinner />
+            Starting...
+          </span>
+        ) : (
+          "Start Without AI"
+        )}
+      </button>
+      {error && (
+        <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+      )}
+    </div>
+  );
+}
+
+export default function RcfaActionBar({
+  rcfaId,
+  status,
+  canEdit,
+  isAdmin,
+  onSaveForm,
+  hasAnsweredQuestions = false,
+  hasNewDataForReanalysis = false,
+  allActionItemsComplete = false,
+  totalActionItems = 0,
+}: RcfaActionBarProps) {
+  // Don't render if user can't edit (except closed state where admin can reopen)
+  if (!canEdit && !(status === "closed" && isAdmin)) {
+    return null;
+  }
+
+  const renderButtons = () => {
+    switch (status) {
+      case "draft":
+        return (
+          <div className="flex flex-wrap items-center gap-3">
+            <AnalyzeWithAIButton rcfaId={rcfaId} onSaveForm={onSaveForm} />
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
+            <StartWithoutAIButton rcfaId={rcfaId} onSaveForm={onSaveForm} />
+          </div>
+        );
+
+      case "investigation":
+        return (
+          <div className="flex flex-wrap items-center gap-3">
+            <ReAnalyzeButton
+              rcfaId={rcfaId}
+              hasAnsweredQuestions={hasAnsweredQuestions}
+              hasNewAnswers={hasNewDataForReanalysis}
+            />
+            <FinalizeInvestigationButton rcfaId={rcfaId} />
+          </div>
+        );
+
+      case "actions_open":
+        return (
+          <div className="flex flex-wrap items-center gap-3">
+            <ReAnalyzeButton
+              rcfaId={rcfaId}
+              hasAnsweredQuestions={hasAnsweredQuestions}
+              hasNewAnswers={hasNewDataForReanalysis}
+            />
+            <BackToInvestigationButton rcfaId={rcfaId} />
+            {allActionItemsComplete && <CloseRcfaButton rcfaId={rcfaId} />}
+            {!allActionItemsComplete && totalActionItems > 0 && (
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                Complete all action items to close
+              </span>
+            )}
+            {totalActionItems === 0 && (
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                Add action items to close
+              </span>
+            )}
+          </div>
+        );
+
+      case "closed":
+        if (isAdmin) {
+          return <ReopenRcfaButton rcfaId={rcfaId} />;
+        }
+        return null;
+
+      default:
+        return null;
+    }
+  };
+
+  const buttons = renderButtons();
+  if (!buttons) return null;
+
+  return (
+    <div className="sticky top-16 z-30 -mx-4 mb-6 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95">
+      {buttons}
+    </div>
+  );
+}
