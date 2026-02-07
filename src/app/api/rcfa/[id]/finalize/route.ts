@@ -46,6 +46,13 @@ export async function POST(
         throw new Error("RCFA_NO_ROOT_CAUSES");
       }
 
+      const actionItemCount = await tx.rcfaActionItem.count({
+        where: { rcfaId: id },
+      });
+      if (actionItemCount === 0) {
+        throw new Error("RCFA_NO_ACTION_ITEMS");
+      }
+
       await tx.rcfa.update({
         where: { id },
         data: { status: "actions_open" },
@@ -78,6 +85,15 @@ export async function POST(
     ) {
       return NextResponse.json(
         { error: "At least one root cause must be finalized before advancing" },
+        { status: 422 }
+      );
+    }
+    if (
+      error instanceof Error &&
+      error.message === "RCFA_NO_ACTION_ITEMS"
+    ) {
+      return NextResponse.json(
+        { error: "At least one action item is required before finalizing investigation" },
         { status: 422 }
       );
     }

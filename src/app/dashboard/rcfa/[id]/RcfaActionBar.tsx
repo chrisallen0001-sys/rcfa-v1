@@ -207,7 +207,10 @@ export default function RcfaActionBar({
               hasAnsweredQuestions={hasAnsweredQuestions}
               hasNewAnswers={hasNewDataForReanalysis}
             />
-            <FinalizeInvestigationButton rcfaId={rcfaId} />
+            <FinalizeInvestigationButton
+              rcfaId={rcfaId}
+              totalActionItems={totalActionItems}
+            />
           </div>
         );
 
