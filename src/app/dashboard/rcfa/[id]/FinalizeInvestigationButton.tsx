@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+const HINT_DISMISS_MS = 2500;
 
 interface FinalizeInvestigationButtonProps {
   rcfaId: string;
@@ -16,7 +18,29 @@ export default function FinalizeInvestigationButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDisabledHint, setShowDisabledHint] = useState(false);
   const pendingRef = useRef(false);
+  const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear hint timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    };
+  }, []);
+
+  function handleButtonClick() {
+    // If disabled, show hint on tap (mobile has no hover)
+    if (!hasActionItems) {
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+      setShowDisabledHint(true);
+      hintTimerRef.current = setTimeout(() => {
+        setShowDisabledHint(false);
+      }, HINT_DISMISS_MS);
+      return;
+    }
+    handleClick();
+  }
 
   async function handleClick() {
     if (pendingRef.current) return;
@@ -54,14 +78,19 @@ export default function FinalizeInvestigationButton({
   return (
     <div className="flex items-center gap-3">
       <button
-        onClick={handleClick}
-        disabled={loading || !hasActionItems}
+        onClick={handleButtonClick}
+        disabled={loading}
+        aria-disabled={!hasActionItems}
         title={
           hasActionItems
             ? "Lock root causes and move to action item tracking"
             : "Add at least one action item before finalizing"
         }
-        className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-400"
+        className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors ${
+          !hasActionItems
+            ? "cursor-not-allowed bg-amber-600/50 dark:bg-amber-500/50"
+            : "bg-amber-600 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400"
+        } disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -91,9 +120,9 @@ export default function FinalizeInvestigationButton({
           "Finalize Investigation"
         )}
       </button>
-      {/* Mobile-only hint when disabled (no hover on mobile) */}
-      {!hasActionItems && (
-        <span className="text-sm text-zinc-500 dark:text-zinc-400 md:hidden">
+      {/* Tap-to-reveal hint for mobile (no hover available) */}
+      {showDisabledHint && (
+        <span className="text-sm text-zinc-500 dark:text-zinc-400">
           Add action items first
         </span>
       )}
