@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@/generated/prisma/internal/prismaNamespace";
 import { getAuthContext } from "@/lib/auth-context";
+import { AUDIT_EVENT_TYPES } from "@/lib/audit-constants";
 
 export async function PATCH(
   request: NextRequest,
@@ -59,16 +60,52 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.rcfaFollowupQuestion.update({
+    // Fetch the existing question to check if this is an update
+    const existingQuestion = await prisma.rcfaFollowupQuestion.findUnique({
       where: { id: questionId, rcfaId },
-      data: {
-        answerText,
-        answeredByUserId: userId,
-        answeredAt: new Date(),
-      },
-      include: {
-        answeredBy: { select: { email: true } },
-      },
+      select: { answerText: true, questionText: true },
+    });
+
+    if (!existingQuestion) {
+      return NextResponse.json(
+        { error: "Question not found" },
+        { status: 404 }
+      );
+    }
+
+    const previousAnswer = existingQuestion.answerText;
+    const isUpdate = previousAnswer !== null && previousAnswer !== answerText;
+
+    // Use transaction to ensure audit event and update are atomic
+    const updated = await prisma.$transaction(async (tx) => {
+      // Log audit event if this is an answer update (not first-time answer)
+      if (isUpdate) {
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId,
+            actorUserId: userId,
+            eventType: AUDIT_EVENT_TYPES.ANSWER_UPDATED,
+            eventPayload: {
+              questionId,
+              questionText: existingQuestion.questionText,
+              previousAnswer,
+              newAnswer: answerText,
+            },
+          },
+        });
+      }
+
+      return tx.rcfaFollowupQuestion.update({
+        where: { id: questionId, rcfaId },
+        data: {
+          answerText,
+          answeredByUserId: userId,
+          answeredAt: new Date(),
+        },
+        include: {
+          answeredBy: { select: { email: true } },
+        },
+      });
     });
 
     return NextResponse.json(updated);
