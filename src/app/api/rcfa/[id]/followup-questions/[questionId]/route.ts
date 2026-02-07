@@ -74,12 +74,28 @@ export async function PATCH(
     }
 
     const previousAnswer = existingQuestion.answerText;
-    const isUpdate = previousAnswer !== null && previousAnswer !== answerText;
+    const isFirstAnswer = previousAnswer === null;
+    const isUpdate = !isFirstAnswer && previousAnswer !== answerText;
 
     // Use transaction to ensure audit event and update are atomic
     const updated = await prisma.$transaction(async (tx) => {
-      // Log audit event if this is an answer update (not first-time answer)
-      if (isUpdate) {
+      // Log audit event for first-time answer
+      if (isFirstAnswer) {
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId,
+            actorUserId: userId,
+            eventType: AUDIT_EVENT_TYPES.ANSWER_SUBMITTED,
+            eventPayload: {
+              questionId,
+              questionText: existingQuestion.questionText,
+              answerText,
+            },
+          },
+        });
+      }
+      // Log audit event for answer update
+      else if (isUpdate) {
         await tx.rcfaAuditEvent.create({
           data: {
             rcfaId,
