@@ -21,6 +21,7 @@ import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
 import EditableIntakeForm from "./EditableIntakeForm";
 import AddInformationSection from "./AddInformationSection";
+import CollapsibleSection from "@/components/CollapsibleSection";
 import type {
   ConfidenceLabel,
   Priority,
@@ -64,17 +65,16 @@ function formatUsd(value: unknown): string | null {
 function Section({
   title,
   children,
+  headerContent,
 }: {
   title: string;
   children: React.ReactNode;
+  headerContent?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-      <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        {title}
-      </h2>
+    <CollapsibleSection title={title} headerContent={headerContent}>
       {children}
-    </section>
+    </CollapsibleSection>
   );
 }
 
@@ -257,7 +257,7 @@ export default async function RcfaDetailPage({
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Intake Summary - editable when draft */}
         {rcfa.status === "draft" && canEdit ? (
           <EditableIntakeForm
@@ -518,12 +518,10 @@ export default async function RcfaDetailPage({
 
         {/* Tracked Action Items */}
         {hasAnalysis && (rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
-          <section className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                Tracked Action Items
-              </h2>
-              {totalActionItems > 0 && (
+          <Section
+            title="Tracked Action Items"
+            headerContent={
+              totalActionItems > 0 ? (
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700">
                     <div
@@ -535,8 +533,9 @@ export default async function RcfaDetailPage({
                     {completedActionItems} of {totalActionItems} complete
                   </span>
                 </div>
-              )}
-            </div>
+              ) : undefined
+            }
+          >
             <div className="space-y-4">
               {rcfa.actionItems.map((a) => (
                 <EditableActionItem
@@ -559,7 +558,7 @@ export default async function RcfaDetailPage({
                 <AddActionItemForm rcfaId={rcfa.id} />
               )}
             </div>
-          </section>
+          </Section>
         )}
 
         {/* Actions Open Phase Controls */}

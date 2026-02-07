@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import CollapsibleSection from "@/components/CollapsibleSection";
 
 interface AddInformationSectionProps {
   rcfaId: string;
@@ -68,18 +69,14 @@ export default function AddInformationSection({
   };
 
   return (
-    <section className="rounded-lg border border-purple-200 bg-purple-50/50 p-6 dark:border-purple-900 dark:bg-purple-950/20">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Add Information
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Add new findings, lab results, or other information discovered during investigation.
-            After saving, you can re-analyze to incorporate the new data.
-          </p>
-        </div>
-      </div>
+    <CollapsibleSection
+      title="Add Information"
+      className="rounded-lg border border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20"
+    >
+      <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+        Add new findings, lab results, or other information discovered during investigation.
+        After saving, you can re-analyze to incorporate the new data.
+      </p>
 
       <div className="space-y-4">
         <textarea
@@ -114,6 +111,6 @@ export default function AddInformationSection({
           </button>
         </div>
       </div>
-    </section>
+    </CollapsibleSection>
   );
 }
