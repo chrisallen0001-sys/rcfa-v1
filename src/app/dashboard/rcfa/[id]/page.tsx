@@ -5,23 +5,19 @@ import { getAuthContext } from "@/lib/auth-context";
 import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import FollowupQuestions from "./FollowupQuestions";
-import ReAnalyzeButton from "./ReAnalyzeButton";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
 import EditableRootCause from "./EditableRootCause";
-import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import AddActionItemForm from "./AddActionItemForm";
 import EditableActionItem from "./EditableActionItem";
-import CloseRcfaButton from "./CloseRcfaButton";
-import BackToInvestigationButton from "./BackToInvestigationButton";
-import ReopenRcfaButton from "./ReopenRcfaButton";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
-import EditableIntakeForm from "./EditableIntakeForm";
 import AddInformationSection from "./AddInformationSection";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import RcfaActionBar from "./RcfaActionBar";
+import DraftModeWrapper from "./DraftModeWrapper";
 import type {
   ConfidenceLabel,
   Priority,
@@ -257,12 +253,25 @@ export default async function RcfaDetailPage({
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
+      {/* Sticky Action Bar - shows appropriate buttons based on status */}
+      {rcfa.status !== "draft" && (
+        <RcfaActionBar
+          rcfaId={rcfa.id}
+          status={rcfa.status}
+          canEdit={canEdit}
+          isAdmin={isAdmin}
+          hasAnsweredQuestions={hasAnsweredQuestions}
+          hasNewDataForReanalysis={hasNewDataForReanalysis}
+          allActionItemsComplete={allActionItemsComplete}
+          totalActionItems={totalActionItems}
+        />
+      )}
+
       <div className="space-y-4">
         {/* Intake Summary - editable when draft */}
         {rcfa.status === "draft" && canEdit ? (
-          <EditableIntakeForm
+          <DraftModeWrapper
             rcfaId={rcfa.id}
-            showActionButtons
             initialData={{
               title: rcfa.title,
               equipmentDescription: rcfa.equipmentDescription,
@@ -359,15 +368,6 @@ export default async function RcfaDetailPage({
           />
         )}
 
-        {/* Re-Analyze Button - available in investigation and actions_open */}
-        {(rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit && (
-          <ReAnalyzeButton
-            rcfaId={rcfa.id}
-            hasAnsweredQuestions={hasAnsweredQuestions}
-            hasNewAnswers={hasNewDataForReanalysis}
-          />
-        )}
-
         {/* Root Cause Candidates */}
         {hasAnalysis && sortedRootCauseCandidates.length > 0 && (
           <Section title="Root Cause Candidates">
@@ -446,11 +446,6 @@ export default async function RcfaDetailPage({
               )}
             </div>
           </Section>
-        )}
-
-        {/* Finalize Investigation Button */}
-        {rcfa.status === "investigation" && canEdit && (
-          <FinalizeInvestigationButton rcfaId={rcfa.id} />
         )}
 
         {/* Action Item Candidates */}
@@ -561,26 +556,6 @@ export default async function RcfaDetailPage({
           </Section>
         )}
 
-        {/* Actions Open Phase Controls */}
-        {rcfa.status === "actions_open" && canEdit && (
-          <div className="flex flex-wrap items-center gap-4">
-            <BackToInvestigationButton rcfaId={rcfa.id} />
-            {allActionItemsComplete && (
-              <CloseRcfaButton rcfaId={rcfa.id} />
-            )}
-            {!allActionItemsComplete && totalActionItems > 0 && (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Complete all action items to close this RCFA
-              </p>
-            )}
-            {totalActionItems === 0 && (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Add at least one action item to close this RCFA
-              </p>
-            )}
-          </div>
-        )}
-
         {/* Closed RCFA Info */}
         {rcfa.status === "closed" && (
           <Section title="Closed">
@@ -600,11 +575,6 @@ export default async function RcfaDetailPage({
                   <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
                     {rcfa.closingNotes}
                   </p>
-                </div>
-              )}
-              {isAdmin && (
-                <div className="pt-2">
-                  <ReopenRcfaButton rcfaId={rcfa.id} />
                 </div>
               )}
             </div>
