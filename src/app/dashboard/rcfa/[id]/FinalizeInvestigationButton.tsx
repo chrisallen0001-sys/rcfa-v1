@@ -91,11 +91,6 @@ export default function FinalizeInvestigationButton({
           "Finalize Investigation"
         )}
       </button>
-      {!hasActionItems && (
-        <span className="text-sm text-zinc-500 dark:text-zinc-400">
-          Add action items first
-        </span>
-      )}
       {error && (
         <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
       )}
