@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
 import { useElapsedTime } from "./useElapsedTime";
+import { useDisabledHint } from "./useDisabledHint";
 
 interface ReAnalyzeButtonProps {
   rcfaId: string;
@@ -122,6 +123,16 @@ export default function ReAnalyzeButton({
   const [dialogState, setDialogState] = useState<DialogState>({ kind: "none" });
   const pendingRef = useRef(false);
   const elapsed = useElapsedTime(loading);
+  const disabledHint = useDisabledHint();
+
+  function handleButtonClick() {
+    // If disabled, show hint on tap (mobile has no hover)
+    if (!hasNewAnswers) {
+      disabledHint.trigger();
+      return;
+    }
+    handleReAnalyze();
+  }
 
   async function handleReAnalyze() {
     if (pendingRef.current) return;
@@ -161,12 +172,17 @@ export default function ReAnalyzeButton({
     router.refresh();
   }, [router]);
 
+  const disabledHintText = !hasAnsweredQuestions
+    ? "Answer questions first"
+    : "No new answers";
+
   return (
     <>
       <div className="flex items-center gap-3">
         <button
-          onClick={handleReAnalyze}
-          disabled={loading || !hasNewAnswers}
+          onClick={handleButtonClick}
+          disabled={loading}
+          aria-disabled={!hasNewAnswers}
           title={
             !hasAnsweredQuestions
               ? "Answer at least one follow-up question before re-analyzing"
@@ -174,7 +190,11 @@ export default function ReAnalyzeButton({
                 ? "No new or updated answers since the last re-analysis"
                 : undefined
           }
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
+          className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors ${
+            !hasNewAnswers
+              ? "cursor-not-allowed bg-blue-600/50 dark:bg-blue-500/50"
+              : "bg-blue-600 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+          } disabled:cursor-not-allowed disabled:opacity-50`}
         >
           {loading ? (
             <span className="flex items-center gap-2">
@@ -185,12 +205,10 @@ export default function ReAnalyzeButton({
             "Re-Analyze with Answers"
           )}
         </button>
-        {/* Mobile-only hint when disabled (no hover on mobile) */}
-        {!hasNewAnswers && (
+        {/* Tap-to-reveal hint for mobile (desktop has hover tooltips) */}
+        {disabledHint.show && (
           <span className="text-sm text-zinc-500 dark:text-zinc-400 md:hidden">
-            {!hasAnsweredQuestions
-              ? "Answer questions first"
-              : "No new answers"}
+            {disabledHintText}
           </span>
         )}
         {error && (
