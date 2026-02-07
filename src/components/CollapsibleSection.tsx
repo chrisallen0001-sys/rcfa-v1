@@ -1,0 +1,64 @@
+"use client";
+
+import { useState, ReactNode } from "react";
+
+interface CollapsibleSectionProps {
+  title: string;
+  children: ReactNode;
+  defaultExpanded?: boolean;
+  /** Optional content to render in the header row (e.g., progress bar, badge) */
+  headerContent?: ReactNode;
+  /** Custom className for the section wrapper */
+  className?: string;
+}
+
+export default function CollapsibleSection({
+  title,
+  children,
+  defaultExpanded = true,
+  headerContent,
+  className = "rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950",
+}: CollapsibleSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  return (
+    <section className={className}>
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex w-full items-center justify-between p-6 text-left"
+        aria-expanded={isExpanded}
+        aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
+      >
+        <div className="flex flex-1 items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            {title}
+          </h2>
+          {headerContent}
+        </div>
+        <svg
+          className={`ml-4 h-5 w-5 flex-shrink-0 text-zinc-400 transition-transform duration-200 ${
+            isExpanded ? "rotate-180" : ""
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+      <div
+        className={`overflow-hidden transition-all duration-200 ${
+          isExpanded ? "max-h-[10000px] opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="px-6 pb-6">{children}</div>
+      </div>
+    </section>
+  );
+}
