@@ -235,6 +235,7 @@ export async function POST(
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
             followUpQuestionCount: result.followUpQuestions.length,
+            answerSnapshot: {},
           },
         },
       });

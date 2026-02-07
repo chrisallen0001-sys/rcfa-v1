@@ -371,8 +371,9 @@ function PayloadDetail({ eventType, payload }: { eventType: string; payload: Rec
   }
 
   // For non-update events, show all payload fields
+  // Exclude internal tracking fields: source, previous*, answerSnapshot
   const entries = Object.entries(payload).filter(
-    ([key]) => !key.startsWith("previous") && key !== "source"
+    ([key]) => !key.startsWith("previous") && key !== "source" && key !== "answerSnapshot"
   );
 
   if (entries.length === 0) {
