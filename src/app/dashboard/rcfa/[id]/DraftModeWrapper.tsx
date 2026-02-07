@@ -42,6 +42,7 @@ export default function DraftModeWrapper({
 
   return (
     <>
+      {/* isAdmin=false: Draft state has no admin-specific actions (Reopen is only for closed state) */}
       <RcfaActionBar
         rcfaId={rcfaId}
         status="draft"

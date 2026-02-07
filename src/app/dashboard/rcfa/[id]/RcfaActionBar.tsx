@@ -248,6 +248,7 @@ export default function RcfaActionBar({
   const buttons = renderButtons();
   if (!buttons) return null;
 
+  // top-16 (64px) positions below AppHeader. Update if header height changes.
   return (
     <div className="sticky top-16 z-30 -mx-4 mb-6 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95">
       {buttons}
