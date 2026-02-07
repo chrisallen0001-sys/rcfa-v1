@@ -351,10 +351,33 @@ export default function EditableIntakeForm({ rcfaId, initialData, showActionButt
       abortControllerRef.current.abort();
     }
 
+    // Clear saved indicator timer
+    if (savedIndicatorTimerRef.current) {
+      clearTimeout(savedIndicatorTimerRef.current);
+    }
+
+    setAutoSaveStatus("saving");
+    setAutoSaveError(null);
+
     try {
       await performSave(formDataRef.current);
+      if (!isMountedRef.current) return false;
+      setAutoSaveStatus("saved");
+
+      // Hide "saved" indicator after 2 seconds
+      savedIndicatorTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setAutoSaveStatus("idle");
+        }
+      }, SAVED_INDICATOR_DURATION_MS);
+
       return true;
     } catch (err) {
+      if (!isMountedRef.current) return false;
+      setAutoSaveStatus("error");
+      setAutoSaveError(
+        err instanceof Error ? err.message : "Failed to save"
+      );
       setActionError(
         err instanceof Error ? err.message : "Failed to save changes before starting"
       );
@@ -381,6 +404,8 @@ export default function EditableIntakeForm({ rcfaId, initialData, showActionButt
         method: "POST",
       });
 
+      if (!isMountedRef.current) return;
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Failed to analyze with AI");
@@ -388,12 +413,15 @@ export default function EditableIntakeForm({ rcfaId, initialData, showActionButt
 
       router.refresh();
     } catch (err) {
+      if (!isMountedRef.current) return;
       setActionError(
         err instanceof Error ? err.message : "Failed to analyze with AI"
       );
     } finally {
       actionPendingRef.current = false;
-      setIsAnalyzing(false);
+      if (isMountedRef.current) {
+        setIsAnalyzing(false);
+      }
     }
   };
 
@@ -416,6 +444,8 @@ export default function EditableIntakeForm({ rcfaId, initialData, showActionButt
         method: "POST",
       });
 
+      if (!isMountedRef.current) return;
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Failed to start investigation");
@@ -423,16 +453,19 @@ export default function EditableIntakeForm({ rcfaId, initialData, showActionButt
 
       router.refresh();
     } catch (err) {
+      if (!isMountedRef.current) return;
       setActionError(
         err instanceof Error ? err.message : "Failed to start investigation"
       );
     } finally {
       actionPendingRef.current = false;
-      setIsStartingWithoutAI(false);
+      if (isMountedRef.current) {
+        setIsStartingWithoutAI(false);
+      }
     }
   };
 
-  const isActionInProgress = isAnalyzing || isStartingWithoutAI;
+  const isActionInProgress = isAnalyzing || isStartingWithoutAI || autoSaveStatus === "saving";
 
   return (
     <>
