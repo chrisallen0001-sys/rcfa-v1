@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const HINT_DISMISS_MS = 2500;
+import { useDisabledHint } from "./useDisabledHint";
 
 interface FinalizeInvestigationButtonProps {
   rcfaId: string;
@@ -18,25 +17,13 @@ export default function FinalizeInvestigationButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showDisabledHint, setShowDisabledHint] = useState(false);
   const pendingRef = useRef(false);
-  const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Clear hint timer on unmount
-  useEffect(() => {
-    return () => {
-      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-    };
-  }, []);
+  const disabledHint = useDisabledHint();
 
   function handleButtonClick() {
     // If disabled, show hint on tap (mobile has no hover)
     if (!hasActionItems) {
-      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-      setShowDisabledHint(true);
-      hintTimerRef.current = setTimeout(() => {
-        setShowDisabledHint(false);
-      }, HINT_DISMISS_MS);
+      disabledHint.trigger();
       return;
     }
     handleClick();
@@ -120,9 +107,9 @@ export default function FinalizeInvestigationButton({
           "Finalize Investigation"
         )}
       </button>
-      {/* Tap-to-reveal hint for mobile (no hover available) */}
-      {showDisabledHint && (
-        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+      {/* Tap-to-reveal hint for mobile (desktop has hover tooltips) */}
+      {disabledHint.show && (
+        <span className="text-sm text-zinc-500 dark:text-zinc-400 md:hidden">
           Add action items first
         </span>
       )}

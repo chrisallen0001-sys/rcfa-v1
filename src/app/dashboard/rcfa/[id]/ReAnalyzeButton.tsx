@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
 import { useElapsedTime } from "./useElapsedTime";
+import { useDisabledHint } from "./useDisabledHint";
 
 interface ReAnalyzeButtonProps {
   rcfaId: string;
@@ -111,8 +112,6 @@ type DialogState =
   | { kind: "noChange" }
   | { kind: "materialChange"; reasoning: string };
 
-const HINT_DISMISS_MS = 2500;
-
 export default function ReAnalyzeButton({
   rcfaId,
   hasAnsweredQuestions,
@@ -122,26 +121,14 @@ export default function ReAnalyzeButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>({ kind: "none" });
-  const [showDisabledHint, setShowDisabledHint] = useState(false);
   const pendingRef = useRef(false);
-  const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
   const elapsed = useElapsedTime(loading);
-
-  // Clear hint timer on unmount
-  useEffect(() => {
-    return () => {
-      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-    };
-  }, []);
+  const disabledHint = useDisabledHint();
 
   function handleButtonClick() {
     // If disabled, show hint on tap (mobile has no hover)
     if (!hasNewAnswers) {
-      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-      setShowDisabledHint(true);
-      hintTimerRef.current = setTimeout(() => {
-        setShowDisabledHint(false);
-      }, HINT_DISMISS_MS);
+      disabledHint.trigger();
       return;
     }
     handleReAnalyze();
@@ -218,9 +205,9 @@ export default function ReAnalyzeButton({
             "Re-Analyze with Answers"
           )}
         </button>
-        {/* Tap-to-reveal hint for mobile (no hover available) */}
-        {showDisabledHint && (
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+        {/* Tap-to-reveal hint for mobile (desktop has hover tooltips) */}
+        {disabledHint.show && (
+          <span className="text-sm text-zinc-500 dark:text-zinc-400 md:hidden">
             {disabledHintText}
           </span>
         )}
