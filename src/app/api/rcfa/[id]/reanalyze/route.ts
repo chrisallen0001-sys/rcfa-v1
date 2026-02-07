@@ -302,33 +302,82 @@ export async function POST(
       );
     }
 
-    // Guard: reject if no answers or investigation notes have changed since the last re-analysis
-    const lastReanalysis = await prisma.rcfaAuditEvent.findFirst({
+    // Get the last analysis event to compare answer snapshots
+    const lastAnalysis = await prisma.rcfaAuditEvent.findFirst({
       where: {
         rcfaId: id,
         eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
-        OR: [
-          { eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS } },
-          { eventPayload: { path: ["source"], equals: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE } },
-        ],
       },
       orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
+      select: { createdAt: true, eventPayload: true },
     });
 
-    if (lastReanalysis) {
+    // Extract previous answer snapshot (map of questionId -> answerText)
+    const previousAnswerSnapshot: Record<string, string | null> = {};
+    if (lastAnalysis?.eventPayload && typeof lastAnalysis.eventPayload === "object") {
+      const payload = lastAnalysis.eventPayload as Record<string, unknown>;
+      if (payload.answerSnapshot && typeof payload.answerSnapshot === "object") {
+        Object.assign(previousAnswerSnapshot, payload.answerSnapshot);
+      }
+    }
+
+    // Guard: reject if no answers or investigation notes have changed since the last re-analysis
+    const isReanalysis = lastAnalysis?.eventPayload &&
+      typeof lastAnalysis.eventPayload === "object" &&
+      ((lastAnalysis.eventPayload as Record<string, unknown>).source === AUDIT_SOURCES.AI_REANALYSIS ||
+       (lastAnalysis.eventPayload as Record<string, unknown>).source === AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE);
+
+    if (isReanalysis) {
       const hasNewAnswers = answeredQuestions.some(
-        (q) => q.answeredAt !== null && q.answeredAt > lastReanalysis.createdAt
+        (q) => q.answeredAt !== null && q.answeredAt > lastAnalysis.createdAt
       );
       const hasNewInvestigationNotes =
         rcfa.investigationNotesUpdatedAt !== null &&
-        rcfa.investigationNotesUpdatedAt > lastReanalysis.createdAt;
+        rcfa.investigationNotesUpdatedAt > lastAnalysis.createdAt;
 
       if (!hasNewAnswers && !hasNewInvestigationNotes) {
         return NextResponse.json(
           { error: "No new answers or investigation notes since the last re-analysis" },
           { status: 422 }
         );
+      }
+    }
+
+    // Build current answer snapshot and detect changes for audit logging
+    const currentAnswerSnapshot: Record<string, string | null> = {};
+    const answerAuditEvents: Array<{
+      eventType: string;
+      eventPayload: { [key: string]: string | null };
+    }> = [];
+
+    for (const q of rcfa.followupQuestions) {
+      currentAnswerSnapshot[q.id] = q.answerText;
+
+      const previousAnswer = previousAnswerSnapshot[q.id] ?? null;
+      const currentAnswer = q.answerText;
+
+      // First-time answer (was null, now has value)
+      if (previousAnswer === null && currentAnswer !== null) {
+        answerAuditEvents.push({
+          eventType: AUDIT_EVENT_TYPES.ANSWER_SUBMITTED,
+          eventPayload: {
+            questionId: q.id,
+            questionText: q.questionText,
+            answerText: currentAnswer,
+          },
+        });
+      }
+      // Answer updated (had value, now different value)
+      else if (previousAnswer !== null && currentAnswer !== null && previousAnswer !== currentAnswer) {
+        answerAuditEvents.push({
+          eventType: AUDIT_EVENT_TYPES.ANSWER_UPDATED,
+          eventPayload: {
+            questionId: q.id,
+            questionText: q.questionText,
+            previousAnswer,
+            newAnswer: currentAnswer,
+          },
+        });
       }
     }
 
@@ -372,20 +421,34 @@ export async function POST(
 
     if (result.noMaterialChange) {
       // No material change — preserve existing candidates, log for traceability.
-      // No transaction needed: we are only inserting a single audit row and not
-      // modifying candidates, so there is no multi-table consistency concern.
-      await prisma.rcfaAuditEvent.create({
-        data: {
-          rcfaId: id,
-          actorUserId: userId,
-          eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
-          eventPayload: {
-            source: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
-            materialityReasoning,
-            rootCauseCandidateCount: 0,
-            actionItemCandidateCount: 0,
+      // Use transaction to log answer changes atomically with the analysis event.
+      await prisma.$transaction(async (tx) => {
+        // Log answer audit events
+        for (const event of answerAuditEvents) {
+          await tx.rcfaAuditEvent.create({
+            data: {
+              rcfaId: id,
+              actorUserId: userId,
+              eventType: event.eventType,
+              eventPayload: event.eventPayload,
+            },
+          });
+        }
+
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId: id,
+            actorUserId: userId,
+            eventType: AUDIT_EVENT_TYPES.CANDIDATE_GENERATED,
+            eventPayload: {
+              source: AUDIT_SOURCES.AI_REANALYSIS_NO_CHANGE,
+              materialityReasoning,
+              rootCauseCandidateCount: 0,
+              actionItemCandidateCount: 0,
+              answerSnapshot: currentAnswerSnapshot,
+            },
           },
-        },
+        });
       });
 
       return NextResponse.json(
@@ -424,6 +487,18 @@ export async function POST(
         })),
       });
 
+      // Log answer audit events
+      for (const event of answerAuditEvents) {
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId: id,
+            actorUserId: userId,
+            eventType: event.eventType,
+            eventPayload: event.eventPayload,
+          },
+        });
+      }
+
       await tx.rcfaAuditEvent.create({
         data: {
           rcfaId: id,
@@ -434,6 +509,7 @@ export async function POST(
             materialityReasoning,
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
+            answerSnapshot: currentAnswerSnapshot,
           },
         },
       });
