@@ -18,6 +18,7 @@ interface AuditLogSectionProps {
 const EVENT_TYPE_LABELS: Record<string, string> = {
   status_changed: "Status Changed",
   [AUDIT_EVENT_TYPES.CANDIDATE_GENERATED]: "Candidates Generated",
+  [AUDIT_EVENT_TYPES.ANSWER_UPDATED]: "Answer Updated",
   promoted_to_final: "Promoted to Final",
   final_updated: "Root Cause Updated",
   final_deleted: "Root Cause Deleted",
@@ -152,6 +153,10 @@ function formatPayloadSummary(
         return `${payload.previousOwnerName} → ${payload.newOwnerName}`;
       }
       return "Owner reassigned";
+    case AUDIT_EVENT_TYPES.ANSWER_UPDATED:
+      return payload.questionText
+        ? truncate(String(payload.questionText), 60)
+        : "Answer updated";
     default:
       return "";
   }
@@ -209,7 +214,8 @@ function isUpdateEvent(eventType: string): boolean {
   return (
     eventType === "final_updated" ||
     eventType === "action_item_updated" ||
-    eventType === "owner_changed"
+    eventType === "owner_changed" ||
+    eventType === AUDIT_EVENT_TYPES.ANSWER_UPDATED
   );
 }
 
@@ -271,6 +277,32 @@ function getChangedFields(payload: Record<string, unknown>): Array<{
 }
 
 function PayloadDetail({ eventType, payload }: { eventType: string; payload: Record<string, unknown> }) {
+  // Special handling for answer_updated events
+  if (eventType === AUDIT_EVENT_TYPES.ANSWER_UPDATED) {
+    return (
+      <dl className="space-y-3">
+        <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+          <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Question:</dt>
+          <dd className="text-zinc-700 dark:text-zinc-300 break-words">
+            {formatValue(payload.questionText)}
+          </dd>
+        </div>
+        <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+          <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Previous:</dt>
+          <dd className="text-zinc-700 dark:text-zinc-300 break-words">
+            {formatValue(payload.previousAnswer)}
+          </dd>
+        </div>
+        <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+          <dt className="text-zinc-500 dark:text-zinc-400 font-medium">New:</dt>
+          <dd className="text-zinc-700 dark:text-zinc-300 break-words">
+            {formatValue(payload.newAnswer)}
+          </dd>
+        </div>
+      </dl>
+    );
+  }
+
   if (isUpdateEvent(eventType)) {
     const changes = getChangedFields(payload);
     if (changes.length === 0) {
