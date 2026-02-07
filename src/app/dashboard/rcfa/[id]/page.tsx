@@ -6,8 +6,6 @@ import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import FollowupQuestions from "./FollowupQuestions";
 import ReAnalyzeButton from "./ReAnalyzeButton";
-import StartInvestigationButton from "./StartInvestigationButton";
-import AnalyzeWithAIButton from "./AnalyzeWithAIButton";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
@@ -259,24 +257,12 @@ export default async function RcfaDetailPage({
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
-      {rcfa.status === "draft" && canEdit && (
-        <div className="mb-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <AnalyzeWithAIButton rcfaId={rcfa.id} />
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
-            <StartInvestigationButton rcfaId={rcfa.id} />
-          </div>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            AI analysis generates follow-up questions, root cause candidates, and action items. You can also start without AI and add these manually.
-          </p>
-        </div>
-      )}
-
       <div className="space-y-6">
         {/* Intake Summary - editable when draft */}
         {rcfa.status === "draft" && canEdit ? (
           <EditableIntakeForm
             rcfaId={rcfa.id}
+            showActionButtons
             initialData={{
               title: rcfa.title,
               equipmentDescription: rcfa.equipmentDescription,
