@@ -34,7 +34,9 @@ export default function CollapsibleSection({
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             {title}
           </h2>
-          {headerContent}
+          {headerContent && (
+            <div onClick={(e) => e.stopPropagation()}>{headerContent}</div>
+          )}
         </div>
         <svg
           className={`ml-4 h-5 w-5 flex-shrink-0 text-zinc-400 transition-transform duration-200 ${
@@ -52,6 +54,9 @@ export default function CollapsibleSection({
           />
         </svg>
       </button>
+      {/* Using max-h-[10000px] as a large value to allow content to expand smoothly.
+          CSS Grid animation (grid-template-rows: 0fr → 1fr) would be cleaner but requires
+          additional markup. This approach is pragmatic for varying content heights. */}
       <div
         className={`overflow-hidden transition-all duration-200 ${
           isExpanded ? "max-h-[10000px] opacity-100" : "max-h-0 opacity-0"

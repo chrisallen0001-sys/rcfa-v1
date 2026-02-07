@@ -520,7 +520,7 @@ export default function EditableIntakeForm({ rcfaId, initialData, showActionButt
       <CollapsibleSection
         title="Intake Summary"
         headerContent={
-          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-3">
             {/* Auto-save status indicator */}
             {autoSaveStatus === "saving" && (
               <span className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
