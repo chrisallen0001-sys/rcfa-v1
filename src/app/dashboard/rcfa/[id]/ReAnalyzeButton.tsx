@@ -185,6 +185,14 @@ export default function ReAnalyzeButton({
             "Re-Analyze with Answers"
           )}
         </button>
+        {/* Mobile-only hint when disabled (no hover on mobile) */}
+        {!hasNewAnswers && (
+          <span className="text-sm text-zinc-500 dark:text-zinc-400 md:hidden">
+            {!hasAnsweredQuestions
+              ? "Answer questions first"
+              : "No new answers"}
+          </span>
+        )}
         {error && (
           <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
         )}
