@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 
 interface FinalizeInvestigationButtonProps {
   rcfaId: string;
+  totalActionItems: number;
 }
 
 export default function FinalizeInvestigationButton({
   rcfaId,
+  totalActionItems,
 }: FinalizeInvestigationButtonProps) {
+  const hasActionItems = totalActionItems > 0;
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +55,12 @@ export default function FinalizeInvestigationButton({
     <div className="flex items-center gap-3">
       <button
         onClick={handleClick}
-        disabled={loading}
+        disabled={loading || !hasActionItems}
+        title={
+          hasActionItems
+            ? "Lock root causes and move to action item tracking"
+            : "Add at least one action item before finalizing"
+        }
         className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-400"
       >
         {loading ? (
@@ -80,9 +88,14 @@ export default function FinalizeInvestigationButton({
             Finalizing...
           </span>
         ) : (
-          "Finalize Root Causes"
+          "Finalize Investigation"
         )}
       </button>
+      {!hasActionItems && (
+        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          Add action items first
+        </span>
+      )}
       {error && (
         <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
       )}
