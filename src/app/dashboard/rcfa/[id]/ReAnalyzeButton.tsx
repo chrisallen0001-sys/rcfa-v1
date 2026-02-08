@@ -84,7 +84,7 @@ function InfoDialog({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
+        className="mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900 sm:mx-0"
       >
         <h2
           id={titleId}
