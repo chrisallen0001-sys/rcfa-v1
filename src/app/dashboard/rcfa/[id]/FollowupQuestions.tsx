@@ -158,9 +158,11 @@ const QuestionCard = forwardRef<QuestionCardHandle, QuestionCardProps>(
           await savePromiseRef.current;
         }
 
-        // Propagate save errors to caller
+        // Propagate save errors to caller (clear ref to prevent stale errors on retry)
         if (lastSaveErrorRef.current) {
-          throw new Error(lastSaveErrorRef.current);
+          const errorMsg = lastSaveErrorRef.current;
+          lastSaveErrorRef.current = null;
+          throw new Error(errorMsg);
         }
       },
     }), [save, savedAnswer]);
