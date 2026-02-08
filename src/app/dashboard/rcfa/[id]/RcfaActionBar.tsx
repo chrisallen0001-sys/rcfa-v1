@@ -45,11 +45,13 @@ function AnalyzeWithAIButton({
   onSaveForm,
   disabled,
   disabledReason,
+  onLoadingChange,
 }: {
   rcfaId: string;
   onSaveForm?: () => Promise<boolean>;
   disabled?: boolean;
   disabledReason?: string;
+  onLoadingChange?: (loading: boolean) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -71,6 +73,7 @@ function AnalyzeWithAIButton({
     if (pendingRef.current) return;
     pendingRef.current = true;
     setLoading(true);
+    onLoadingChange?.(true);
     setError(null);
 
     try {
@@ -98,6 +101,7 @@ function AnalyzeWithAIButton({
     } finally {
       pendingRef.current = false;
       setLoading(false);
+      onLoadingChange?.(false);
     }
   }
 
@@ -244,6 +248,8 @@ export default function RcfaActionBar({
   allActionItemsComplete = false,
   totalActionItems = 0,
 }: RcfaActionBarProps) {
+  const [isAIAnalyzing, setIsAIAnalyzing] = useState(false);
+
   // Don't render if user can't edit (except closed state where admin can reopen)
   if (!canEdit && !(status === "closed" && isAdmin)) {
     return null;
@@ -255,6 +261,12 @@ export default function RcfaActionBar({
     ? `Required fields missing: ${missingRequiredFields.map(f => FIELD_LABELS[f]).join(", ")}`
     : undefined;
 
+  // Disable Manual Investigation while AI analysis is running
+  const manualDisabled = hasMissingFields || isAIAnalyzing;
+  const manualDisabledReason = isAIAnalyzing
+    ? "AI analysis in progress"
+    : disabledReason;
+
   const renderButtons = () => {
     switch (status) {
       case "draft":
@@ -265,13 +277,14 @@ export default function RcfaActionBar({
               onSaveForm={onSaveForm}
               disabled={hasMissingFields}
               disabledReason={disabledReason}
+              onLoadingChange={setIsAIAnalyzing}
             />
             <span className="text-sm text-zinc-500 dark:text-zinc-400">or</span>
             <StartWithoutAIButton
               rcfaId={rcfaId}
               onSaveForm={onSaveForm}
-              disabled={hasMissingFields}
-              disabledReason={disabledReason}
+              disabled={manualDisabled}
+              disabledReason={manualDisabledReason}
             />
           </div>
         );
