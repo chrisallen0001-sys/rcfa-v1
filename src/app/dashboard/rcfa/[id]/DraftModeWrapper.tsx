@@ -8,6 +8,8 @@ import type { OperatingContext } from "@/generated/prisma/client";
 
 interface DraftModeWrapperProps {
   rcfaId: string;
+  /** Expand intake form by default (e.g., for newly created RCFAs) */
+  defaultExpanded?: boolean;
   initialData: {
     title: string;
     equipmentDescription: string;
@@ -29,6 +31,7 @@ interface DraftModeWrapperProps {
 
 export default function DraftModeWrapper({
   rcfaId,
+  defaultExpanded = false,
   initialData,
 }: DraftModeWrapperProps) {
   // Ref to hold the save function exposed by EditableIntakeForm
@@ -72,6 +75,7 @@ export default function DraftModeWrapper({
       <EditableIntakeForm
         rcfaId={rcfaId}
         initialData={initialData}
+        defaultExpanded={defaultExpanded}
         onSaveRef={saveFormRef}
         onDirtyChange={handleDirtyChange}
         onMissingFieldsChange={handleMissingFieldsChange}

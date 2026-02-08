@@ -55,6 +55,8 @@ type Props = {
     activePmsSummary: string | null;
     additionalNotes: string | null;
   };
+  /** Expand intake form by default (e.g., for newly created RCFAs) */
+  defaultExpanded?: boolean;
   /** Ref to expose save function for external callers (e.g., action bar) */
   onSaveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   /** Callback when dirty state changes (has unsaved edits or pending save) */
@@ -95,7 +97,7 @@ const selectClass =
 const AUTO_SAVE_DELAY_MS = 2000;
 const SAVED_INDICATOR_DURATION_MS = 2000;
 
-export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef, onDirtyChange, onMissingFieldsChange }: Props) {
+export default function EditableIntakeForm({ rcfaId, initialData, defaultExpanded = false, onSaveRef, onDirtyChange, onMissingFieldsChange }: Props) {
   const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     title: initialData.title,
@@ -393,7 +395,8 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef, onD
   return (
     <CollapsibleSection
       title="Intake Summary"
-        headerContent={
+      defaultExpanded={defaultExpanded}
+      headerContent={
           <div className="flex items-center gap-3">
             {/* Auto-save status indicator */}
             {autoSaveStatus === "saving" && (

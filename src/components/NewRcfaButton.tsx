@@ -58,7 +58,7 @@ export function NewRcfaButton() {
       }
 
       const { id } = await res.json();
-      router.push(`/dashboard/rcfa/${id}`);
+      router.push(`/dashboard/rcfa/${id}?new=true`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create RCFA");
       setIsCreating(false);
