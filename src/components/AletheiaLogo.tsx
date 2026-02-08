@@ -7,6 +7,7 @@ export default function AletheiaLogo({ className = "" }: AletheiaLogoProps) {
     <svg
       viewBox="0 0 71.948463 31.375267"
       className={className}
+      role="img"
       aria-label="Aletheia"
       fill="currentColor"
     >
