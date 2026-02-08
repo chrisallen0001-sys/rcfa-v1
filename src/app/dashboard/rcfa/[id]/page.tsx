@@ -67,6 +67,8 @@ interface SectionStatusData {
   investigationNotes: string | null;
   rootCauseFinals: unknown[];
   actionItems: unknown[];
+  rootCauseCandidates: { id: string }[];
+  actionItemCandidates: { id: string }[];
 }
 
 type SectionStatuses = {
@@ -84,7 +86,11 @@ type SectionStatuses = {
  * Computes section status indicators for investigation workflow guidance.
  * Only returns statuses during investigation state; returns null otherwise.
  */
-function computeSectionStatuses(rcfa: SectionStatusData): SectionStatuses | null {
+function computeSectionStatuses(
+  rcfa: SectionStatusData,
+  promotedCandidateIds: Set<string | null>,
+  promotedActionCandidateIds: Set<string | null>
+): SectionStatuses | null {
   if (rcfa.status !== "investigation") {
     return null;
   }
@@ -100,9 +106,17 @@ function computeSectionStatuses(rcfa: SectionStatusData): SectionStatuses | null
       rcfa.investigationNotes && rcfa.investigationNotes.trim().length > 0
         ? "complete"
         : "optional",
-    rootCauseCandidates: "none",
+    rootCauseCandidates:
+      rcfa.rootCauseCandidates.length > 0 &&
+      rcfa.rootCauseCandidates.some((c) => !promotedCandidateIds.has(c.id))
+        ? "review"
+        : "none",
     finalRootCauses: rcfa.rootCauseFinals.length > 0 ? "complete" : "required",
-    actionCandidates: "none",
+    actionCandidates:
+      rcfa.actionItemCandidates.length > 0 &&
+      rcfa.actionItemCandidates.some((a) => !promotedActionCandidateIds.has(a.id))
+        ? "review"
+        : "none",
     trackedActions: rcfa.actionItems.length > 0 ? "complete" : "required",
     auditLog: "none",
   };
@@ -304,7 +318,11 @@ export default async function RcfaDetailPage({
   );
 
   // Compute section statuses for investigation workflow guidance
-  const sectionStatuses = computeSectionStatuses(rcfa);
+  const sectionStatuses = computeSectionStatuses(
+    rcfa,
+    promotedCandidateIds,
+    promotedActionCandidateIds
+  );
 
   // Shared audit log and admin section
   const auditAndAdminContent = (
