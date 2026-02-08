@@ -1,6 +1,6 @@
 "use client";
 
-export type SectionStatus = "complete" | "required" | "optional" | "none";
+export type SectionStatus = "complete" | "required" | "optional" | "review" | "none";
 
 interface SectionStatusIndicatorProps {
   status: SectionStatus;
@@ -38,6 +38,12 @@ export default function SectionStatusIndicator({
       label: "Optional",
       className: "text-zinc-500 dark:text-zinc-400",
       bgClassName: "bg-zinc-100 dark:bg-zinc-800",
+    },
+    review: {
+      icon: "🔍",
+      label: "Review",
+      className: "text-purple-600 dark:text-purple-400",
+      bgClassName: "bg-purple-100 dark:bg-purple-900/30",
     },
   }[status];
 
