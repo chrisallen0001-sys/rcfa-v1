@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
 import { useElapsedTime } from "./useElapsedTime";
@@ -75,7 +76,9 @@ function InfoDialog({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
-  return (
+  // Use portal to render at document.body level, escaping parent stacking contexts
+  // This component is only rendered client-side (inside "use client" module)
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
@@ -105,7 +108,8 @@ function InfoDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
