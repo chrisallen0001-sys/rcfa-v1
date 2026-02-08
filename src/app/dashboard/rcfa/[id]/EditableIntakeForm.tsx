@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { OperatingContext } from "@/generated/prisma/client";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import CurrencyInput from "@/components/CurrencyInput";
 
 type AutoSaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -557,27 +558,19 @@ export default function EditableIntakeForm({ rcfaId, initialData, defaultExpande
         </FormField>
 
         <FormField label="Production Cost (USD)">
-          <input
-            type="number"
+          <CurrencyInput
             name="productionCostUsd"
             value={formData.productionCostUsd}
             onChange={handleChange}
-            placeholder="0.00"
-            min="0"
-            step="0.01"
             className={inputClass}
           />
         </FormField>
 
         <FormField label="Maintenance Cost (USD)">
-          <input
-            type="number"
+          <CurrencyInput
             name="maintenanceCostUsd"
             value={formData.maintenanceCostUsd}
             onChange={handleChange}
-            placeholder="0.00"
-            min="0"
-            step="0.01"
             className={inputClass}
           />
         </FormField>
