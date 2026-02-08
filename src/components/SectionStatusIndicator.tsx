@@ -22,19 +22,19 @@ export default function SectionStatusIndicator({
 
   const config = {
     complete: {
-      icon: "✓",
+      icon: "✅",
       label: "Complete",
       className: "text-green-600 dark:text-green-500",
       bgClassName: "bg-green-100 dark:bg-green-900/30",
     },
     required: {
-      icon: "!",
+      icon: "⚠️",
       label: "Required",
       className: "text-amber-600 dark:text-amber-500",
       bgClassName: "bg-amber-100 dark:bg-amber-900/30",
     },
     optional: {
-      icon: "?",
+      icon: "💡",
       label: "Optional",
       className: "text-zinc-500 dark:text-zinc-400",
       bgClassName: "bg-zinc-100 dark:bg-zinc-800",

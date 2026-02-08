@@ -61,6 +61,53 @@ function formatUsd(value: unknown): string | null {
   return value != null ? usdFormatter.format(Number(value)) : null;
 }
 
+interface SectionStatusData {
+  status: string;
+  followupQuestions: { answerText: string | null }[];
+  investigationNotes: string | null;
+  rootCauseFinals: unknown[];
+  actionItems: unknown[];
+}
+
+type SectionStatuses = {
+  intake: SectionStatus;
+  followupQuestions: SectionStatus;
+  addInformation: SectionStatus;
+  rootCauseCandidates: SectionStatus;
+  finalRootCauses: SectionStatus;
+  actionCandidates: SectionStatus;
+  trackedActions: SectionStatus;
+  auditLog: SectionStatus;
+};
+
+/**
+ * Computes section status indicators for investigation workflow guidance.
+ * Only returns statuses during investigation state; returns null otherwise.
+ */
+function computeSectionStatuses(rcfa: SectionStatusData): SectionStatuses | null {
+  if (rcfa.status !== "investigation") {
+    return null;
+  }
+
+  return {
+    intake: "complete",
+    followupQuestions:
+      rcfa.followupQuestions.length > 0 &&
+      rcfa.followupQuestions.every((q) => q.answerText)
+        ? "complete"
+        : "optional",
+    addInformation:
+      rcfa.investigationNotes && rcfa.investigationNotes.trim().length > 0
+        ? "complete"
+        : "optional",
+    rootCauseCandidates: "none",
+    finalRootCauses: rcfa.rootCauseFinals.length > 0 ? "complete" : "required",
+    actionCandidates: "none",
+    trackedActions: rcfa.actionItems.length > 0 ? "complete" : "required",
+    auditLog: "none",
+  };
+}
+
 function Section({
   title,
   children,
@@ -257,31 +304,7 @@ export default async function RcfaDetailPage({
   );
 
   // Compute section statuses for investigation workflow guidance
-  // Only show indicators during investigation state
-  const isInvestigationState = rcfa.status === "investigation";
-  const sectionStatuses = isInvestigationState
-    ? {
-        intake: "complete" as SectionStatus,
-        followupQuestions: rcfa.followupQuestions.every((q) => q.answerText)
-          ? ("complete" as SectionStatus)
-          : ("optional" as SectionStatus),
-        addInformation:
-          rcfa.investigationNotes && rcfa.investigationNotes.trim().length > 0
-            ? ("complete" as SectionStatus)
-            : ("optional" as SectionStatus),
-        rootCauseCandidates: "none" as SectionStatus,
-        finalRootCauses:
-          rcfa.rootCauseFinals.length > 0
-            ? ("complete" as SectionStatus)
-            : ("required" as SectionStatus),
-        actionCandidates: "none" as SectionStatus,
-        trackedActions:
-          rcfa.actionItems.length > 0
-            ? ("complete" as SectionStatus)
-            : ("required" as SectionStatus),
-        auditLog: "none" as SectionStatus,
-      }
-    : null;
+  const sectionStatuses = computeSectionStatuses(rcfa);
 
   // Shared audit log and admin section
   const auditAndAdminContent = (
