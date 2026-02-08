@@ -73,7 +73,7 @@ export default function AddInformationSection({
   };
 
   return (
-    <CollapsibleSection title="Add Information" status={status}>
+    <CollapsibleSection title="Supporting Info" status={status}>
       <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
         Add new findings, lab results, or other information discovered during investigation.
         After saving, you can re-analyze to incorporate the new data.
