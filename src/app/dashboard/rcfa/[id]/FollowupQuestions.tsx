@@ -44,6 +44,7 @@ interface FollowupQuestionsProps {
 }
 
 interface QuestionCardHandle {
+  /** Flushes pending saves. Throws if save fails. */
   flush: () => Promise<void>;
 }
 
@@ -73,6 +74,7 @@ const QuestionCard = forwardRef<QuestionCardHandle, QuestionCardProps>(
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const savePromiseRef = useRef<Promise<void> | null>(null);
+    const lastSaveErrorRef = useRef<string | null>(null);
     const answerTextRef = useRef(answerText);
     answerTextRef.current = answerText;
 
@@ -84,7 +86,7 @@ const QuestionCard = forwardRef<QuestionCardHandle, QuestionCardProps>(
     }, [isDirty, status, question.id, onDirtyChange]);
 
     const save = useCallback(
-      async (textToSave: string) => {
+      async (textToSave: string): Promise<void> => {
         const trimmed = textToSave.trim();
         if (!trimmed) return;
 
@@ -96,6 +98,7 @@ const QuestionCard = forwardRef<QuestionCardHandle, QuestionCardProps>(
 
         setStatus("saving");
         setError(null);
+        lastSaveErrorRef.current = null;
 
         try {
           const res = await fetch(
@@ -121,11 +124,14 @@ const QuestionCard = forwardRef<QuestionCardHandle, QuestionCardProps>(
           router.refresh();
         } catch (err) {
           if (err instanceof Error && err.name === "AbortError") {
-            // Request was aborted, don't update state
+            // Request was aborted - clear promise ref since it's no longer valid
+            savePromiseRef.current = null;
             return;
           }
-          setError(err instanceof Error ? err.message : "Failed to save answer");
+          const errorMessage = err instanceof Error ? err.message : "Failed to save answer";
+          setError(errorMessage);
           setStatus("error");
+          lastSaveErrorRef.current = errorMessage;
         }
       },
       [rcfaId, question.id, router]
@@ -140,18 +146,21 @@ const QuestionCard = forwardRef<QuestionCardHandle, QuestionCardProps>(
           debounceTimerRef.current = null;
         }
 
-        // If we have pending changes, save immediately
+        // If we have pending changes, start save immediately
         const trimmed = answerTextRef.current.trim();
         const trimmedSaved = savedAnswer ?? "";
         if (trimmed && trimmed !== trimmedSaved) {
-          const promise = save(answerTextRef.current);
-          savePromiseRef.current = promise;
-          await promise;
+          savePromiseRef.current = save(answerTextRef.current);
         }
 
-        // Wait for any in-flight save to complete
+        // Wait for any in-flight or just-started save to complete
         if (savePromiseRef.current) {
           await savePromiseRef.current;
+        }
+
+        // Propagate save errors to caller
+        if (lastSaveErrorRef.current) {
+          throw new Error(lastSaveErrorRef.current);
         }
       },
     }), [save, savedAnswer]);
@@ -172,8 +181,7 @@ const QuestionCard = forwardRef<QuestionCardHandle, QuestionCardProps>(
         if (trimmedNew && trimmedNew !== trimmedSaved) {
           setStatus("pending");
           debounceTimerRef.current = setTimeout(() => {
-            const promise = save(newValue);
-            savePromiseRef.current = promise;
+            savePromiseRef.current = save(newValue);
           }, DEBOUNCE_MS);
         } else if (!trimmedNew || trimmedNew === trimmedSaved) {
           setStatus("idle");
