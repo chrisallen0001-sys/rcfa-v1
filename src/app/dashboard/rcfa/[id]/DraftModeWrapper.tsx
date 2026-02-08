@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useCallback } from "react";
-import EditableIntakeForm from "./EditableIntakeForm";
+import { useRef, useCallback, useState } from "react";
+import EditableIntakeForm, { type RequiredField } from "./EditableIntakeForm";
 import RcfaActionBar from "./RcfaActionBar";
 import { useDraftNavigation } from "./DraftNavigationContext";
 import type { OperatingContext } from "@/generated/prisma/client";
@@ -34,6 +34,7 @@ export default function DraftModeWrapper({
   // Ref to hold the save function exposed by EditableIntakeForm
   const saveFormRef = useRef<(() => Promise<boolean>) | null>(null);
   const draftNav = useDraftNavigation();
+  const [missingFields, setMissingFields] = useState<RequiredField[]>([]);
 
   const handleSaveForm = useCallback(async (): Promise<boolean> => {
     if (saveFormRef.current) {
@@ -46,6 +47,10 @@ export default function DraftModeWrapper({
     draftNav?.setIsDirty(isDirty);
   }, [draftNav]);
 
+  const handleMissingFieldsChange = useCallback((fields: RequiredField[]) => {
+    setMissingFields(fields);
+  }, []);
+
   return (
     <>
       {/* isAdmin=false: Draft state has no admin-specific actions (Reopen is only for closed state) */}
@@ -55,12 +60,14 @@ export default function DraftModeWrapper({
         canEdit={true}
         isAdmin={false}
         onSaveForm={handleSaveForm}
+        missingRequiredFields={missingFields}
       />
       <EditableIntakeForm
         rcfaId={rcfaId}
         initialData={initialData}
         onSaveRef={saveFormRef}
         onDirtyChange={handleDirtyChange}
+        onMissingFieldsChange={handleMissingFieldsChange}
       />
     </>
   );
