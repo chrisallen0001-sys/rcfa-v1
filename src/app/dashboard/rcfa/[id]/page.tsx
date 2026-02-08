@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
+import InvestigationWrapper from "./InvestigationWrapper";
 import FollowupQuestions from "./FollowupQuestions";
 import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
@@ -157,7 +158,6 @@ export default async function RcfaDetailPage({
     (a, b) => CONFIDENCE_ORDER[a.confidenceLabel] - CONFIDENCE_ORDER[b.confidenceLabel]
   );
 
-  const hasAnalysis = rcfa.status !== "draft";
   const hasAnsweredQuestions = rcfa.followupQuestions.some(
     (q) => q.answerText !== null
   );
@@ -253,9 +253,19 @@ export default async function RcfaDetailPage({
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
 
-      {/* Sticky Action Bar - shows appropriate buttons based on status */}
-      {rcfa.status !== "draft" && (
+      {/* Sticky Action Bar - for closed state only (investigation/actions_open handled by InvestigationWrapper) */}
+      {rcfa.status === "closed" && (
         <RcfaActionBar
+          rcfaId={rcfa.id}
+          status={rcfa.status}
+          canEdit={canEdit}
+          isAdmin={isAdmin}
+        />
+      )}
+
+      {/* Investigation/Actions Open - uses wrapper for flush coordination */}
+      {(rcfa.status === "investigation" || rcfa.status === "actions_open") && (
+        <InvestigationWrapper
           rcfaId={rcfa.id}
           status={rcfa.status}
           canEdit={canEdit}
@@ -264,9 +274,294 @@ export default async function RcfaDetailPage({
           hasNewDataForReanalysis={hasNewDataForReanalysis}
           allActionItemsComplete={allActionItemsComplete}
           totalActionItems={totalActionItems}
+          questions={rcfa.followupQuestions.map((q) => ({
+            id: q.id,
+            questionText: q.questionText,
+            questionCategory: q.questionCategory,
+            answerText: q.answerText,
+            answeredAt: q.answeredAt?.toISOString() ?? null,
+            answeredBy: q.answeredBy,
+          }))}
+          isInvestigation={rcfa.status === "investigation" && canEdit}
+          beforeQuestions={
+            <Section title="Intake Summary">
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <Field label="Equipment Description" value={rcfa.equipmentDescription} />
+                <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
+                <Field label="Make" value={rcfa.equipmentMake} />
+                <Field label="Model" value={rcfa.equipmentModel} />
+                <Field label="Serial Number" value={rcfa.equipmentSerialNumber} />
+                <Field
+                  label="Equipment Age (years)"
+                  value={rcfa.equipmentAgeYears?.toString() ?? null}
+                />
+                <Field
+                  label="Downtime (minutes)"
+                  value={rcfa.downtimeMinutes?.toString() ?? null}
+                />
+                <Field
+                  label="Production Cost (USD)"
+                  value={formatUsd(rcfa.productionCostUsd)}
+                />
+                <Field
+                  label="Maintenance Cost (USD)"
+                  value={formatUsd(rcfa.maintenanceCostUsd)}
+                />
+                <Field
+                  label="Total Cost (USD)"
+                  value={
+                    rcfa.productionCostUsd != null || rcfa.maintenanceCostUsd != null
+                      ? formatUsd(
+                          Number(rcfa.productionCostUsd ?? 0) +
+                            Number(rcfa.maintenanceCostUsd ?? 0)
+                        )
+                      : null
+                  }
+                />
+              </dl>
+              <dl className="mt-4 grid gap-4">
+                <Field label="Failure Description" value={rcfa.failureDescription} />
+                <Field label="Pre-Failure Conditions" value={rcfa.preFailureConditions} />
+                <Field label="Work History Summary" value={rcfa.workHistorySummary} />
+                <Field label="Active PMs Summary" value={rcfa.activePmsSummary} />
+                <Field label="Additional Notes" value={rcfa.additionalNotes} />
+              </dl>
+            </Section>
+          }
+          afterQuestions={
+            <>
+              {/* Add Information Section */}
+              {canEdit && (
+                <AddInformationSection
+                  rcfaId={rcfa.id}
+                  initialNotes={rcfa.investigationNotes}
+                />
+              )}
+
+              {/* Root Cause Candidates */}
+              {sortedRootCauseCandidates.length > 0 && (
+                <Section title="Root Cause Candidates">
+                  <div className="space-y-4">
+                    {sortedRootCauseCandidates.map((c) => {
+                      const isNew = isNewCandidate(c.generatedAt);
+                      return (
+                        <div
+                          key={c.id}
+                          className={`rounded-md border p-4 ${
+                            isNew
+                              ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
+                              : "border-zinc-100 dark:border-zinc-800"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                {c.causeText}
+                              </p>
+                              {isNew && (
+                                <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                                  New
+                                </span>
+                              )}
+                            </div>
+                            <Badge
+                              label={c.confidenceLabel}
+                              colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
+                            />
+                          </div>
+                          {c.rationaleText && (
+                            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                              {c.rationaleText}
+                            </p>
+                          )}
+                          {rcfa.status === "investigation" && canEdit &&
+                            !promotedCandidateIds.has(c.id) && (
+                              <div className="mt-3">
+                                <PromoteRootCauseButton
+                                  rcfaId={rcfa.id}
+                                  candidateId={c.id}
+                                />
+                              </div>
+                            )}
+                          {promotedCandidateIds.has(c.id) && (
+                            <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                              Promoted to final
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* Final Root Causes */}
+              {(rcfa.rootCauseFinals.length > 0 || rcfa.status === "investigation") && (
+                <Section title="Final Root Causes">
+                  <div className="space-y-4">
+                    {rcfa.rootCauseFinals.map((f) => (
+                      <EditableRootCause
+                        key={f.id}
+                        rcfaId={rcfa.id}
+                        finalId={f.id}
+                        causeText={f.causeText}
+                        evidenceSummary={f.evidenceSummary}
+                        selectedByEmail={f.selectedBy.email}
+                        selectedAt={f.selectedAt.toISOString().slice(0, 10)}
+                        isInvestigation={rcfa.status === "investigation" && canEdit}
+                      />
+                    ))}
+                    {rcfa.status === "investigation" && canEdit && (
+                      <AddRootCauseForm rcfaId={rcfa.id} />
+                    )}
+                  </div>
+                </Section>
+              )}
+
+              {/* Action Item Candidates */}
+              {rcfa.actionItemCandidates.length > 0 && (
+                <Section title="Action Item Candidates">
+                  <div className="space-y-4">
+                    {rcfa.actionItemCandidates.map((a) => {
+                      const isNew = isNewCandidate(a.generatedAt);
+                      return (
+                        <div
+                          key={a.id}
+                          className={`rounded-md border p-4 ${
+                            isNew
+                              ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
+                              : "border-zinc-100 dark:border-zinc-800"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                {a.actionText}
+                              </p>
+                              {isNew && (
+                                <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                                  New
+                                </span>
+                              )}
+                            </div>
+                            <Badge
+                              label={a.priority}
+                              colorClass={PRIORITY_COLORS[a.priority]}
+                            />
+                          </div>
+                          {a.rationaleText && (
+                            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                              {a.rationaleText}
+                            </p>
+                          )}
+                          <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                            {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
+                            {a.successCriteria && (
+                              <span>Success: {a.successCriteria}</span>
+                            )}
+                          </div>
+                          {rcfa.status === "investigation" && canEdit &&
+                            !promotedActionCandidateIds.has(a.id) && (
+                              <div className="mt-3">
+                                <PromoteActionItemButton
+                                  rcfaId={rcfa.id}
+                                  candidateId={a.id}
+                                />
+                              </div>
+                            )}
+                          {promotedActionCandidateIds.has(a.id) && (
+                            <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                              Promoted to tracked
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* Tracked Action Items */}
+              {(rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
+                <Section
+                  title="Tracked Action Items"
+                  headerContent={
+                    totalActionItems > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700">
+                          <div
+                            className="h-2 rounded-full bg-green-500 transition-all"
+                            style={{ width: `${(completedActionItems / totalActionItems) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                          {completedActionItems} of {totalActionItems} complete
+                        </span>
+                      </div>
+                    ) : undefined
+                  }
+                >
+                  <div className="space-y-4">
+                    {rcfa.actionItems.map((a) => (
+                      <EditableActionItem
+                        key={a.id}
+                        rcfaId={rcfa.id}
+                        actionItemId={a.id}
+                        actionText={a.actionText}
+                        priority={a.priority}
+                        status={a.status}
+                        successCriteria={a.successCriteria}
+                        dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
+                        ownerUserId={a.owner?.id ?? null}
+                        ownerName={a.owner?.displayName ?? null}
+                        createdByEmail={a.createdBy.email}
+                        createdAt={a.createdAt.toISOString().slice(0, 10)}
+                        canEdit={canEditActionItems}
+                      />
+                    ))}
+                    {canEditActionItems && (
+                      <AddActionItemForm rcfaId={rcfa.id} />
+                    )}
+                  </div>
+                </Section>
+              )}
+
+              {/* Audit Log */}
+              {rcfa.auditEvents.length > 0 && (
+                <AuditLogSection
+                  events={rcfa.auditEvents.map((e) => ({
+                    id: e.id,
+                    eventType: e.eventType,
+                    eventPayload: e.eventPayload as Record<string, unknown>,
+                    createdAt: e.createdAt.toISOString(),
+                    actorEmail: e.actor?.email ?? null,
+                  }))}
+                />
+              )}
+
+              {/* Admin Actions */}
+              {isAdmin && (
+                <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+                  <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+                    Admin actions
+                  </p>
+                  <div className="space-y-4">
+                    <ReassignOwnerButton
+                      rcfaId={rcfa.id}
+                      currentOwnerId={rcfa.owner.id}
+                      currentOwnerName={rcfa.owner.displayName}
+                    />
+                    <DeleteRcfaButton rcfaId={rcfa.id} rcfaTitle={rcfa.title} />
+                  </div>
+                </div>
+              )}
+            </>
+          }
         />
       )}
 
+      {/* Draft and Closed states - use standard space-y-4 layout */}
+      {(rcfa.status === "draft" || rcfa.status === "closed") && (
       <div className="space-y-4">
         {/* Intake Summary - editable when draft */}
         {rcfa.status === "draft" && canEdit ? (
@@ -342,8 +637,8 @@ export default async function RcfaDetailPage({
           </Section>
         )}
 
-        {/* Follow-up Questions */}
-        {hasAnalysis && rcfa.followupQuestions.length > 0 && (
+        {/* Follow-up Questions - read-only for closed state */}
+        {rcfa.status === "closed" && rcfa.followupQuestions.length > 0 && (
           <Section title="Follow-up Questions">
             <FollowupQuestions
               rcfaId={rcfa.id}
@@ -355,78 +650,47 @@ export default async function RcfaDetailPage({
                 answeredAt: q.answeredAt?.toISOString() ?? null,
                 answeredBy: q.answeredBy,
               }))}
-              isInvestigation={rcfa.status === "investigation" && canEdit}
+              isInvestigation={false}
             />
           </Section>
         )}
 
-        {/* Add Information Section - available in investigation and actions_open */}
-        {(rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit && (
-          <AddInformationSection
-            rcfaId={rcfa.id}
-            initialNotes={rcfa.investigationNotes}
-          />
-        )}
-
-        {/* Root Cause Candidates */}
-        {hasAnalysis && sortedRootCauseCandidates.length > 0 && (
+        {/* Root Cause Candidates - read-only for closed state */}
+        {rcfa.status === "closed" && sortedRootCauseCandidates.length > 0 && (
           <Section title="Root Cause Candidates">
             <div className="space-y-4">
-              {sortedRootCauseCandidates.map((c) => {
-                const isNew = isNewCandidate(c.generatedAt);
-                return (
-                  <div
-                    key={c.id}
-                    className={`rounded-md border p-4 ${
-                      isNew
-                        ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
-                        : "border-zinc-100 dark:border-zinc-800"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                          {c.causeText}
-                        </p>
-                        {isNew && (
-                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
-                            New
-                          </span>
-                        )}
-                      </div>
-                      <Badge
-                        label={c.confidenceLabel}
-                        colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
-                      />
-                    </div>
-                    {c.rationaleText && (
-                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                        {c.rationaleText}
-                      </p>
-                    )}
-                    {rcfa.status === "investigation" && canEdit &&
-                      !promotedCandidateIds.has(c.id) && (
-                        <div className="mt-3">
-                          <PromoteRootCauseButton
-                            rcfaId={rcfa.id}
-                            candidateId={c.id}
-                          />
-                        </div>
-                      )}
-                    {promotedCandidateIds.has(c.id) && (
-                      <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
-                        Promoted to final
-                      </p>
-                    )}
+              {sortedRootCauseCandidates.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {c.causeText}
+                    </p>
+                    <Badge
+                      label={c.confidenceLabel}
+                      colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
+                    />
                   </div>
-                );
-              })}
+                  {c.rationaleText && (
+                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {c.rationaleText}
+                    </p>
+                  )}
+                  {promotedCandidateIds.has(c.id) && (
+                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                      Promoted to final
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           </Section>
         )}
 
-        {/* Final Root Causes */}
-        {hasAnalysis && (rcfa.rootCauseFinals.length > 0 || rcfa.status === "investigation") && (
+        {/* Final Root Causes - read-only for closed state */}
+        {rcfa.status === "closed" && rcfa.rootCauseFinals.length > 0 && (
           <Section title="Final Root Causes">
             <div className="space-y-4">
               {rcfa.rootCauseFinals.map((f) => (
@@ -438,81 +702,55 @@ export default async function RcfaDetailPage({
                   evidenceSummary={f.evidenceSummary}
                   selectedByEmail={f.selectedBy.email}
                   selectedAt={f.selectedAt.toISOString().slice(0, 10)}
-                  isInvestigation={rcfa.status === "investigation" && canEdit}
+                  isInvestigation={false}
                 />
               ))}
-              {rcfa.status === "investigation" && canEdit && (
-                <AddRootCauseForm rcfaId={rcfa.id} />
-              )}
             </div>
           </Section>
         )}
 
-        {/* Action Item Candidates */}
-        {hasAnalysis && rcfa.actionItemCandidates.length > 0 && (
+        {/* Action Item Candidates - read-only for closed state */}
+        {rcfa.status === "closed" && rcfa.actionItemCandidates.length > 0 && (
           <Section title="Action Item Candidates">
             <div className="space-y-4">
-              {rcfa.actionItemCandidates.map((a) => {
-                const isNew = isNewCandidate(a.generatedAt);
-                return (
-                  <div
-                    key={a.id}
-                    className={`rounded-md border p-4 ${
-                      isNew
-                        ? "border-purple-300 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
-                        : "border-zinc-100 dark:border-zinc-800"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                          {a.actionText}
-                        </p>
-                        {isNew && (
-                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
-                            New
-                          </span>
-                        )}
-                      </div>
-                      <Badge
-                        label={a.priority}
-                        colorClass={PRIORITY_COLORS[a.priority]}
-                      />
-                    </div>
-                    {a.rationaleText && (
-                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                        {a.rationaleText}
-                      </p>
-                    )}
-                    <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-                      {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
-                      {a.successCriteria && (
-                        <span>Success: {a.successCriteria}</span>
-                      )}
-                    </div>
-                    {rcfa.status === "investigation" && canEdit &&
-                      !promotedActionCandidateIds.has(a.id) && (
-                        <div className="mt-3">
-                          <PromoteActionItemButton
-                            rcfaId={rcfa.id}
-                            candidateId={a.id}
-                          />
-                        </div>
-                      )}
-                    {promotedActionCandidateIds.has(a.id) && (
-                      <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
-                        Promoted to tracked
-                      </p>
+              {rcfa.actionItemCandidates.map((a) => (
+                <div
+                  key={a.id}
+                  className="rounded-md border border-zinc-100 p-4 dark:border-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {a.actionText}
+                    </p>
+                    <Badge
+                      label={a.priority}
+                      colorClass={PRIORITY_COLORS[a.priority]}
+                    />
+                  </div>
+                  {a.rationaleText && (
+                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {a.rationaleText}
+                    </p>
+                  )}
+                  <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                    {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
+                    {a.successCriteria && (
+                      <span>Success: {a.successCriteria}</span>
                     )}
                   </div>
-                );
-              })}
+                  {promotedActionCandidateIds.has(a.id) && (
+                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                      Promoted to tracked
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           </Section>
         )}
 
-        {/* Tracked Action Items */}
-        {hasAnalysis && (rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
+        {/* Tracked Action Items - read-only for closed state */}
+        {rcfa.status === "closed" && rcfa.actionItems.length > 0 && (
           <Section
             title="Tracked Action Items"
             headerContent={
@@ -546,12 +784,9 @@ export default async function RcfaDetailPage({
                   ownerName={a.owner?.displayName ?? null}
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
-                  canEdit={canEditActionItems}
+                  canEdit={false}
                 />
               ))}
-              {canEditActionItems && (
-                <AddActionItemForm rcfaId={rcfa.id} />
-              )}
             </div>
           </Section>
         )}
@@ -611,6 +846,7 @@ export default async function RcfaDetailPage({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

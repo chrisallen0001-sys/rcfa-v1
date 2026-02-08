@@ -22,6 +22,8 @@ interface RcfaActionBarProps {
   // For investigation/actions_open state
   hasAnsweredQuestions?: boolean;
   hasNewDataForReanalysis?: boolean;
+  /** Called before re-analyze to flush pending answer saves */
+  onFlushAnswers?: () => Promise<void>;
   // For actions_open state
   allActionItemsComplete?: boolean;
   totalActionItems?: number;
@@ -180,6 +182,7 @@ export default function RcfaActionBar({
   onSaveForm,
   hasAnsweredQuestions = false,
   hasNewDataForReanalysis = false,
+  onFlushAnswers,
   allActionItemsComplete = false,
   totalActionItems = 0,
 }: RcfaActionBarProps) {
@@ -206,6 +209,7 @@ export default function RcfaActionBar({
               rcfaId={rcfaId}
               hasAnsweredQuestions={hasAnsweredQuestions}
               hasNewAnswers={hasNewDataForReanalysis}
+              onBeforeAnalyze={onFlushAnswers}
             />
             <FinalizeInvestigationButton
               rcfaId={rcfaId}
@@ -221,6 +225,7 @@ export default function RcfaActionBar({
               rcfaId={rcfaId}
               hasAnsweredQuestions={hasAnsweredQuestions}
               hasNewAnswers={hasNewDataForReanalysis}
+              onBeforeAnalyze={onFlushAnswers}
             />
             <BackToInvestigationButton rcfaId={rcfaId} />
             {allActionItemsComplete && <CloseRcfaButton rcfaId={rcfaId} />}
