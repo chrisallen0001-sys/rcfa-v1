@@ -33,6 +33,9 @@ type FormData = {
   additionalNotes: string;
 };
 
+/** Fields required before starting investigation */
+export type RequiredField = "title" | "equipmentDescription" | "failureDescription";
+
 type Props = {
   rcfaId: string;
   initialData: {
@@ -56,6 +59,8 @@ type Props = {
   onSaveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   /** Callback when dirty state changes (has unsaved edits or pending save) */
   onDirtyChange?: (isDirty: boolean) => void;
+  /** Callback when required field validity changes */
+  onMissingFieldsChange?: (missingFields: RequiredField[]) => void;
 };
 
 function FormField({
@@ -90,7 +95,7 @@ const selectClass =
 const AUTO_SAVE_DELAY_MS = 2000;
 const SAVED_INDICATOR_DURATION_MS = 2000;
 
-export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef, onDirtyChange }: Props) {
+export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef, onDirtyChange, onMissingFieldsChange }: Props) {
   const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     title: initialData.title,
@@ -138,6 +143,15 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef, onD
   useEffect(() => {
     onDirtyChange?.(hasPendingChanges);
   }, [hasPendingChanges, onDirtyChange]);
+
+  // Compute and notify parent of missing required fields
+  useEffect(() => {
+    const missing: RequiredField[] = [];
+    if (!formData.title.trim()) missing.push("title");
+    if (!formData.equipmentDescription.trim()) missing.push("equipmentDescription");
+    if (!formData.failureDescription.trim()) missing.push("failureDescription");
+    onMissingFieldsChange?.(missing);
+  }, [formData.title, formData.equipmentDescription, formData.failureDescription, onMissingFieldsChange]);
 
   // Browser navigation guard: warn about unsaved changes
   useEffect(() => {
@@ -441,7 +455,7 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef, onD
         }
       >
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Title">
+        <FormField label="Title" required>
           <input
             type="text"
             name="title"
