@@ -108,11 +108,15 @@ function Badge({ label, colorClass }: { label: string; colorClass: string }) {
 
 export default async function RcfaDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ new?: string }>;
 }) {
   const { userId, role } = await getAuthContext();
   const { id } = await params;
+  const { new: isNew } = await searchParams;
+  const isNewRcfa = isNew === "true";
 
   if (!UUID_RE.test(id)) {
     notFound();
@@ -292,6 +296,7 @@ export default async function RcfaDetailPage({
         <div className="space-y-4">
           <DraftModeWrapper
             rcfaId={rcfa.id}
+            defaultExpanded={isNewRcfa}
             initialData={{
               title: rcfa.title,
               equipmentDescription: rcfa.equipmentDescription,
