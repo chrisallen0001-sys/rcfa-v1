@@ -17,6 +17,7 @@ import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
 import AddInformationSection from "./AddInformationSection";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import RcfaActionBar from "./RcfaActionBar";
 import DraftModeWrapper from "./DraftModeWrapper";
 import DraftPageContent from "./DraftPageContent";
@@ -64,13 +65,15 @@ function Section({
   title,
   children,
   headerContent,
+  status,
 }: {
   title: string;
   children: React.ReactNode;
   headerContent?: React.ReactNode;
+  status?: SectionStatus;
 }) {
   return (
-    <CollapsibleSection title={title} headerContent={headerContent}>
+    <CollapsibleSection title={title} headerContent={headerContent} status={status}>
       {children}
     </CollapsibleSection>
   );
@@ -253,6 +256,33 @@ export default async function RcfaDetailPage({
     </>
   );
 
+  // Compute section statuses for investigation workflow guidance
+  // Only show indicators during investigation state
+  const isInvestigationState = rcfa.status === "investigation";
+  const sectionStatuses = isInvestigationState
+    ? {
+        intake: "complete" as SectionStatus,
+        followupQuestions: rcfa.followupQuestions.every((q) => q.answerText)
+          ? ("complete" as SectionStatus)
+          : ("optional" as SectionStatus),
+        addInformation:
+          rcfa.investigationNotes && rcfa.investigationNotes.trim().length > 0
+            ? ("complete" as SectionStatus)
+            : ("optional" as SectionStatus),
+        rootCauseCandidates: "none" as SectionStatus,
+        finalRootCauses:
+          rcfa.rootCauseFinals.length > 0
+            ? ("complete" as SectionStatus)
+            : ("required" as SectionStatus),
+        actionCandidates: "none" as SectionStatus,
+        trackedActions:
+          rcfa.actionItems.length > 0
+            ? ("complete" as SectionStatus)
+            : ("required" as SectionStatus),
+        auditLog: "none" as SectionStatus,
+      }
+    : null;
+
   // Shared audit log and admin section
   const auditAndAdminContent = (
     <>
@@ -370,8 +400,9 @@ export default async function RcfaDetailPage({
             answeredBy: q.answeredBy,
           }))}
           isInvestigation={rcfa.status === "investigation" && canEdit}
+          followupQuestionsStatus={sectionStatuses?.followupQuestions}
           beforeQuestions={
-            <Section title="Intake Summary">
+            <Section title="Intake Summary" status={sectionStatuses?.intake}>
               <dl className="grid gap-4 sm:grid-cols-2">
                 <Field label="Equipment Description" value={rcfa.equipmentDescription} />
                 <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
@@ -422,12 +453,13 @@ export default async function RcfaDetailPage({
                 <AddInformationSection
                   rcfaId={rcfa.id}
                   initialNotes={rcfa.investigationNotes}
+                  status={sectionStatuses?.addInformation}
                 />
               )}
 
               {/* Root Cause Candidates */}
               {sortedRootCauseCandidates.length > 0 && (
-                <Section title="Root Cause Candidates">
+                <Section title="Root Cause Candidates" status={sectionStatuses?.rootCauseCandidates}>
                   <div className="space-y-4">
                     {sortedRootCauseCandidates.map((c) => {
                       const isNew = isNewCandidate(c.generatedAt);
@@ -484,7 +516,7 @@ export default async function RcfaDetailPage({
 
               {/* Final Root Causes */}
               {(rcfa.rootCauseFinals.length > 0 || rcfa.status === "investigation") && (
-                <Section title="Final Root Causes">
+                <Section title="Final Root Causes" status={sectionStatuses?.finalRootCauses}>
                   <div className="space-y-4">
                     {rcfa.rootCauseFinals.map((f) => (
                       <EditableRootCause
@@ -507,7 +539,7 @@ export default async function RcfaDetailPage({
 
               {/* Action Item Candidates */}
               {rcfa.actionItemCandidates.length > 0 && (
-                <Section title="Action Item Candidates">
+                <Section title="Action Item Candidates" status={sectionStatuses?.actionCandidates}>
                   <div className="space-y-4">
                     {rcfa.actionItemCandidates.map((a) => {
                       const isNew = isNewCandidate(a.generatedAt);
@@ -572,6 +604,7 @@ export default async function RcfaDetailPage({
               {(rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
                 <Section
                   title="Tracked Action Items"
+                  status={sectionStatuses?.trackedActions}
                   headerContent={
                     totalActionItems > 0 ? (
                       <div className="flex items-center gap-2">

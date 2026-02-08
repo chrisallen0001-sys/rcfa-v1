@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, ReactNode } from "react";
+import SectionStatusIndicator, {
+  type SectionStatus,
+} from "./SectionStatusIndicator";
 
 interface CollapsibleSectionProps {
   title: string;
@@ -10,6 +13,8 @@ interface CollapsibleSectionProps {
   headerContent?: ReactNode;
   /** Custom className for the section wrapper */
   className?: string;
+  /** Status indicator for workflow guidance (investigation phase only) */
+  status?: SectionStatus;
 }
 
 export default function CollapsibleSection({
@@ -18,6 +23,7 @@ export default function CollapsibleSection({
   defaultExpanded = false,
   headerContent,
   className = "rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950",
+  status,
 }: CollapsibleSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -31,9 +37,12 @@ export default function CollapsibleSection({
         aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
       >
         <div className="flex flex-1 items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            {title}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              {title}
+            </h2>
+            {status && <SectionStatusIndicator status={status} />}
+          </div>
           {headerContent && (
             <div onClick={(e) => e.stopPropagation()}>{headerContent}</div>
           )}

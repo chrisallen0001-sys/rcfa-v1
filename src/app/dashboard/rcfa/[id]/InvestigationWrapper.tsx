@@ -6,6 +6,7 @@ import FollowupQuestions, {
   type FollowupQuestionsHandle,
 } from "./FollowupQuestions";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import type { QuestionCategory } from "@/generated/prisma/client";
 
 interface FollowupQuestion {
@@ -32,6 +33,8 @@ interface InvestigationWrapperProps {
   beforeQuestions?: ReactNode;
   /** Content rendered after follow-up questions section (e.g., Add Information, Root Causes) */
   afterQuestions?: ReactNode;
+  /** Status indicator for follow-up questions section */
+  followupQuestionsStatus?: SectionStatus;
 }
 
 export default function InvestigationWrapper({
@@ -47,6 +50,7 @@ export default function InvestigationWrapper({
   isInvestigation,
   beforeQuestions,
   afterQuestions,
+  followupQuestionsStatus,
 }: InvestigationWrapperProps) {
   const followupQuestionsRef = useRef<FollowupQuestionsHandle>(null);
 
@@ -72,7 +76,7 @@ export default function InvestigationWrapper({
       <div className="space-y-4">
         {beforeQuestions}
         {questions.length > 0 && (
-          <CollapsibleSection title="Follow-up Questions">
+          <CollapsibleSection title="Follow-up Questions" status={followupQuestionsStatus}>
             <FollowupQuestions
               ref={followupQuestionsRef}
               rcfaId={rcfaId}
