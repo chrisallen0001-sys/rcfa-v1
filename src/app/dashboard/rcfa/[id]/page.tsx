@@ -17,6 +17,7 @@ import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
 import AddInformationSection from "./AddInformationSection";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import ChevronLeftIcon from "@/components/ChevronLeftIcon";
 import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import RcfaActionBar from "./RcfaActionBar";
 import DraftModeWrapper from "./DraftModeWrapper";
@@ -417,12 +418,13 @@ export default async function RcfaDetailPage({
   // Non-draft modes or draft without edit permission: regular navigation
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-2">
+      <div className="mb-4">
         <Link
           href="/dashboard"
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+          className="inline-flex items-center text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+          aria-label="Back to Dashboard"
         >
-          &larr; Dashboard
+          <ChevronLeftIcon />
         </Link>
       </div>
       {headerContent}
