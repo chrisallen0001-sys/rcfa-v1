@@ -227,10 +227,6 @@ export async function PATCH(
 
       // Validate and build update data
       const updateData: Record<string, unknown> = {};
-      const changes: Record<
-        string,
-        { from: string | number | null; to: string | number | null }
-      > = {};
 
       // String fields (title has max length)
       if (body.title !== undefined) {
@@ -243,7 +239,6 @@ export async function PATCH(
         }
         if (trimmed !== rcfa.title) {
           updateData.title = trimmed;
-          changes.title = { from: rcfa.title, to: trimmed };
         }
       }
 
@@ -256,7 +251,6 @@ export async function PATCH(
           const trimmed = String(body[field]).trim();
           if (trimmed !== rcfa[field]) {
             updateData[field] = trimmed;
-            changes[field] = { from: rcfa[field], to: trimmed };
           }
         }
       }
@@ -276,7 +270,6 @@ export async function PATCH(
           const current = rcfa[field];
           if (trimmed !== current) {
             updateData[field] = trimmed || null;
-            changes[field] = { from: current, to: trimmed || null };
           }
         }
       }
@@ -294,7 +287,6 @@ export async function PATCH(
         }
         if (context !== rcfa.operatingContext) {
           updateData.operatingContext = context;
-          changes.operatingContext = { from: rcfa.operatingContext, to: context };
         }
       }
 
@@ -315,7 +307,6 @@ export async function PATCH(
           : null;
         if (value !== current) {
           updateData.equipmentAgeYears = value;
-          changes.equipmentAgeYears = { from: current, to: value };
         }
       }
 
@@ -332,7 +323,6 @@ export async function PATCH(
         }
         if (value !== rcfa.downtimeMinutes) {
           updateData.downtimeMinutes = value;
-          changes.downtimeMinutes = { from: rcfa.downtimeMinutes, to: value };
         }
       }
 
@@ -351,7 +341,6 @@ export async function PATCH(
           const current = rcfa[field] ? Number(rcfa[field]) : null;
           if (value !== current) {
             updateData[field] = value;
-            changes[field] = { from: current, to: value };
           }
         }
       }
@@ -361,21 +350,10 @@ export async function PATCH(
         return NextResponse.json({ message: "No changes" }, { status: 200 });
       }
 
-      // Perform update in transaction with audit
-      await prisma.$transaction(async (tx) => {
-        await tx.rcfa.update({
-          where: { id },
-          data: updateData,
-        });
-
-        await tx.rcfaAuditEvent.create({
-          data: {
-            rcfaId: id,
-            actorUserId: userId,
-            eventType: "fields_updated",
-            eventPayload: { changes },
-          },
-        });
+      // Perform update (no audit logging for draft field edits per issue #204)
+      await prisma.rcfa.update({
+        where: { id },
+        data: updateData,
       });
 
       return NextResponse.json({ success: true }, { status: 200 });
