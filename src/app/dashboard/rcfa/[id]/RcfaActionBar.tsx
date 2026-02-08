@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
 import { useElapsedTime } from "./useElapsedTime";
+import { useDisabledHint } from "./useDisabledHint";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import BackToInvestigationButton from "./BackToInvestigationButton";
@@ -55,6 +56,16 @@ function AnalyzeWithAIButton({
   const [error, setError] = useState<string | null>(null);
   const pendingRef = useRef(false);
   const elapsed = useElapsedTime(loading);
+  const disabledHint = useDisabledHint();
+
+  function handleButtonClick() {
+    // If disabled, show hint on tap (mobile has no hover)
+    if (disabled) {
+      disabledHint.trigger();
+      return;
+    }
+    handleClick();
+  }
 
   async function handleClick() {
     if (pendingRef.current) return;
@@ -93,10 +104,15 @@ function AnalyzeWithAIButton({
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={handleClick}
-        disabled={loading || disabled}
+        onClick={handleButtonClick}
+        disabled={loading}
+        aria-disabled={disabled}
         title={disabled && disabledReason ? disabledReason : "AI-guided investigation: AI will generate follow-up questions, root cause candidates, and suggested action items"}
-        className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-500 dark:hover:bg-purple-400"
+        className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors ${
+          disabled
+            ? "cursor-not-allowed bg-purple-600/50 dark:bg-purple-500/50"
+            : "bg-purple-600 hover:bg-purple-500 dark:bg-purple-500 dark:hover:bg-purple-400"
+        } disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -107,6 +123,12 @@ function AnalyzeWithAIButton({
           "AI-Guided Investigation"
         )}
       </button>
+      {/* Tap-to-reveal hint for mobile (desktop has hover tooltips) */}
+      {disabledHint.show && disabledReason && (
+        <span className="text-sm text-amber-600 dark:text-amber-400 md:hidden">
+          {disabledReason}
+        </span>
+      )}
       {error && (
         <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
       )}
@@ -129,6 +151,16 @@ function StartWithoutAIButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingRef = useRef(false);
+  const disabledHint = useDisabledHint();
+
+  function handleButtonClick() {
+    // If disabled, show hint on tap (mobile has no hover)
+    if (disabled) {
+      disabledHint.trigger();
+      return;
+    }
+    handleClick();
+  }
 
   async function handleClick() {
     if (pendingRef.current) return;
@@ -167,10 +199,15 @@ function StartWithoutAIButton({
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={handleClick}
-        disabled={loading || disabled}
+        onClick={handleButtonClick}
+        disabled={loading}
+        aria-disabled={disabled}
         title={disabled && disabledReason ? disabledReason : "Manual investigation: Start investigation without AI suggestions"}
-        className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+          disabled
+            ? "cursor-not-allowed border-zinc-300/50 text-zinc-700/50 dark:border-zinc-700/50 dark:text-zinc-300/50"
+            : "border-zinc-300 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        } disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -181,6 +218,12 @@ function StartWithoutAIButton({
           "Manual Investigation"
         )}
       </button>
+      {/* Tap-to-reveal hint for mobile (desktop has hover tooltips) */}
+      {disabledHint.show && disabledReason && (
+        <span className="text-sm text-amber-600 dark:text-amber-400 md:hidden">
+          {disabledReason}
+        </span>
+      )}
       {error && (
         <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
       )}
