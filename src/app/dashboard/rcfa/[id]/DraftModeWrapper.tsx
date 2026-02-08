@@ -34,7 +34,14 @@ export default function DraftModeWrapper({
   // Ref to hold the save function exposed by EditableIntakeForm
   const saveFormRef = useRef<(() => Promise<boolean>) | null>(null);
   const draftNav = useDraftNavigation();
-  const [missingFields, setMissingFields] = useState<RequiredField[]>([]);
+  // Initialize with missing fields computed from initialData to avoid brief enabled state
+  const [missingFields, setMissingFields] = useState<RequiredField[]>(() => {
+    const missing: RequiredField[] = [];
+    if (!initialData.title.trim()) missing.push("title");
+    if (!initialData.equipmentDescription.trim()) missing.push("equipmentDescription");
+    if (!initialData.failureDescription.trim()) missing.push("failureDescription");
+    return missing;
+  });
 
   const handleSaveForm = useCallback(async (): Promise<boolean> => {
     if (saveFormRef.current) {

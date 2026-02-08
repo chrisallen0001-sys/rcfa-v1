@@ -9,11 +9,9 @@ import FinalizeInvestigationButton from "./FinalizeInvestigationButton";
 import BackToInvestigationButton from "./BackToInvestigationButton";
 import CloseRcfaButton from "./CloseRcfaButton";
 import ReopenRcfaButton from "./ReopenRcfaButton";
+import type { RequiredField } from "./EditableIntakeForm";
 
 type RcfaStatus = "draft" | "investigation" | "actions_open" | "closed";
-
-/** Fields required before starting investigation */
-type RequiredField = "title" | "equipmentDescription" | "failureDescription";
 
 /** Human-readable labels for required fields */
 const FIELD_LABELS: Record<RequiredField, string> = {
