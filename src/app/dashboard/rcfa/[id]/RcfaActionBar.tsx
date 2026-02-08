@@ -66,12 +66,12 @@ function AnalyzeWithAIButton({
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to analyze with AI");
+        throw new Error(data.error ?? "Failed to start AI-guided investigation");
       }
 
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to analyze with AI");
+      setError(err instanceof Error ? err.message : "Failed to start AI-guided investigation");
     } finally {
       pendingRef.current = false;
       setLoading(false);
@@ -83,16 +83,16 @@ function AnalyzeWithAIButton({
       <button
         onClick={handleClick}
         disabled={loading || disabled}
-        title="AI will generate follow-up questions, root cause candidates, and suggested action items"
+        title="AI-guided investigation: AI will generate follow-up questions, root cause candidates, and suggested action items"
         className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-500 dark:hover:bg-purple-400"
       >
         {loading ? (
           <span className="flex items-center gap-2">
             <Spinner />
-            Analyzing... {elapsed}s
+            Starting AI-Guided Investigation... {elapsed}s
           </span>
         ) : (
-          "Analyze with AI"
+          "AI-Guided Investigation"
         )}
       </button>
       {error && (
@@ -155,16 +155,16 @@ function StartWithoutAIButton({
       <button
         onClick={handleClick}
         disabled={loading || disabled}
-        title="Start investigation manually without AI suggestions"
+        title="Manual investigation: Start investigation without AI suggestions"
         className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
       >
         {loading ? (
           <span className="flex items-center gap-2">
             <Spinner />
-            Starting...
+            Starting Manual Investigation...
           </span>
         ) : (
-          "Start Without AI"
+          "Manual Investigation"
         )}
       </button>
       {error && (
