@@ -17,6 +17,7 @@ import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
 import AddInformationSection from "./AddInformationSection";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import ChevronLeftIcon from "@/components/ChevronLeftIcon";
 import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import RcfaActionBar from "./RcfaActionBar";
 import DraftModeWrapper from "./DraftModeWrapper";
@@ -423,19 +424,7 @@ export default async function RcfaDetailPage({
           className="inline-flex items-center text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
           aria-label="Back to Dashboard"
         >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
+          <ChevronLeftIcon />
         </Link>
       </div>
       {headerContent}

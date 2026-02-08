@@ -3,6 +3,7 @@
 import { type ReactNode } from "react";
 import { DraftNavigationProvider } from "./DraftNavigationContext";
 import GuardedBackLink from "./GuardedBackLink";
+import ChevronLeftIcon from "@/components/ChevronLeftIcon";
 
 interface DraftPageContentProps {
   /** Full page content including the form */
@@ -23,19 +24,7 @@ export default function DraftPageContent({ children }: DraftPageContentProps) {
             className="inline-flex items-center text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
             aria-label="Back to Dashboard"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
-            </svg>
+            <ChevronLeftIcon />
           </GuardedBackLink>
         </div>
         {children}
