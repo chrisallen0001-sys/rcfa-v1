@@ -19,6 +19,7 @@ import AddInformationSection from "./AddInformationSection";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import RcfaActionBar from "./RcfaActionBar";
 import DraftModeWrapper from "./DraftModeWrapper";
+import DraftPageContent from "./DraftPageContent";
 import type {
   ConfidenceLabel,
   Priority,
@@ -225,16 +226,9 @@ export default async function RcfaDetailPage({
   // Helper for statuses that allow action item editing
   const canEditActionItems = (rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit;
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-2">
-        <Link
-          href="/dashboard"
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-        >
-          &larr; Dashboard
-        </Link>
-      </div>
+  // Shared header content (RCFA number, title, badge, owner)
+  const headerContent = (
+    <>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="shrink-0 rounded bg-zinc-100 px-2 py-1 text-sm font-mono font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
@@ -252,6 +246,94 @@ export default async function RcfaDetailPage({
       <div className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
       </div>
+    </>
+  );
+
+  // Shared audit log and admin section
+  const auditAndAdminContent = (
+    <>
+      {/* Audit Log */}
+      {rcfa.auditEvents.length > 0 && (
+        <AuditLogSection
+          events={rcfa.auditEvents.map((e) => ({
+            id: e.id,
+            eventType: e.eventType,
+            eventPayload: e.eventPayload as Record<string, unknown>,
+            createdAt: e.createdAt.toISOString(),
+            actorEmail: e.actor?.email ?? null,
+          }))}
+        />
+      )}
+
+      {/* Admin Actions */}
+      {isAdmin && (
+        <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+          <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+            Admin actions
+          </p>
+          <div className="space-y-4">
+            <ReassignOwnerButton
+              rcfaId={rcfa.id}
+              currentOwnerId={rcfa.owner.id}
+              currentOwnerName={rcfa.owner.displayName}
+            />
+            <DeleteRcfaButton rcfaId={rcfa.id} rcfaTitle={rcfa.title} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // Draft mode with edit permission: use guarded navigation
+  if (rcfa.status === "draft" && canEdit) {
+    return (
+      <DraftPageContent>
+        {headerContent}
+        <div className="space-y-4">
+          <DraftModeWrapper
+            rcfaId={rcfa.id}
+            initialData={{
+              title: rcfa.title,
+              equipmentDescription: rcfa.equipmentDescription,
+              operatingContext: rcfa.operatingContext,
+              equipmentMake: rcfa.equipmentMake,
+              equipmentModel: rcfa.equipmentModel,
+              equipmentSerialNumber: rcfa.equipmentSerialNumber,
+              equipmentAgeYears: rcfa.equipmentAgeYears
+                ? Number(rcfa.equipmentAgeYears)
+                : null,
+              downtimeMinutes: rcfa.downtimeMinutes,
+              productionCostUsd: rcfa.productionCostUsd
+                ? Number(rcfa.productionCostUsd)
+                : null,
+              maintenanceCostUsd: rcfa.maintenanceCostUsd
+                ? Number(rcfa.maintenanceCostUsd)
+                : null,
+              failureDescription: rcfa.failureDescription,
+              preFailureConditions: rcfa.preFailureConditions,
+              workHistorySummary: rcfa.workHistorySummary,
+              activePmsSummary: rcfa.activePmsSummary,
+              additionalNotes: rcfa.additionalNotes,
+            }}
+          />
+          {auditAndAdminContent}
+        </div>
+      </DraftPageContent>
+    );
+  }
+
+  // Non-draft modes or draft without edit permission: regular navigation
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-8">
+      <div className="mb-2">
+        <Link
+          href="/dashboard"
+          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+        >
+          &larr; Dashboard
+        </Link>
+      </div>
+      {headerContent}
 
       {/* Sticky Action Bar - for closed state only (investigation/actions_open handled by InvestigationWrapper) */}
       {rcfa.status === "closed" && (
@@ -560,39 +642,12 @@ export default async function RcfaDetailPage({
         />
       )}
 
-      {/* Draft and Closed states - use standard space-y-4 layout */}
-      {(rcfa.status === "draft" || rcfa.status === "closed") && (
+      {/* Draft (read-only) and Closed states - use standard space-y-4 layout */}
+      {/* Note: Draft with canEdit is handled in early return above */}
+      {((rcfa.status === "draft" && !canEdit) || rcfa.status === "closed") && (
       <div className="space-y-4">
-        {/* Intake Summary - editable when draft */}
-        {rcfa.status === "draft" && canEdit ? (
-          <DraftModeWrapper
-            rcfaId={rcfa.id}
-            initialData={{
-              title: rcfa.title,
-              equipmentDescription: rcfa.equipmentDescription,
-              operatingContext: rcfa.operatingContext,
-              equipmentMake: rcfa.equipmentMake,
-              equipmentModel: rcfa.equipmentModel,
-              equipmentSerialNumber: rcfa.equipmentSerialNumber,
-              equipmentAgeYears: rcfa.equipmentAgeYears
-                ? Number(rcfa.equipmentAgeYears)
-                : null,
-              downtimeMinutes: rcfa.downtimeMinutes,
-              productionCostUsd: rcfa.productionCostUsd
-                ? Number(rcfa.productionCostUsd)
-                : null,
-              maintenanceCostUsd: rcfa.maintenanceCostUsd
-                ? Number(rcfa.maintenanceCostUsd)
-                : null,
-              failureDescription: rcfa.failureDescription,
-              preFailureConditions: rcfa.preFailureConditions,
-              workHistorySummary: rcfa.workHistorySummary,
-              activePmsSummary: rcfa.activePmsSummary,
-              additionalNotes: rcfa.additionalNotes,
-            }}
-          />
-        ) : (
-          <Section title="Intake Summary">
+        {/* Intake Summary - read-only */}
+        <Section title="Intake Summary">
             <dl className="grid gap-4 sm:grid-cols-2">
               <Field label="Equipment Description" value={rcfa.equipmentDescription} />
               <Field label="Operating Context" value={OPERATING_CONTEXT_LABELS[rcfa.operatingContext]} />
@@ -635,7 +690,6 @@ export default async function RcfaDetailPage({
               <Field label="Additional Notes" value={rcfa.additionalNotes} />
             </dl>
           </Section>
-        )}
 
         {/* Follow-up Questions - read-only for closed state */}
         {rcfa.status === "closed" && rcfa.followupQuestions.length > 0 && (
@@ -816,35 +870,7 @@ export default async function RcfaDetailPage({
           </Section>
         )}
 
-        {/* Audit Log */}
-        {rcfa.auditEvents.length > 0 && (
-          <AuditLogSection
-            events={rcfa.auditEvents.map((e) => ({
-              id: e.id,
-              eventType: e.eventType,
-              eventPayload: e.eventPayload as Record<string, unknown>,
-              createdAt: e.createdAt.toISOString(),
-              actorEmail: e.actor?.email ?? null,
-            }))}
-          />
-        )}
-
-        {/* Admin Actions */}
-        {isAdmin && (
-          <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-              Admin actions
-            </p>
-            <div className="space-y-4">
-              <ReassignOwnerButton
-                rcfaId={rcfa.id}
-                currentOwnerId={rcfa.owner.id}
-                currentOwnerName={rcfa.owner.displayName}
-              />
-              <DeleteRcfaButton rcfaId={rcfa.id} rcfaTitle={rcfa.title} />
-            </div>
-          </div>
-        )}
+        {auditAndAdminContent}
       </div>
       )}
     </div>
