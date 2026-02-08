@@ -657,10 +657,10 @@ export default async function RcfaDetailPage({
                 </Section>
               )}
 
-              {/* Tracked Action Items */}
+              {/* Final Action Items */}
               {(rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
                 <Section
-                  title="Tracked Action Items"
+                  title="Final Action Items"
                   status={sectionStatuses?.trackedActions}
                   headerContent={
                     totalActionItems > 0 ? (
@@ -898,10 +898,10 @@ export default async function RcfaDetailPage({
           </Section>
         )}
 
-        {/* Tracked Action Items - read-only for closed state */}
+        {/* Final Action Items - read-only for closed state */}
         {rcfa.status === "closed" && rcfa.actionItems.length > 0 && (
           <Section
-            title="Tracked Action Items"
+            title="Final Action Items"
             headerContent={
               totalActionItems > 0 ? (
                 <div className="flex items-center gap-2">
