@@ -3,10 +3,13 @@
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import type { SectionStatus } from "@/components/SectionStatusIndicator";
 
 interface AddInformationSectionProps {
   rcfaId: string;
   initialNotes: string | null;
+  /** Status indicator for workflow guidance */
+  status?: SectionStatus;
 }
 
 const textareaClass =
@@ -15,6 +18,7 @@ const textareaClass =
 export default function AddInformationSection({
   rcfaId,
   initialNotes,
+  status,
 }: AddInformationSectionProps) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes ?? "");
@@ -69,7 +73,7 @@ export default function AddInformationSection({
   };
 
   return (
-    <CollapsibleSection title="Add Information">
+    <CollapsibleSection title="Add Information" status={status}>
       <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
         Add new findings, lab results, or other information discovered during investigation.
         After saving, you can re-analyze to incorporate the new data.
