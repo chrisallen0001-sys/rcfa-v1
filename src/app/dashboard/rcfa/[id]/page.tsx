@@ -417,12 +417,25 @@ export default async function RcfaDetailPage({
   // Non-draft modes or draft without edit permission: regular navigation
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-2">
+      <div className="mb-4">
         <Link
           href="/dashboard"
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+          className="inline-flex items-center text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+          aria-label="Back to Dashboard"
         >
-          &larr; Dashboard
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 19.5L8.25 12l7.5-7.5"
+            />
+          </svg>
         </Link>
       </div>
       {headerContent}

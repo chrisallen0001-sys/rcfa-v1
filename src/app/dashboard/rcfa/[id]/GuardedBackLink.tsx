@@ -8,9 +8,10 @@ interface GuardedBackLinkProps {
   href: string;
   children: React.ReactNode;
   className?: string;
+  "aria-label"?: string;
 }
 
-export default function GuardedBackLink({ href, children, className }: GuardedBackLinkProps) {
+export default function GuardedBackLink({ href, children, className, "aria-label": ariaLabel }: GuardedBackLinkProps) {
   const router = useRouter();
   const draftNav = useDraftNavigation();
 
@@ -34,7 +35,7 @@ export default function GuardedBackLink({ href, children, className }: GuardedBa
   }
 
   return (
-    <Link href={href} className={className} onClick={handleClick}>
+    <Link href={href} className={className} onClick={handleClick} aria-label={ariaLabel}>
       {children}
     </Link>
   );
