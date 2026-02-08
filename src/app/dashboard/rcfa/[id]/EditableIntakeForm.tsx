@@ -54,6 +54,8 @@ type Props = {
   };
   /** Ref to expose save function for external callers (e.g., action bar) */
   onSaveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  /** Callback when dirty state changes (has unsaved edits or pending save) */
+  onDirtyChange?: (isDirty: boolean) => void;
 };
 
 function FormField({
@@ -88,7 +90,7 @@ const selectClass =
 const AUTO_SAVE_DELAY_MS = 2000;
 const SAVED_INDICATOR_DURATION_MS = 2000;
 
-export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: Props) {
+export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef, onDirtyChange }: Props) {
   const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     title: initialData.title,
@@ -108,15 +110,11 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: P
     additionalNotes: initialData.additionalNotes ?? "",
   });
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
 
   // Auto-save state
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>("idle");
   const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
+  const [hasPendingDebounce, setHasPendingDebounce] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const savedIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   const formDataRef = useRef(formData);
@@ -132,6 +130,27 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: P
   useEffect(() => {
     autoSaveStatusRef.current = autoSaveStatus;
   }, [autoSaveStatus]);
+
+  // Track dirty state: has pending debounce timer or is currently saving
+  const hasPendingChanges = hasPendingDebounce || autoSaveStatus === "saving";
+
+  // Notify parent of dirty state changes
+  useEffect(() => {
+    onDirtyChange?.(hasPendingChanges);
+  }, [hasPendingChanges, onDirtyChange]);
+
+  // Browser navigation guard: warn about unsaved changes
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      // Check if there are pending changes (debounce timer active or currently saving)
+      if (debounceTimerRef.current !== null || autoSaveStatusRef.current === "saving") {
+        e.preventDefault();
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -199,9 +218,15 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: P
       setAutoSaveStatus("idle");
     }
 
+    // Mark that we have a pending debounce
+    setHasPendingDebounce(true);
+
     // Set up new debounce timer
     debounceTimerRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
+
+      // Timer fired, no longer pending
+      setHasPendingDebounce(false);
 
       // Cancel any in-flight request
       if (abortControllerRef.current) {
@@ -247,7 +272,6 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: P
     ) => {
       const { name, value } = e.target;
       setFormData((prev) => ({ ...prev, [name]: value }));
-      setFeedback(null);
 
       // Trigger debounced auto-save
       triggerAutoSave();
@@ -255,48 +279,12 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: P
     [triggerAutoSave]
   );
 
-  // Manual save
-  const handleSave = async () => {
-    // Cancel any pending auto-save
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Cancel any in-flight auto-save request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setIsSaving(true);
-    setFeedback(null);
-    setAutoSaveStatus("idle");
-    setAutoSaveError(null);
-
-    try {
-      await performSave(formData, abortControllerRef.current.signal);
-      if (!isMountedRef.current) return;
-      setFeedback({ type: "success", message: "Changes saved" });
-      router.refresh();
-    } catch (err) {
-      if (!isMountedRef.current) return;
-      if (err instanceof Error && err.name === "AbortError") return;
-      setFeedback({
-        type: "error",
-        message: err instanceof Error ? err.message : "Failed to save changes",
-      });
-    } finally {
-      if (isMountedRef.current) {
-        setIsSaving(false);
-      }
-    }
-  };
-
   // Retry failed auto-save - performs immediate save (no debounce delay)
   const handleRetry = async () => {
     // Cancel any pending debounce timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      setHasPendingDebounce(false);
     }
 
     // Cancel any in-flight request
@@ -337,6 +325,7 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: P
     // Cancel any pending debounce timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      setHasPendingDebounce(false);
     }
 
     // Cancel any in-flight request
@@ -448,27 +437,6 @@ export default function EditableIntakeForm({ rcfaId, initialData, onSaveRef }: P
                 </button>
               </span>
             )}
-
-            {/* Manual save feedback */}
-            {feedback && autoSaveStatus === "idle" && (
-              <span
-                className={`text-sm ${
-                  feedback.type === "success"
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
-                }`}
-              >
-                {feedback.message}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving || autoSaveStatus === "saving"}
-              className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
-              {isSaving ? "Saving..." : "Save Changes"}
-            </button>
           </div>
         }
       >

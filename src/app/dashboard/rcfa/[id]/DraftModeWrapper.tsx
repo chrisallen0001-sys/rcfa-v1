@@ -3,6 +3,7 @@
 import { useRef, useCallback } from "react";
 import EditableIntakeForm from "./EditableIntakeForm";
 import RcfaActionBar from "./RcfaActionBar";
+import { useDraftNavigation } from "./DraftNavigationContext";
 import type { OperatingContext } from "@/generated/prisma/client";
 
 interface DraftModeWrapperProps {
@@ -32,6 +33,7 @@ export default function DraftModeWrapper({
 }: DraftModeWrapperProps) {
   // Ref to hold the save function exposed by EditableIntakeForm
   const saveFormRef = useRef<(() => Promise<boolean>) | null>(null);
+  const draftNav = useDraftNavigation();
 
   const handleSaveForm = useCallback(async (): Promise<boolean> => {
     if (saveFormRef.current) {
@@ -39,6 +41,10 @@ export default function DraftModeWrapper({
     }
     return true; // If no save function, assume already saved
   }, []);
+
+  const handleDirtyChange = useCallback((isDirty: boolean) => {
+    draftNav?.setIsDirty(isDirty);
+  }, [draftNav]);
 
   return (
     <>
@@ -54,6 +60,7 @@ export default function DraftModeWrapper({
         rcfaId={rcfaId}
         initialData={initialData}
         onSaveRef={saveFormRef}
+        onDirtyChange={handleDirtyChange}
       />
     </>
   );
