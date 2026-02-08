@@ -37,15 +37,15 @@ export default function CollapsibleSection({
         aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
       >
         <div className="flex flex-1 items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            {title}
+          </h2>
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              {title}
-            </h2>
+            {headerContent && (
+              <div onClick={(e) => e.stopPropagation()}>{headerContent}</div>
+            )}
             {status && <SectionStatusIndicator status={status} />}
           </div>
-          {headerContent && (
-            <div onClick={(e) => e.stopPropagation()}>{headerContent}</div>
-          )}
         </div>
         <svg
           className={`ml-4 h-5 w-5 flex-shrink-0 text-zinc-400 transition-transform duration-200 ${
