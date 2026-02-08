@@ -83,43 +83,58 @@ type SectionStatuses = {
 };
 
 /**
- * Computes section status indicators for investigation workflow guidance.
- * Only returns statuses during investigation state; returns null otherwise.
+ * Computes section status indicators for workflow guidance.
+ * Returns statuses for investigation and actions_open states; null otherwise.
  */
 function computeSectionStatuses(
   rcfa: SectionStatusData,
   promotedCandidateIds: Set<string | null>,
-  promotedActionCandidateIds: Set<string | null>
+  promotedActionCandidateIds: Set<string | null>,
+  allActionItemsComplete: boolean
 ): SectionStatuses | null {
-  if (rcfa.status !== "investigation") {
-    return null;
+  if (rcfa.status === "investigation") {
+    return {
+      intake: "complete",
+      followupQuestions:
+        rcfa.followupQuestions.length > 0 &&
+        rcfa.followupQuestions.every((q) => q.answerText)
+          ? "complete"
+          : "optional",
+      addInformation:
+        rcfa.investigationNotes && rcfa.investigationNotes.trim().length > 0
+          ? "complete"
+          : "optional",
+      rootCauseCandidates:
+        rcfa.rootCauseCandidates.length > 0 &&
+        rcfa.rootCauseCandidates.some((c) => !promotedCandidateIds.has(c.id))
+          ? "review"
+          : "none",
+      finalRootCauses: rcfa.rootCauseFinals.length > 0 ? "complete" : "required",
+      actionCandidates:
+        rcfa.actionItemCandidates.length > 0 &&
+        rcfa.actionItemCandidates.some((a) => !promotedActionCandidateIds.has(a.id))
+          ? "review"
+          : "none",
+      trackedActions: rcfa.actionItems.length > 0 ? "complete" : "required",
+      auditLog: "none",
+    };
   }
 
-  return {
-    intake: "complete",
-    followupQuestions:
-      rcfa.followupQuestions.length > 0 &&
-      rcfa.followupQuestions.every((q) => q.answerText)
-        ? "complete"
-        : "optional",
-    addInformation:
-      rcfa.investigationNotes && rcfa.investigationNotes.trim().length > 0
-        ? "complete"
-        : "optional",
-    rootCauseCandidates:
-      rcfa.rootCauseCandidates.length > 0 &&
-      rcfa.rootCauseCandidates.some((c) => !promotedCandidateIds.has(c.id))
-        ? "review"
-        : "none",
-    finalRootCauses: rcfa.rootCauseFinals.length > 0 ? "complete" : "required",
-    actionCandidates:
-      rcfa.actionItemCandidates.length > 0 &&
-      rcfa.actionItemCandidates.some((a) => !promotedActionCandidateIds.has(a.id))
-        ? "review"
-        : "none",
-    trackedActions: rcfa.actionItems.length > 0 ? "complete" : "required",
-    auditLog: "none",
-  };
+  if (rcfa.status === "actions_open") {
+    return {
+      intake: "complete",
+      followupQuestions: "complete",
+      addInformation: "none", // section is hidden in this state
+      rootCauseCandidates: "none",
+      finalRootCauses: "complete",
+      actionCandidates: "none",
+      trackedActions: allActionItemsComplete ? "complete" : "required",
+      auditLog: "none",
+    };
+  }
+
+  // Closed and other states: no indicators
+  return null;
 }
 
 function Section({
@@ -317,11 +332,12 @@ export default async function RcfaDetailPage({
     </>
   );
 
-  // Compute section statuses for investigation workflow guidance
+  // Compute section statuses for workflow guidance
   const sectionStatuses = computeSectionStatuses(
     rcfa,
     promotedCandidateIds,
-    promotedActionCandidateIds
+    promotedActionCandidateIds,
+    allActionItemsComplete
   );
 
   // Shared audit log and admin section
