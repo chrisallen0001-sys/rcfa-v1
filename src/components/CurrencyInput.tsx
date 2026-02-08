@@ -46,7 +46,15 @@ export default function CurrencyInput({
 
   const handleBlur = useCallback(() => {
     setIsFocused(false);
-  }, []);
+    // Sanitize pasted negative values
+    const num = parseFloat(value);
+    if (!isNaN(num) && num < 0) {
+      const syntheticEvent = {
+        target: { name, value: Math.abs(num).toString() },
+      } as React.ChangeEvent<HTMLInputElement>;
+      onChange(syntheticEvent);
+    }
+  }, [value, name, onChange]);
 
   // Prevent negative numbers
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -65,8 +73,8 @@ export default function CurrencyInput({
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      min="0"
-      step="0.01"
+      min={isFocused ? "0" : undefined}
+      step={isFocused ? "0.01" : undefined}
       disabled={disabled}
       className={className}
     />
