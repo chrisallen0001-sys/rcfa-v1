@@ -17,6 +17,8 @@ interface ReAnalyzeButtonProps {
   rcfaId: string;
   hasAnsweredQuestions: boolean;
   hasNewAnswers: boolean;
+  /** Called before analysis to flush any pending saves */
+  onBeforeAnalyze?: () => Promise<void>;
 }
 
 function InfoDialog({
@@ -116,6 +118,7 @@ export default function ReAnalyzeButton({
   rcfaId,
   hasAnsweredQuestions,
   hasNewAnswers,
+  onBeforeAnalyze,
 }: ReAnalyzeButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -141,6 +144,11 @@ export default function ReAnalyzeButton({
     setError(null);
 
     try {
+      // Flush any pending answer saves before analyzing
+      if (onBeforeAnalyze) {
+        await onBeforeAnalyze();
+      }
+
       const res = await fetch(`/api/rcfa/${rcfaId}/reanalyze`, {
         method: "POST",
       });
