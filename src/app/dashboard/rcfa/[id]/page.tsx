@@ -31,12 +31,13 @@ import type {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
+  deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
   low: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   high: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
 
-const CONFIDENCE_ORDER: Record<ConfidenceLabel, number> = { high: 0, medium: 1, low: 2 };
+const CONFIDENCE_ORDER: Record<ConfidenceLabel, number> = { high: 0, medium: 1, low: 2, deprioritized: 3 };
 
 const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
   running: "Running",
@@ -48,6 +49,7 @@ const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
 
 
 const PRIORITY_COLORS: Record<Priority, string> = {
+  deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
