@@ -14,12 +14,14 @@ export const metadata: Metadata = {
 const ITEMS_PER_PAGE = 50;
 
 const PRIORITY_LABELS: Record<Priority, string> = {
+  deprioritized: "Deprioritized",
   low: "Low",
   medium: "Medium",
   high: "High",
 };
 
 const PRIORITY_COLORS: Record<Priority, string> = {
+  deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   medium:
     "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",

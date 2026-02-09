@@ -52,12 +52,14 @@ enum GeneratedBy {
 }
 
 enum ConfidenceLabel {
+  deprioritized
   low
   medium
   high
 }
 
 enum Priority {
+  deprioritized
   low
   medium
   high
