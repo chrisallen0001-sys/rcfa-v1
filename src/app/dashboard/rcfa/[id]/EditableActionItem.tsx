@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
 import { useUsers } from "./useUsers";
-import { truncateTitle } from "@/lib/rcfa-utils";
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: "Low",
@@ -219,14 +218,14 @@ export default function EditableActionItem({
       aria-expanded={isExpanded}
       aria-label={isExpanded ? "Collapse action item" : "Expand action item"}
     >
-      <div className="flex flex-1 items-center gap-3 overflow-hidden">
+      <div className="flex flex-1 items-start gap-3 sm:items-center sm:overflow-hidden">
         <p
-          className="flex-1 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100"
+          className="flex-1 line-clamp-3 text-sm font-medium text-zinc-900 sm:truncate sm:line-clamp-none dark:text-zinc-100"
           title={initialActionText}
         >
-          {truncateTitle(initialActionText)}
+          {initialActionText}
         </p>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="mt-0.5 flex shrink-0 items-center gap-2 sm:mt-0">
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[initialPriority] ?? ""}`}
           >
