@@ -67,7 +67,7 @@ const FIELD_LABELS: Record<string, string> = {
   previousConfidence: "Previous Confidence",
   newConfidence: "New Confidence",
   updateReason: "Reason",
-  completionNotes: "Completion Notes",
+  completionNotes: "Action Taken",
   owner: "Owner",
   ownerUserId: "Owner",
   previousOwnerUserId: "Previous Owner",

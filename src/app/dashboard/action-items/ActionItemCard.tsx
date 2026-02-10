@@ -204,7 +204,7 @@ export default function ActionItemCard({
           <textarea
             value={completionNotes}
             onChange={(e) => setCompletionNotes(e.target.value)}
-            placeholder="Completion notes (optional)"
+            placeholder="Action taken (optional)"
             maxLength={2000}
             rows={2}
             className="mb-2 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
