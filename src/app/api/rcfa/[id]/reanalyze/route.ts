@@ -21,6 +21,8 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
 const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions.
 
+CRITICAL: Your DEFAULT position is noMaterialChange: true. Only set noMaterialChange to false when you can identify a SPECIFIC, CONCRETE engineering insight that would change a failure hypothesis or action item. Reformatting, typo fixes, or minor numeric variations are NEVER material.
+
 The user message contains:
 1. Original intake data
 2. Investigation notes (new findings added during investigation)
@@ -39,6 +41,13 @@ Ask yourself these specific questions:
   e) Does any answer shift the priority or urgency of an existing action item?
 
 If the answer to ALL of the above is "no," set noMaterialChange to true and return empty arrays for all candidate fields.
+
+Also ask yourself these COUNTER-questions:
+  f) Could this answer simply be a rephrasing or clarification of previously known information?
+  g) If I ignore the exact wording and focus only on the engineering meaning, does anything actually change?
+  h) Would an experienced engineer reviewing both versions conclude they represent the same technical state?
+
+If the answer to ANY of (f), (g), or (h) is "yes" AND the answer to ALL of (a) through (e) is "no," you MUST return noMaterialChange: true.
 
 STEP 2A — RE-EVALUATE EXISTING AI CANDIDATES (only if Step 1 determined material change exists).
 For each existing candidate where generatedBy="ai", determine if the new evidence:
@@ -81,6 +90,13 @@ TEXTUAL EQUIVALENCE:
 - More verbose or more concise expression of the same technical finding
 - Paraphrasing of the same evidence using different terminology (e.g., "elevated moisture" vs "significantly elevated Karl Fischer water content" when referring to the same condition)
 
+TRIVIAL CHANGES (always noMaterialChange: true):
+- Single digit changes in numeric ranges (e.g., "32-35 psig" → "32-36 psig") that don't change the diagnostic category
+- Typo corrections or minor spelling changes (e.g., "Suction press" → "Suction pressure")
+- Placeholder or null-value responses like "Nothing new to add", "N/A", "No additional information"
+- Grammatical corrections without technical content changes
+- Adding units or clarifying existing values without changing them
+
 IMPORTANT: Before deciding on noMaterialChange, summarize in one sentence what NEW engineering insight (if any) the updated answers provide that was not already reflected in the existing candidates. If you cannot identify a specific new insight that would change a root cause hypothesis or action item, the answer is noMaterialChange: true.
 
 Return valid JSON only with the following structure:
@@ -111,6 +127,9 @@ Requirements:
 - When noMaterialChange is false: rootCauseCandidates should have 0 to 6 NEW items (0 if only existing candidates need updates), actionItems should have 0 to 10 NEW items.
 - rootCauseCandidates: ONLY genuinely NEW hypotheses. Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
 - actionItems: ONLY genuinely NEW action items. Include priority, a concrete timeframe, and measurable success criteria.
+
+FINAL CHECK: Before returning your response, ask yourself: "What specific new failure mechanism or action category does this answer introduce?" If you cannot name one, set noMaterialChange: true.
+
 - Return ONLY valid JSON. No markdown, no commentary.`;
 
 interface ExistingCandidateUpdate {
@@ -339,6 +358,7 @@ async function callOpenAI(userPrompt: string): Promise<ReAnalysisResult> {
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     response_format: { type: "json_object" },
+    temperature: 0.2,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
