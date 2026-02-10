@@ -90,7 +90,7 @@ const PREVIOUS_FIELD_MAP: Record<string, string> = {
   previousOwnerUserId: "ownerUserId",
   // Owner change event - only show name (ID is not user-friendly)
   previousOwnerName: "newOwnerName",
-  // Candidate update events
+  // Candidate update events (only confidence - priority already mapped above for action_item_updated)
   previousConfidence: "newConfidence",
 };
 
@@ -346,7 +346,8 @@ function PayloadDetail({ eventType, payload }: { eventType: string; payload: Rec
   // Special handling for candidate_updated events
   if (eventType === AUDIT_EVENT_TYPES.CANDIDATE_UPDATED) {
     const isRootCause = payload.candidateType === "rootCause";
-    const candidateText = String(isRootCause ? payload.causeText : payload.actionText);
+    const rawText = isRootCause ? payload.causeText : payload.actionText;
+    const candidateText = rawText ? String(rawText) : "Unknown candidate";
     const levelLabel = isRootCause ? "Confidence" : "Priority";
     const previousLevel = isRootCause ? payload.previousConfidence : payload.previousPriority;
     const newLevel = isRootCause ? payload.newConfidence : payload.newPriority;
