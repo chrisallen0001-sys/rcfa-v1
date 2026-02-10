@@ -188,6 +188,56 @@ function Badge({ label, colorClass }: { label: string; colorClass: string }) {
   );
 }
 
+function ConfidenceChangeIndicator({
+  previous,
+  current,
+  colorMap,
+}: {
+  previous: string;
+  current: string;
+  colorMap: Record<string, string>;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs">
+      <span className={`rounded px-1.5 py-0.5 font-medium ${colorMap[previous] || ""}`}>
+        {previous}
+      </span>
+      <span className="text-zinc-400">→</span>
+      <span className={`rounded px-1.5 py-0.5 font-medium ${colorMap[current] || ""}`}>
+        {current}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Renders either a confidence change indicator (if candidate was updated)
+ * or a static badge (if no update occurred).
+ */
+function CandidateLevelBadge({
+  candidateId,
+  currentLevel,
+  colorMap,
+  candidateUpdateMap,
+}: {
+  candidateId: string;
+  currentLevel: string;
+  colorMap: Record<string, string>;
+  candidateUpdateMap: Map<string, { previous: string; current: string }>;
+}) {
+  const update = candidateUpdateMap.get(candidateId);
+  if (update) {
+    return (
+      <ConfidenceChangeIndicator
+        previous={update.previous}
+        current={update.current}
+        colorMap={colorMap}
+      />
+    );
+  }
+  return <Badge label={currentLevel} colorClass={colorMap[currentLevel]} />;
+}
+
 export default async function RcfaDetailPage({
   params,
   searchParams,
@@ -301,6 +351,23 @@ export default async function RcfaDetailPage({
   // Helper to determine if a candidate was added in the latest re-analysis
   const isNewCandidate = (generatedAt: Date): boolean =>
     previousAnalysisTimestamp !== null && generatedAt > previousAnalysisTimestamp;
+
+  // Build map of candidate ID → confidence/priority change from CANDIDATE_UPDATED audit events
+  // Only track the most recent update for each candidate (events are ordered desc)
+  const candidateUpdateMap = new Map<string, { previous: string; current: string }>();
+  for (const event of rcfa.auditEvents) {
+    if (event.eventType === AUDIT_EVENT_TYPES.CANDIDATE_UPDATED) {
+      const payload = event.eventPayload as Record<string, unknown>;
+      const candidateId = payload.candidateId as string;
+      if (candidateId && !candidateUpdateMap.has(candidateId)) {
+        const previous = (payload.previousConfidence || payload.previousPriority) as string;
+        const current = (payload.newConfidence || payload.newPriority) as string;
+        if (previous && current) {
+          candidateUpdateMap.set(candidateId, { previous, current });
+        }
+      }
+    }
+  }
 
   // Action items progress tracking
   const completedActionItems = rcfa.actionItems.filter(
@@ -534,9 +601,11 @@ export default async function RcfaDetailPage({
                                 </span>
                               )}
                             </div>
-                            <Badge
-                              label={c.confidenceLabel}
-                              colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
+                            <CandidateLevelBadge
+                              candidateId={c.id}
+                              currentLevel={c.confidenceLabel}
+                              colorMap={CONFIDENCE_COLORS}
+                              candidateUpdateMap={candidateUpdateMap}
                             />
                           </div>
                           {c.rationaleText && (
@@ -614,9 +683,11 @@ export default async function RcfaDetailPage({
                                 </span>
                               )}
                             </div>
-                            <Badge
-                              label={a.priority}
-                              colorClass={PRIORITY_COLORS[a.priority]}
+                            <CandidateLevelBadge
+                              candidateId={a.id}
+                              currentLevel={a.priority}
+                              colorMap={PRIORITY_COLORS}
+                              candidateUpdateMap={candidateUpdateMap}
                             />
                           </div>
                           {a.rationaleText && (
@@ -811,9 +882,11 @@ export default async function RcfaDetailPage({
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {c.causeText}
                     </p>
-                    <Badge
-                      label={c.confidenceLabel}
-                      colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
+                    <CandidateLevelBadge
+                      candidateId={c.id}
+                      currentLevel={c.confidenceLabel}
+                      colorMap={CONFIDENCE_COLORS}
+                      candidateUpdateMap={candidateUpdateMap}
                     />
                   </div>
                   {c.rationaleText && (
@@ -865,9 +938,11 @@ export default async function RcfaDetailPage({
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {a.actionText}
                     </p>
-                    <Badge
-                      label={a.priority}
-                      colorClass={PRIORITY_COLORS[a.priority]}
+                    <CandidateLevelBadge
+                      candidateId={a.id}
+                      currentLevel={a.priority}
+                      colorMap={PRIORITY_COLORS}
+                      candidateUpdateMap={candidateUpdateMap}
                     />
                   </div>
                   {a.rationaleText && (
