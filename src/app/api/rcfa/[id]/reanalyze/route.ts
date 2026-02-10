@@ -17,6 +17,7 @@ import type {
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
 const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). You previously analyzed intake data and generated follow-up questions. The user has now answered some of those questions.
@@ -116,7 +117,7 @@ Return valid JSON only with the following structure:
     { "causeText": "string", "rationaleText": "string", "confidenceLabel": "low|medium|high" }
   ],
   "actionItems": [
-    { "actionText": "string", "rationaleText": "string", "priority": "low|medium|high", "timeframeText": "string", "successCriteria": "string" }
+    { "actionText": "string (max 90 chars, action-oriented title)", "rationaleText": "string (detailed description: what, why, systems involved)", "priority": "low|medium|high", "timeframeText": "string", "suggestedDueDate": "YYYY-MM-DD" }
   ]
 }
 
@@ -126,7 +127,7 @@ Requirements:
 - existingCandidateUpdates: Contains updates to existing AI-generated candidates. Only include candidates whose confidence/priority should change. Each update must have the candidate's UUID (from the prompt), the new confidence/priority level, and an updateReason. NEVER include human-generated candidates here.
 - When noMaterialChange is false: rootCauseCandidates should have 0 to 6 NEW items (0 if only existing candidates need updates), actionItems should have 0 to 10 NEW items.
 - rootCauseCandidates: ONLY genuinely NEW hypotheses. Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
-- actionItems: ONLY genuinely NEW action items. Include priority, a concrete timeframe, and measurable success criteria.
+- actionItems: ONLY genuinely NEW action items. Each should have: actionText (max 90 chars, action-oriented title), rationaleText (detailed description), priority, timeframeText, and suggestedDueDate (YYYY-MM-DD format based on urgency/effort, using today's date from the prompt as reference).
 
 FINAL CHECK: Before returning your response, ask yourself: "What specific new failure mechanism or action category does this answer introduce?" If you cannot name one, set noMaterialChange: true.
 
@@ -159,7 +160,7 @@ interface ReAnalysisResult {
     rationaleText: string;
     priority: Priority;
     timeframeText: string;
-    successCriteria: string;
+    suggestedDueDate?: string;
   }[];
 }
 
@@ -271,6 +272,10 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
     if (!VALID_PRIORITIES.includes(a.priority)) {
       throw new Error(`Invalid priority: ${a.priority}`);
     }
+    // Validate suggestedDueDate format; clear invalid values
+    if (a.suggestedDueDate && !ISO_DATE_RE.test(a.suggestedDueDate)) {
+      a.suggestedDueDate = undefined;
+    }
   }
 
   return {
@@ -338,7 +343,10 @@ function buildReAnalyzePrompt(
         })
       : ["(none)"];
 
+  const today = new Date().toISOString().split("T")[0];
+
   return [
+    `Today's date is ${today}. Use this to calculate suggested due dates for any new action items.\n`,
     "=== ORIGINAL INTAKE DATA ===",
     intakeLines.filter(Boolean).join("\n"),
     investigationNotesSection,
@@ -696,7 +704,9 @@ export async function POST(
           rationaleText: a.rationaleText,
           priority: a.priority,
           timeframeText: a.timeframeText,
-          successCriteria: a.successCriteria,
+          suggestedDueDate: a.suggestedDueDate
+            ? new Date(a.suggestedDueDate + "T00:00:00Z")
+            : null,
           generatedBy: "ai" as const,
         })),
       });
