@@ -220,7 +220,7 @@ export default function EditableActionItem({
     >
       <div className="flex flex-1 items-start gap-3 sm:items-center sm:overflow-hidden">
         <p
-          className="flex-1 line-clamp-3 text-sm font-medium text-zinc-900 sm:truncate sm:line-clamp-none dark:text-zinc-100"
+          className="flex-1 line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
           title={initialActionText}
         >
           {initialActionText}

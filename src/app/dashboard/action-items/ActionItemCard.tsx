@@ -154,7 +154,7 @@ export default function ActionItemCard({
     <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-start justify-between gap-2">
         <p
-          className="line-clamp-3 text-sm font-medium text-zinc-900 sm:truncate sm:line-clamp-none dark:text-zinc-100"
+          className="line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
           title={item.actionText}
         >
           {item.actionText}
