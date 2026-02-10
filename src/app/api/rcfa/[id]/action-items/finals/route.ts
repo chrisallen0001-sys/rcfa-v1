@@ -37,6 +37,10 @@ export async function POST(
       typeof body.ownerUserId === "string" && UUID_RE.test(body.ownerUserId)
         ? body.ownerUserId
         : null;
+    const actionDescription =
+      typeof body.actionDescription === "string"
+        ? body.actionDescription.trim() || null
+        : null;
 
     if (!actionText) {
       return NextResponse.json(
@@ -74,6 +78,7 @@ export async function POST(
         data: {
           rcfaId: id,
           actionText,
+          actionDescription,
           priority,
           dueDate,
           ownerUserId,
@@ -91,6 +96,7 @@ export async function POST(
           eventPayload: {
             actionItemId: record.id,
             actionText,
+            actionDescription,
             priority,
             dueDate,
             ownerUserId,
