@@ -164,11 +164,13 @@ export default function ActionItemCard({
         </span>
       </div>
 
-      {item.actionDescription && (
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          {item.actionDescription}
-        </p>
-      )}
+      <p className={`mt-2 text-sm ${
+        item.actionDescription
+          ? "text-zinc-600 dark:text-zinc-400"
+          : "italic text-zinc-400 dark:text-zinc-500"
+      }`}>
+        {item.actionDescription || "No description provided"}
+      </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">

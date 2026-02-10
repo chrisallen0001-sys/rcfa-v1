@@ -386,16 +386,18 @@ export default function EditableActionItem({
       >
         <div className="space-y-4 px-4 pb-4">
           {/* Action Description */}
-          {initialActionDescription && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Action Description
-              </p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
-                {initialActionDescription}
-              </p>
-            </div>
-          )}
+          <div>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              Action Description
+            </p>
+            <p className={`mt-1 whitespace-pre-wrap text-sm ${
+              initialActionDescription
+                ? "text-zinc-700 dark:text-zinc-300"
+                : "italic text-zinc-400 dark:text-zinc-500"
+            }`}>
+              {initialActionDescription || "No description provided"}
+            </p>
+          </div>
 
           {/* Details grid */}
           <div className="grid gap-3 text-sm sm:grid-cols-3">
