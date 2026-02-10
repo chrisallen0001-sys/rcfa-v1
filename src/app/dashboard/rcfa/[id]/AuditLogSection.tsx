@@ -18,6 +18,7 @@ interface AuditLogSectionProps {
 const EVENT_TYPE_LABELS: Record<string, string> = {
   status_changed: "Status Changed",
   [AUDIT_EVENT_TYPES.CANDIDATE_GENERATED]: "Candidates Generated",
+  [AUDIT_EVENT_TYPES.CANDIDATE_UPDATED]: "Candidate Updated",
   [AUDIT_EVENT_TYPES.ANSWER_SUBMITTED]: "Answer Submitted",
   [AUDIT_EVENT_TYPES.ANSWER_UPDATED]: "Answer Updated",
   promoted_to_final: "Promoted to Final",
@@ -62,6 +63,10 @@ const FIELD_LABELS: Record<string, string> = {
   finalId: "Root Cause ID",
   actionItemId: "Action Item ID",
   candidateId: "Candidate ID",
+  candidateType: "Candidate Type",
+  previousConfidence: "Previous Confidence",
+  newConfidence: "New Confidence",
+  updateReason: "Reason",
   completionNotes: "Completion Notes",
   owner: "Owner",
   ownerUserId: "Owner",
@@ -85,6 +90,8 @@ const PREVIOUS_FIELD_MAP: Record<string, string> = {
   previousOwnerUserId: "ownerUserId",
   // Owner change event - only show name (ID is not user-friendly)
   previousOwnerName: "newOwnerName",
+  // Candidate update events (only confidence - priority already mapped above for action_item_updated)
+  previousConfidence: "newConfidence",
 };
 
 function formatEventType(eventType: string): string {
@@ -162,6 +169,13 @@ function formatPayloadSummary(
       return payload.questionText
         ? truncate(String(payload.questionText), 60)
         : "Answer updated";
+    case AUDIT_EVENT_TYPES.CANDIDATE_UPDATED: {
+      const text = payload.causeText || payload.actionText;
+      const prevLevel = payload.previousConfidence || payload.previousPriority;
+      const newLevel = payload.newConfidence || payload.newPriority;
+      const levelChange = prevLevel && newLevel ? ` (${prevLevel} → ${newLevel})` : "";
+      return text ? truncate(String(text), 50) + levelChange : "Candidate updated";
+    }
     default:
       return "";
   }
@@ -220,7 +234,8 @@ function isUpdateEvent(eventType: string): boolean {
     eventType === "final_updated" ||
     eventType === "action_item_updated" ||
     eventType === "owner_changed" ||
-    eventType === AUDIT_EVENT_TYPES.ANSWER_UPDATED
+    eventType === AUDIT_EVENT_TYPES.ANSWER_UPDATED ||
+    eventType === AUDIT_EVENT_TYPES.CANDIDATE_UPDATED
   );
 }
 
@@ -324,6 +339,58 @@ function PayloadDetail({ eventType, payload }: { eventType: string; payload: Rec
             {formatValue(payload.newAnswer)}
           </dd>
         </div>
+      </dl>
+    );
+  }
+
+  // Special handling for candidate_updated events
+  if (eventType === AUDIT_EVENT_TYPES.CANDIDATE_UPDATED) {
+    const isRootCause = payload.candidateType === "rootCause";
+    const rawText = isRootCause ? payload.causeText : payload.actionText;
+    const candidateText = rawText ? String(rawText) : "Unknown candidate";
+    const levelLabel = isRootCause ? "Confidence" : "Priority";
+    const previousLevel = isRootCause ? payload.previousConfidence : payload.previousPriority;
+    const newLevel = isRootCause ? payload.newConfidence : payload.newPriority;
+
+    return (
+      <dl className="space-y-3">
+        <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+          <dt className="text-zinc-500 dark:text-zinc-400 font-medium">
+            {isRootCause ? "Root Cause:" : "Action Item:"}
+          </dt>
+          <dd className="text-zinc-700 dark:text-zinc-300 break-words">
+            {candidateText}
+          </dd>
+        </div>
+        <div className="rounded-md bg-zinc-50 p-3 dark:bg-zinc-900">
+          <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">
+            {levelLabel}
+          </p>
+          <div className="flex items-start gap-2 text-sm">
+            <span className="flex-shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+              Before
+            </span>
+            <span className="text-zinc-700 dark:text-zinc-300 break-words min-w-0">
+              {formatValue(previousLevel)}
+            </span>
+          </div>
+          <div className="flex items-start gap-2 text-sm mt-2">
+            <span className="flex-shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              After
+            </span>
+            <span className="text-zinc-700 dark:text-zinc-300 break-words min-w-0">
+              {formatValue(newLevel)}
+            </span>
+          </div>
+        </div>
+        {payload.updateReason != null && (
+          <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+            <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Reason:</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300 break-words">
+              {formatValue(payload.updateReason)}
+            </dd>
+          </div>
+        )}
       </dl>
     );
   }
