@@ -28,14 +28,14 @@ const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root 
     { "causeText": "string", "rationaleText": "string", "confidenceLabel": "low|medium|high" }
   ],
   "actionItems": [
-    { "actionText": "string", "rationaleText": "string", "priority": "low|medium|high", "timeframeText": "string", "successCriteria": "string" }
+    { "actionText": "string (max 90 chars, action-oriented title)", "rationaleText": "string (detailed description: what needs to be done, why, and what systems are involved)", "priority": "low|medium|high", "timeframeText": "string", "suggestedDueDate": "YYYY-MM-DD" }
   ]
 }
 
 Requirements:
 - followUpQuestions: 5 to 10 items. Choose the most relevant questionCategory for each.
 - rootCauseCandidates: 3 to 6 items. Provide a rationale and confidence level for each.
-- actionItems: 5 to 10 items. Include priority, a concrete timeframe, and measurable success criteria.
+- actionItems: 5 to 10 items. actionText should be a concise, action-oriented title (max 90 characters). rationaleText should be a detailed description explaining what needs to be done, why it matters, and what systems or components are involved. suggestedDueDate should be a reasonable ISO date (YYYY-MM-DD) based on urgency and effort, using today's date from the prompt as reference.
 - Return ONLY valid JSON. No markdown, no commentary.`;
 
 interface AnalysisResult {
@@ -53,7 +53,7 @@ interface AnalysisResult {
     rationaleText: string;
     priority: Priority;
     timeframeText: string;
-    successCriteria: string;
+    suggestedDueDate?: string;
   }[];
 }
 
@@ -100,7 +100,10 @@ function validateAnalysisResult(parsed: unknown): AnalysisResult {
 }
 
 function buildUserPrompt(rcfa: Rcfa): string {
+  const today = new Date().toISOString().split("T")[0];
   const lines = [
+    `Today's date is ${today}. Use this to calculate suggested due dates for action items.`,
+    "",
     `Equipment Description: ${rcfa.equipmentDescription}`,
     rcfa.equipmentMake && `Equipment Make: ${rcfa.equipmentMake}`,
     rcfa.equipmentModel && `Equipment Model: ${rcfa.equipmentModel}`,
@@ -211,7 +214,6 @@ export async function POST(
           rationaleText: a.rationaleText,
           priority: a.priority,
           timeframeText: a.timeframeText,
-          successCriteria: a.successCriteria,
           generatedBy: "ai" as const,
         })),
       });
