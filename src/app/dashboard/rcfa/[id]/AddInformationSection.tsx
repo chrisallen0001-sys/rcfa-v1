@@ -1,13 +1,26 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import type { SectionStatus } from "@/components/SectionStatusIndicator";
 
 const DEBOUNCE_MS = 2000;
+const SAVED_INDICATOR_MS = 3000;
 
 type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
+
+export interface AddInformationSectionHandle {
+  /** Flushes pending saves. Throws if save fails. */
+  flush: () => Promise<void>;
+}
 
 interface AddInformationSectionProps {
   rcfaId: string;
@@ -19,11 +32,10 @@ interface AddInformationSectionProps {
 const textareaClass =
   "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-500";
 
-export default function AddInformationSection({
-  rcfaId,
-  initialNotes,
-  status,
-}: AddInformationSectionProps) {
+const AddInformationSection = forwardRef<
+  AddInformationSectionHandle,
+  AddInformationSectionProps
+>(function AddInformationSection({ rcfaId, initialNotes, status }, ref) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [savedNotes, setSavedNotes] = useState(initialNotes ?? "");
@@ -31,9 +43,14 @@ export default function AddInformationSection({
   const [error, setError] = useState<string | null>(null);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
+  const lastSaveErrorRef = useRef<string | null>(null);
   const notesRef = useRef(notes);
   notesRef.current = notes;
+  const savedNotesRef = useRef(savedNotes);
+  savedNotesRef.current = savedNotes;
 
   const save = useCallback(
     async (textToSave: string): Promise<void> => {
@@ -45,6 +62,7 @@ export default function AddInformationSection({
 
       setSaveStatus("saving");
       setError(null);
+      lastSaveErrorRef.current = null;
 
       try {
         const res = await fetch(`/api/rcfa/${rcfaId}`, {
@@ -64,17 +82,62 @@ export default function AddInformationSection({
         setSavedNotes(textToSave);
         setSaveStatus("saved");
         router.refresh();
+
+        // Auto-clear "Saved" indicator after delay
+        if (savedIndicatorTimerRef.current) {
+          clearTimeout(savedIndicatorTimerRef.current);
+        }
+        savedIndicatorTimerRef.current = setTimeout(() => {
+          setSaveStatus((current) => (current === "saved" ? "idle" : current));
+        }, SAVED_INDICATOR_MS);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          // Request was aborted - don't update state
+          // Request was aborted - clear promise ref since it's no longer valid
+          savePromiseRef.current = null;
           return;
         }
-        const errorMessage = err instanceof Error ? err.message : "Failed to save";
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to save";
         setError(errorMessage);
         setSaveStatus("error");
+        lastSaveErrorRef.current = errorMessage;
       }
     },
     [rcfaId, router]
+  );
+
+  // Expose flush method to parent via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      flush: async () => {
+        // Clear debounce timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+
+        // If we have pending changes, start save immediately
+        const currentNotes = notesRef.current;
+        const currentSaved = savedNotesRef.current;
+        if (currentNotes !== currentSaved) {
+          savePromiseRef.current = save(currentNotes);
+        }
+
+        // Wait for any in-flight or just-started save to complete
+        if (savePromiseRef.current) {
+          await savePromiseRef.current;
+        }
+
+        // Propagate save errors to caller
+        if (lastSaveErrorRef.current) {
+          const errorMsg = lastSaveErrorRef.current;
+          lastSaveErrorRef.current = null;
+          throw new Error(errorMsg);
+        }
+      },
+    }),
+    [save]
   );
 
   const handleChange = useCallback(
@@ -91,7 +154,7 @@ export default function AddInformationSection({
       if (newValue !== savedNotes) {
         setSaveStatus("pending");
         debounceTimerRef.current = setTimeout(() => {
-          save(newValue);
+          savePromiseRef.current = save(newValue);
         }, DEBOUNCE_MS);
       } else {
         setSaveStatus("idle");
@@ -101,14 +164,31 @@ export default function AddInformationSection({
   );
 
   const retryHandler = useCallback(() => {
-    save(notesRef.current);
+    savePromiseRef.current = save(notesRef.current);
   }, [save]);
+
+  // Navigation guard: warn user about unsaved changes
+  useEffect(() => {
+    const hasPending = saveStatus === "pending" || saveStatus === "saving";
+
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (hasPending) {
+        e.preventDefault();
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [saveStatus]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+      }
+      if (savedIndicatorTimerRef.current) {
+        clearTimeout(savedIndicatorTimerRef.current);
       }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -156,8 +236,9 @@ export default function AddInformationSection({
   return (
     <CollapsibleSection title="Supporting Info" status={status}>
       <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-        Add new findings, lab results, or other information discovered during investigation.
-        After saving, you can re-analyze to incorporate the new data.
+        Add new findings, lab results, or other information discovered during
+        investigation. After saving, you can re-analyze to incorporate the new
+        data.
       </p>
 
       <div className="space-y-4">
@@ -175,4 +256,6 @@ export default function AddInformationSection({
       </div>
     </CollapsibleSection>
   );
-}
+});
+
+export default AddInformationSection;

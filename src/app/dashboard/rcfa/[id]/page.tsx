@@ -15,7 +15,6 @@ import EditableActionItem from "./EditableActionItem";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
-import AddInformationSection from "./AddInformationSection";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import ChevronLeftIcon from "@/components/ChevronLeftIcon";
 import type { SectionStatus } from "@/components/SectionStatusIndicator";
@@ -519,6 +518,8 @@ export default async function RcfaDetailPage({
           }))}
           isInvestigation={rcfa.status === "investigation" && canEdit}
           followupQuestionsStatus={sectionStatuses?.followupQuestions}
+          initialInvestigationNotes={rcfa.investigationNotes}
+          addInformationStatus={sectionStatuses?.addInformation}
           beforeQuestions={
             <Section title="Intake Summary" status={sectionStatuses?.intake}>
               <dl className="grid gap-4 sm:grid-cols-2">
@@ -564,17 +565,8 @@ export default async function RcfaDetailPage({
               </dl>
             </Section>
           }
-          afterQuestions={
+          afterAddInfo={
             <>
-              {/* Add Information Section */}
-              {canEdit && (
-                <AddInformationSection
-                  rcfaId={rcfa.id}
-                  initialNotes={rcfa.investigationNotes}
-                  status={sectionStatuses?.addInformation}
-                />
-              )}
-
               {/* Root Cause Candidates */}
               {sortedRootCauseCandidates.length > 0 && (
                 <Section title="Root Cause Candidates" status={sectionStatuses?.rootCauseCandidates}>

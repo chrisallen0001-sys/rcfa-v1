@@ -5,6 +5,9 @@ import RcfaActionBar from "./RcfaActionBar";
 import FollowupQuestions, {
   type FollowupQuestionsHandle,
 } from "./FollowupQuestions";
+import AddInformationSection, {
+  type AddInformationSectionHandle,
+} from "./AddInformationSection";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import type { QuestionCategory } from "@/generated/prisma/client";
@@ -31,10 +34,14 @@ interface InvestigationWrapperProps {
   isInvestigation: boolean;
   /** Content rendered before follow-up questions section (e.g., Intake Summary) */
   beforeQuestions?: ReactNode;
-  /** Content rendered after follow-up questions section (e.g., Add Information, Root Causes) */
-  afterQuestions?: ReactNode;
+  /** Content rendered after AddInformationSection (e.g., Root Causes, Action Items) */
+  afterAddInfo?: ReactNode;
   /** Status indicator for follow-up questions section */
   followupQuestionsStatus?: SectionStatus;
+  /** Initial notes for AddInformationSection */
+  initialInvestigationNotes: string | null;
+  /** Status indicator for AddInformationSection */
+  addInformationStatus?: SectionStatus;
 }
 
 export default function InvestigationWrapper({
@@ -49,15 +56,26 @@ export default function InvestigationWrapper({
   questions,
   isInvestigation,
   beforeQuestions,
-  afterQuestions,
+  afterAddInfo,
   followupQuestionsStatus,
+  initialInvestigationNotes,
+  addInformationStatus,
 }: InvestigationWrapperProps) {
   const followupQuestionsRef = useRef<FollowupQuestionsHandle>(null);
+  const addInfoRef = useRef<AddInformationSectionHandle>(null);
 
   const handleFlushAnswers = useCallback(async () => {
+    // Flush both follow-up questions and supporting info in parallel
+    const flushPromises: Promise<void>[] = [];
+
     if (followupQuestionsRef.current) {
-      await followupQuestionsRef.current.flushPendingSaves();
+      flushPromises.push(followupQuestionsRef.current.flushPendingSaves());
     }
+    if (addInfoRef.current) {
+      flushPromises.push(addInfoRef.current.flush());
+    }
+
+    await Promise.all(flushPromises);
   }, []);
 
   return (
@@ -74,7 +92,16 @@ export default function InvestigationWrapper({
             />
           </CollapsibleSection>
         )}
-        {afterQuestions}
+        {/* Add Information Section - rendered here for flush coordination */}
+        {canEdit && (
+          <AddInformationSection
+            ref={addInfoRef}
+            rcfaId={rcfaId}
+            initialNotes={initialInvestigationNotes}
+            status={addInformationStatus}
+          />
+        )}
+        {afterAddInfo}
       </div>
       <RcfaActionBar
         rcfaId={rcfaId}
