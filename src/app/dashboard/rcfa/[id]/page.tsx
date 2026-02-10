@@ -431,16 +431,6 @@ export default async function RcfaDetailPage({
       </div>
       {headerContent}
 
-      {/* Sticky Action Bar - for closed state only (investigation/actions_open handled by InvestigationWrapper) */}
-      {rcfa.status === "closed" && (
-        <RcfaActionBar
-          rcfaId={rcfa.id}
-          status={rcfa.status}
-          canEdit={canEdit}
-          isAdmin={isAdmin}
-        />
-      )}
-
       {/* Investigation/Actions Open - uses wrapper for flush coordination */}
       {(rcfa.status === "investigation" || rcfa.status === "actions_open") && (
         <InvestigationWrapper
@@ -970,6 +960,16 @@ export default async function RcfaDetailPage({
         )}
 
         {auditAndAdminContent}
+
+        {/* Bottom sticky action bar for closed state (Reopen for admins) */}
+        {rcfa.status === "closed" && (
+          <RcfaActionBar
+            rcfaId={rcfa.id}
+            status={rcfa.status}
+            canEdit={canEdit}
+            isAdmin={isAdmin}
+          />
+        )}
       </div>
       )}
     </div>

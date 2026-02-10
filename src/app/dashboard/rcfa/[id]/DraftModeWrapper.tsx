@@ -63,6 +63,14 @@ export default function DraftModeWrapper({
 
   return (
     <>
+      <EditableIntakeForm
+        rcfaId={rcfaId}
+        initialData={initialData}
+        defaultExpanded={defaultExpanded}
+        onSaveRef={saveFormRef}
+        onDirtyChange={handleDirtyChange}
+        onMissingFieldsChange={handleMissingFieldsChange}
+      />
       {/* isAdmin=false: Draft state has no admin-specific actions (Reopen is only for closed state) */}
       <RcfaActionBar
         rcfaId={rcfaId}
@@ -71,14 +79,6 @@ export default function DraftModeWrapper({
         isAdmin={false}
         onSaveForm={handleSaveForm}
         missingRequiredFields={missingFields}
-      />
-      <EditableIntakeForm
-        rcfaId={rcfaId}
-        initialData={initialData}
-        defaultExpanded={defaultExpanded}
-        onSaveRef={saveFormRef}
-        onDirtyChange={handleDirtyChange}
-        onMissingFieldsChange={handleMissingFieldsChange}
       />
     </>
   );
