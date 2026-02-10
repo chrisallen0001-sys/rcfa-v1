@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
+import { VALID_PRIORITIES } from "@/lib/validation-constants";
 import type { Priority } from "@/generated/prisma/client";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const VALID_PRIORITIES: Priority[] = ["deprioritized", "low", "medium", "high"];
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 

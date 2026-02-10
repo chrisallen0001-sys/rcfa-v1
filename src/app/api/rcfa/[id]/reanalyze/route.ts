@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
 import { getAuthContext } from "@/lib/auth-context";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
+import {
+  VALID_CONFIDENCE_LABELS,
+  VALID_PRIORITIES,
+} from "@/lib/validation-constants";
 import type {
   Rcfa,
   RcfaFollowupQuestion,
@@ -104,9 +108,6 @@ interface ReAnalysisResult {
     successCriteria: string;
   }[];
 }
-
-const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["deprioritized", "low", "medium", "high"];
-const VALID_PRIORITIES: Priority[] = ["deprioritized", "low", "medium", "high"];
 
 function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
   const obj = parsed as Record<string, unknown>;
