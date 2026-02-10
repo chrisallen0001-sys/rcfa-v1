@@ -260,7 +260,7 @@ export default function EditableActionItem({
   // Editing form content
   if (editing) {
     return (
-      <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20">
+      <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
         {headerRow}
         <form onSubmit={handleSave} className="px-4 pb-4">
           <div className="space-y-3">
@@ -377,7 +377,7 @@ export default function EditableActionItem({
 
   // Read-only expanded view
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20">
+    <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       {headerRow}
       <div
         className={`overflow-hidden transition-all duration-200 ${
