@@ -32,10 +32,6 @@ export async function PATCH(
     const body = await request.json();
     const actionText =
       typeof body.actionText === "string" ? body.actionText.trim() : "";
-    const successCriteria =
-      typeof body.successCriteria === "string"
-        ? body.successCriteria.trim() || null
-        : null;
     if (
       typeof body.priority === "string" &&
       !VALID_PRIORITIES.includes(body.priority as Priority)
@@ -89,12 +85,6 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    if (successCriteria && successCriteria.length > 2000) {
-      return NextResponse.json(
-        { error: "successCriteria must be 2000 characters or fewer" },
-        { status: 400 }
-      );
-    }
 
     const rcfa = await prisma.rcfa.findUnique({ where: { id } });
     if (!rcfa) {
@@ -127,7 +117,6 @@ export async function PATCH(
         where: { id: actionItemId },
         data: {
           actionText,
-          successCriteria,
           priority,
           ...(dueDate !== undefined && { dueDate }),
           ...(ownerUserId !== undefined && { ownerUserId }),
@@ -145,13 +134,11 @@ export async function PATCH(
             actionItemId,
             previousActionText: existing.actionText,
             previousPriority: existing.priority,
-            previousSuccessCriteria: existing.successCriteria,
             previousDueDate: existing.dueDate,
             previousOwnerUserId: existing.ownerUserId,
             previousStatus: existing.status,
             actionText,
             priority,
-            successCriteria,
             dueDate,
             ownerUserId,
             status,

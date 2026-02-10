@@ -36,7 +36,6 @@ interface EditableActionItemProps {
   actionText: string;
   priority: string;
   status: string;
-  successCriteria: string | null;
   dueDate: string | null;
   ownerUserId: string | null;
   ownerName: string | null;
@@ -51,7 +50,6 @@ export default function EditableActionItem({
   actionText: initialActionText,
   priority: initialPriority,
   status,
-  successCriteria: initialSuccessCriteria,
   dueDate: initialDueDate,
   ownerUserId: initialOwnerUserId,
   ownerName,
@@ -64,9 +62,6 @@ export default function EditableActionItem({
   const [actionText, setActionText] = useState(initialActionText);
   const [priority, setPriority] = useState(initialPriority);
   const [editStatus, setEditStatus] = useState(status);
-  const [successCriteria, setSuccessCriteria] = useState(
-    initialSuccessCriteria ?? ""
-  );
   const [dueDate, setDueDate] = useState(initialDueDate ?? "");
   const [ownerUserId, setOwnerUserId] = useState(initialOwnerUserId ?? "");
   const { users, loading: loadingUsers } = useUsers(editing);
@@ -92,7 +87,6 @@ export default function EditableActionItem({
             actionText,
             priority,
             status: editStatus,
-            successCriteria,
             dueDate: dueDate || null,
             ownerUserId: ownerUserId || null,
           }),
@@ -223,18 +217,6 @@ export default function EditableActionItem({
               minToday
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Success Criteria
-            </label>
-            <textarea
-              value={successCriteria}
-              onChange={(e) => setSuccessCriteria(e.target.value)}
-              maxLength={2000}
-              rows={2}
-              className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            />
-          </div>
           {error && (
             <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
           )}
@@ -253,7 +235,6 @@ export default function EditableActionItem({
                 setActionText(initialActionText);
                 setPriority(initialPriority);
                 setEditStatus(status);
-                setSuccessCriteria(initialSuccessCriteria ?? "");
                 setDueDate(initialDueDate ?? "");
                 setOwnerUserId(initialOwnerUserId ?? "");
                 setError(null);
@@ -287,11 +268,6 @@ export default function EditableActionItem({
           </span>
         </div>
       </div>
-      {initialSuccessCriteria && (
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Success: {initialSuccessCriteria}
-        </p>
-      )}
       {initialDueDate && (
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           Due: {initialDueDate}
