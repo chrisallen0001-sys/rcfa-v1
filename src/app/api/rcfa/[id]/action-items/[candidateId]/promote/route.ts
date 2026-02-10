@@ -74,6 +74,7 @@ export async function POST(
         data: {
           rcfaId: id,
           actionText: candidate.actionText,
+          actionDescription: candidate.rationaleText,
           priority: candidate.priority,
           dueDate: candidate.suggestedDueDate,
           selectedFromCandidateId: candidateId,
@@ -91,6 +92,7 @@ export async function POST(
             candidateId,
             actionItemId: created.id,
             actionText: candidate.actionText,
+            actionDescription: candidate.rationaleText,
           },
         },
       });

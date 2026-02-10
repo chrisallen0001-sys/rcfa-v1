@@ -72,6 +72,12 @@ export async function PATCH(
       VALID_STATUSES.includes(body.status as ActionItemStatus)
         ? (body.status as ActionItemStatus)
         : undefined;
+    const actionDescription =
+      body.actionDescription === null
+        ? null
+        : typeof body.actionDescription === "string"
+          ? body.actionDescription.trim() || null
+          : undefined;
 
     if (!actionText) {
       return NextResponse.json(
@@ -121,6 +127,7 @@ export async function PATCH(
           ...(dueDate !== undefined && { dueDate }),
           ...(ownerUserId !== undefined && { ownerUserId }),
           ...(status !== undefined && { status }),
+          ...(actionDescription !== undefined && { actionDescription }),
           updatedByUserId: userId,
         },
       });
@@ -133,11 +140,13 @@ export async function PATCH(
           eventPayload: {
             actionItemId,
             previousActionText: existing.actionText,
+            previousActionDescription: existing.actionDescription,
             previousPriority: existing.priority,
             previousDueDate: existing.dueDate,
             previousOwnerUserId: existing.ownerUserId,
             previousStatus: existing.status,
             actionText,
+            actionDescription,
             priority,
             dueDate,
             ownerUserId,

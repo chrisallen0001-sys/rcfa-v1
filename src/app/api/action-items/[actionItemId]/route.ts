@@ -83,7 +83,18 @@ export async function PATCH(
       );
     }
 
-    const hasChanges = ["status", "ownerUserId", "dueDate", "completionNotes"].some(
+    if (
+      body.actionDescription !== undefined &&
+      body.actionDescription !== null &&
+      typeof body.actionDescription !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "actionDescription must be a string or null" },
+        { status: 400 }
+      );
+    }
+
+    const hasChanges = ["status", "ownerUserId", "dueDate", "completionNotes", "actionDescription"].some(
       (k) => body[k] !== undefined
     );
     if (!hasChanges) {
@@ -156,15 +167,28 @@ export async function PATCH(
       if (body.status === "done" || body.status === "canceled") {
         data.completedAt = new Date();
         data.completedByUserId = userId;
-        data.completionNotes =
-          typeof body.completionNotes === "string"
-            ? body.completionNotes.trim() || null
-            : null;
+        // Set completionNotes if provided during completion
+        if (body.completionNotes !== undefined) {
+          data.completionNotes =
+            typeof body.completionNotes === "string"
+              ? body.completionNotes.trim() || null
+              : null;
+        }
       } else {
         data.completedAt = null;
         data.completedByUserId = null;
-        data.completionNotes = null;
+        // Don't clear completionNotes when reopening - preserve any notes
       }
+    }
+
+    // Allow completionNotes to be updated anytime (independent of status change)
+    if (body.completionNotes !== undefined && body.status === undefined) {
+      data.completionNotes =
+        body.completionNotes === null
+          ? null
+          : typeof body.completionNotes === "string"
+            ? body.completionNotes.trim() || null
+            : existing.completionNotes;
     }
 
     if (body.ownerUserId !== undefined) {
@@ -175,6 +199,15 @@ export async function PATCH(
       data.dueDate = body.dueDate
         ? new Date(body.dueDate + "T00:00:00Z")
         : null;
+    }
+
+    if (body.actionDescription !== undefined) {
+      data.actionDescription =
+        body.actionDescription === null
+          ? null
+          : typeof body.actionDescription === "string"
+            ? body.actionDescription.trim() || null
+            : existing.actionDescription;
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -207,11 +240,18 @@ export async function PATCH(
                     to: body.dueDate,
                   },
                 }),
-                ...(body.status !== undefined &&
-                  body.status !== "done" && body.status !== "canceled" &&
-                  existing.completionNotes !== null && {
-                    completionNotes: { from: existing.completionNotes, to: null },
-                  }),
+                ...(body.completionNotes !== undefined && {
+                  completionNotes: {
+                    from: existing.completionNotes,
+                    to: data.completionNotes ?? null,
+                  },
+                }),
+                ...(body.actionDescription !== undefined && {
+                  actionDescription: {
+                    from: existing.actionDescription,
+                    to: data.actionDescription ?? null,
+                  },
+                }),
               },
             },
           },
