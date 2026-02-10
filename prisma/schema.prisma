@@ -260,7 +260,6 @@ model RcfaActionItemCandidate {
   rationaleText   String?  @map("rationale_text")
   priority        Priority @default(medium)
   timeframeText   String?  @map("timeframe_text")
-  successCriteria String?  @map("success_criteria")
 
   generatedBy GeneratedBy @default(ai) @map("generated_by")
   generatedAt DateTime    @default(now()) @map("generated_at") @db.Timestamptz
@@ -282,7 +281,6 @@ model RcfaActionItem {
   rcfaId String @map("rcfa_id") @db.Uuid
 
   actionText      String           @map("action_text")
-  successCriteria String?          @map("success_criteria")
 
   ownerUserId String?          @map("owner_user_id") @db.Uuid
   priority    Priority         @default(medium)

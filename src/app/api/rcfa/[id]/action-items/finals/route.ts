@@ -24,10 +24,6 @@ export async function POST(
     const body = await request.json();
     const actionText =
       typeof body.actionText === "string" ? body.actionText.trim() : "";
-    const successCriteria =
-      typeof body.successCriteria === "string"
-        ? body.successCriteria.trim() || null
-        : null;
     const rawPriority = typeof body.priority === "string" ? body.priority : null;
     const priority: Priority =
       rawPriority && VALID_PRIORITIES.includes(rawPriority as Priority)
@@ -54,13 +50,6 @@ export async function POST(
         { status: 400 }
       );
     }
-    if (successCriteria && successCriteria.length > 2000) {
-      return NextResponse.json(
-        { error: "successCriteria must be 2000 characters or fewer" },
-        { status: 400 }
-      );
-    }
-
     const rcfa = await prisma.rcfa.findUnique({ where: { id } });
     if (!rcfa) {
       return NextResponse.json({ error: "RCFA not found" }, { status: 404 });
@@ -85,7 +74,6 @@ export async function POST(
         data: {
           rcfaId: id,
           actionText,
-          successCriteria,
           priority,
           dueDate,
           ownerUserId,
@@ -104,7 +92,6 @@ export async function POST(
             actionItemId: record.id,
             actionText,
             priority,
-            successCriteria,
             dueDate,
             ownerUserId,
           },

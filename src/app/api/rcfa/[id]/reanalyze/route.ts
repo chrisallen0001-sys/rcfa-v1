@@ -334,7 +334,7 @@ function buildReAnalyzePrompt(
     actionItemCandidates.length > 0
       ? actionItemCandidates.map((a, i) => {
           const humanMarker = a.generatedBy === "human" ? " [DO NOT RE-EVALUATE]" : "";
-          return `[${i + 1}] id="${a.id}" | generatedBy="${a.generatedBy}"${humanMarker} | ${truncateField(a.actionText)} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${truncateField(a.timeframeText)}` : ""}${a.rationaleText ? ` | Rationale: ${truncateField(a.rationaleText)}` : ""}${a.successCriteria ? ` | Success Criteria: ${truncateField(a.successCriteria)}` : ""}`;
+          return `[${i + 1}] id="${a.id}" | generatedBy="${a.generatedBy}"${humanMarker} | ${truncateField(a.actionText)} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${truncateField(a.timeframeText)}` : ""}${a.rationaleText ? ` | Rationale: ${truncateField(a.rationaleText)}` : ""}`;
         })
       : ["(none)"];
 

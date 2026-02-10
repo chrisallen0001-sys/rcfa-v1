@@ -689,9 +689,6 @@ export default async function RcfaDetailPage({
                           )}
                           <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
                             {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
-                            {a.successCriteria && (
-                              <span>Success: {a.successCriteria}</span>
-                            )}
                           </div>
                           {rcfa.status === "investigation" && canEdit &&
                             !promotedActionCandidateIds.has(a.id) && (
@@ -744,7 +741,6 @@ export default async function RcfaDetailPage({
                         actionText={a.actionText}
                         priority={a.priority}
                         status={a.status}
-                        successCriteria={a.successCriteria}
                         dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
                         ownerUserId={a.owner?.id ?? null}
                         ownerName={a.owner?.displayName ?? null}
@@ -944,9 +940,6 @@ export default async function RcfaDetailPage({
                   )}
                   <div className="mt-2 flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
                     {a.timeframeText && <span>Timeframe: {a.timeframeText}</span>}
-                    {a.successCriteria && (
-                      <span>Success: {a.successCriteria}</span>
-                    )}
                   </div>
                   {promotedActionCandidateIds.has(a.id) && (
                     <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
@@ -988,7 +981,6 @@ export default async function RcfaDetailPage({
                   actionText={a.actionText}
                   priority={a.priority}
                   status={a.status}
-                  successCriteria={a.successCriteria}
                   dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
                   ownerUserId={a.owner?.id ?? null}
                   ownerName={a.owner?.displayName ?? null}
