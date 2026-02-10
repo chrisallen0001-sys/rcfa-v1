@@ -111,13 +111,14 @@ export default function DateInput({
   };
 
   // Calculate dropdown position when opening
+  // Using viewport-relative coordinates since calendar uses position: fixed
   useEffect(() => {
     if (!isOpen || !inputRef.current) return;
 
     const rect = inputRef.current.getBoundingClientRect();
     setDropdownPosition({
-      top: rect.bottom + window.scrollY + 4,
-      left: rect.left + window.scrollX,
+      top: rect.bottom + 4,
+      left: rect.left,
     });
   }, [isOpen]);
 
