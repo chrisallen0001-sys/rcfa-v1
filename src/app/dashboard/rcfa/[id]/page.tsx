@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, truncateTitle } from "@/lib/rcfa-utils";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import InvestigationWrapper from "./InvestigationWrapper";
 import FollowupQuestions from "./FollowupQuestions";
@@ -666,8 +666,8 @@ export default async function RcfaDetailPage({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                {a.actionText}
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100" title={a.actionText}>
+                                {truncateTitle(a.actionText)}
                               </p>
                               {isNew && (
                                 <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">

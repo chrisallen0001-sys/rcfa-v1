@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import type { ActionItemRow, UserOption } from "./page";
 import DateInput from "@/components/DateInput";
+import { truncateTitle } from "@/lib/rcfa-utils";
 
 type Props = {
   item: ActionItemRow;
@@ -121,8 +122,8 @@ export default function ActionItemCard({
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          {item.actionText}
+        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100" title={item.actionText}>
+          {truncateTitle(item.actionText)}
         </p>
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityColors[item.priority]}`}
