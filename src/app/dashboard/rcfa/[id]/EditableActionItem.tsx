@@ -82,7 +82,7 @@ export default function EditableActionItem({
   const [editStatus, setEditStatus] = useState(status);
   const [dueDate, setDueDate] = useState(initialDueDate ?? "");
   const [ownerUserId, setOwnerUserId] = useState(initialOwnerUserId ?? "");
-  const { users, loading: loadingUsers } = useUsers(editing || isExpanded);
+  const { users, loading: loadingUsers } = useUsers(canEdit && (editing || isExpanded));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -207,12 +207,15 @@ export default function EditableActionItem({
   const hasCompletionNotesChanges =
     (completionNotes || null) !== (initialCompletionNotes || null);
 
-  // Collapsed header row
+  // Collapsed header row (non-interactive when editing)
   const headerRow = (
     <button
       type="button"
-      onClick={() => setIsExpanded(!isExpanded)}
-      className="flex w-full items-center justify-between px-4 py-3 text-left"
+      onClick={() => !editing && setIsExpanded(!isExpanded)}
+      disabled={editing}
+      className={`flex w-full items-center justify-between px-4 py-3 text-left ${
+        editing ? "cursor-default" : "cursor-pointer"
+      }`}
       aria-expanded={isExpanded}
       aria-label={isExpanded ? "Collapse action item" : "Expand action item"}
     >
