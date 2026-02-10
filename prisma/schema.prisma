@@ -281,7 +281,8 @@ model RcfaActionItem {
   id     String @id @default(uuid()) @db.Uuid
   rcfaId String @map("rcfa_id") @db.Uuid
 
-  actionText      String           @map("action_text")
+  actionText        String  @map("action_text")
+  actionDescription String? @map("action_description")
 
   ownerUserId String?          @map("owner_user_id") @db.Uuid
   priority    Priority         @default(medium)
