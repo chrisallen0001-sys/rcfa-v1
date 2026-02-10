@@ -562,12 +562,101 @@ export async function POST(
       );
     }
 
-    // APPEND new AI-generated candidates (keep existing ones per issue #151)
+    // Update existing candidates and append new ones
+    let updatedRootCauseCount = 0;
+    let updatedActionItemCount = 0;
+
     await prisma.$transaction(async (tx) => {
       // Re-read with row lock to prevent race conditions
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
       if (locked.status !== "investigation" && locked.status !== "actions_open") {
         throw new Error("RCFA_STATUS_INVALID");
+      }
+
+      // Update existing AI-generated root cause candidates
+      for (const update of result.existingCandidateUpdates.rootCauses) {
+        // Fetch existing candidate to get previous value for audit logging
+        const existing = await tx.rcfaRootCauseCandidate.findFirst({
+          where: { id: update.id, rcfaId: id, generatedBy: "ai" },
+          select: { id: true, confidenceLabel: true, causeText: true },
+        });
+
+        if (!existing) {
+          console.warn(
+            `Root cause candidate ${update.id} not found or not AI-generated; skipping update`
+          );
+          continue;
+        }
+
+        // Only update if confidence actually changed
+        if (existing.confidenceLabel !== update.confidenceLabel) {
+          await tx.rcfaRootCauseCandidate.update({
+            where: { id: update.id },
+            data: { confidenceLabel: update.confidenceLabel },
+          });
+
+          updatedRootCauseCount++;
+
+          // Log audit event for this update
+          await tx.rcfaAuditEvent.create({
+            data: {
+              rcfaId: id,
+              actorUserId: userId,
+              eventType: AUDIT_EVENT_TYPES.CANDIDATE_UPDATED,
+              eventPayload: {
+                candidateId: update.id,
+                candidateType: "rootCause",
+                causeText: truncateField(existing.causeText, 200),
+                previousConfidence: existing.confidenceLabel,
+                newConfidence: update.confidenceLabel,
+                updateReason: update.updateReason,
+              },
+            },
+          });
+        }
+      }
+
+      // Update existing AI-generated action item candidates
+      for (const update of result.existingCandidateUpdates.actionItems) {
+        // Fetch existing candidate to get previous value for audit logging
+        const existing = await tx.rcfaActionItemCandidate.findFirst({
+          where: { id: update.id, rcfaId: id, generatedBy: "ai" },
+          select: { id: true, priority: true, actionText: true },
+        });
+
+        if (!existing) {
+          console.warn(
+            `Action item candidate ${update.id} not found or not AI-generated; skipping update`
+          );
+          continue;
+        }
+
+        // Only update if priority actually changed
+        if (existing.priority !== update.priority) {
+          await tx.rcfaActionItemCandidate.update({
+            where: { id: update.id },
+            data: { priority: update.priority },
+          });
+
+          updatedActionItemCount++;
+
+          // Log audit event for this update
+          await tx.rcfaAuditEvent.create({
+            data: {
+              rcfaId: id,
+              actorUserId: userId,
+              eventType: AUDIT_EVENT_TYPES.CANDIDATE_UPDATED,
+              eventPayload: {
+                candidateId: update.id,
+                candidateType: "actionItem",
+                actionText: truncateField(existing.actionText, 200),
+                previousPriority: existing.priority,
+                newPriority: update.priority,
+                updateReason: update.updateReason,
+              },
+            },
+          });
+        }
       }
 
       // Insert new candidates (keeping existing ones - they can be identified by generatedAt timestamp)
@@ -612,6 +701,8 @@ export async function POST(
           eventPayload: {
             source: AUDIT_SOURCES.AI_REANALYSIS,
             materialityReasoning,
+            updatedRootCauseCount,
+            updatedActionItemCount,
             rootCauseCandidateCount: result.rootCauseCandidates.length,
             actionItemCandidateCount: result.actionItems.length,
             answerSnapshot: currentAnswerSnapshot,
