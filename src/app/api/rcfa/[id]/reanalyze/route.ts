@@ -25,9 +25,9 @@ The user message contains:
 1. Original intake data
 2. Investigation notes (new findings added during investigation)
 3. Follow-up questions and answers
-4. The EXISTING root cause candidates and action item candidates currently on file
+4. The EXISTING root cause candidates and action item candidates currently on file (with their UUIDs and generatedBy field)
 
-Your task has two steps:
+Your task has three steps:
 
 STEP 1 — MATERIALITY ASSESSMENT. Review the follow-up answers AND investigation notes alongside the EXISTING root cause candidates and action items. Your goal is to determine whether the new information (answers or investigation notes) introduces anything that would materially alter the existing candidates. Focus on whether the engineering conclusions and failure hypotheses change — not on whether the text itself looks different.
 
@@ -38,9 +38,21 @@ Ask yourself these specific questions:
   d) Does any answer make an existing action item irrelevant or demand a new category of action?
   e) Does any answer shift the priority or urgency of an existing action item?
 
-If the answer to ALL of the above is "no," set noMaterialChange to true and return empty arrays.
+If the answer to ALL of the above is "no," set noMaterialChange to true and return empty arrays for all candidate fields.
 
-STEP 2 — PRODUCE ONLY NEW CANDIDATES (only if Step 1 determined material change exists). If and only if Step 1 identified a genuine material change, produce ONLY NEW root cause candidates and action items that differ from the existing ones. Do NOT repeat or rephrase existing candidates. The new candidates you provide will be APPENDED to the existing list, so only include genuinely new hypotheses or actions that are not already captured.
+STEP 2A — RE-EVALUATE EXISTING AI CANDIDATES (only if Step 1 determined material change exists).
+For each existing candidate where generatedBy="ai", determine if the new evidence:
+- CONFIRMS the candidate → keep or INCREASE confidence/priority
+- CONTRADICTS the candidate → LOWER confidence/priority, or set to "deprioritized"
+- HAS NO EFFECT → keep current level (do not include in existingCandidateUpdates)
+
+IMPORTANT RULES:
+- Candidates where generatedBy="human" MUST NOT be re-evaluated. Never include them in existingCandidateUpdates.
+- Use "deprioritized" when new evidence strongly contradicts a previous hypothesis or makes an action item irrelevant.
+- Only include candidates in existingCandidateUpdates if their confidence/priority should CHANGE. Do not include unchanged candidates.
+- Always provide an updateReason explaining WHY the confidence/priority changed based on the new evidence.
+
+STEP 2B — PRODUCE ONLY NEW CANDIDATES (only if Step 1 determined material change exists). If and only if Step 1 identified a genuine material change, produce ONLY NEW root cause candidates and action items that differ from the existing ones. Do NOT repeat or rephrase existing candidates. The new candidates you provide will be APPENDED to the existing list, so only include genuinely new hypotheses or actions that are not already captured.
 
 A material change requires that the ENGINEERING CONCLUSIONS change, not merely that the answer text looks different. Specifically, a material change means ANY of the following:
 - A new root cause should be added that is not substantively covered by any existing candidate
@@ -76,6 +88,14 @@ Return valid JSON only with the following structure:
 {
   "materialityReasoning": "string",
   "noMaterialChange": true | false,
+  "existingCandidateUpdates": {
+    "rootCauses": [
+      { "id": "uuid", "confidenceLabel": "deprioritized|low|medium|high", "updateReason": "string" }
+    ],
+    "actionItems": [
+      { "id": "uuid", "priority": "deprioritized|low|medium|high", "updateReason": "string" }
+    ]
+  },
   "rootCauseCandidates": [
     { "causeText": "string", "rationaleText": "string", "confidenceLabel": "low|medium|high" }
   ],
@@ -86,15 +106,30 @@ Return valid JSON only with the following structure:
 
 Requirements:
 - materialityReasoning: A single sentence explaining what new engineering insight (if any) the updated answers provide. If there is no new insight, state that explicitly (e.g., "The updated answers convey the same failure evidence and diagnostic conclusions as previously provided.").
-- noMaterialChange: Set to true when the existing candidates already correctly capture the root cause hypotheses and action items supported by the evidence. The bar for material change is HIGH: the new answers must introduce a genuinely new failure hypothesis, contradict an existing one with evidence, or shift confidence/priority levels. Reformatting, paraphrasing, or minor numeric variance in answers that reach the same engineering conclusions is NEVER material change. When true, rootCauseCandidates and actionItems should be empty arrays. If no existing candidates are on file (both sections show "(none)"), you MUST set noMaterialChange to false and provide your full analysis.
-- When noMaterialChange is false: rootCauseCandidates should have 3 to 6 items, actionItems should have 5 to 10 items.
-- rootCauseCandidates: Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
-- actionItems: Include priority, a concrete timeframe, and measurable success criteria.
+- noMaterialChange: Set to true when the existing candidates already correctly capture the root cause hypotheses and action items supported by the evidence. The bar for material change is HIGH: the new answers must introduce a genuinely new failure hypothesis, contradict an existing one with evidence, or shift confidence/priority levels. Reformatting, paraphrasing, or minor numeric variance in answers that reach the same engineering conclusions is NEVER material change. When true, all candidate arrays should be empty. If no existing candidates are on file (both sections show "(none)"), you MUST set noMaterialChange to false and provide your full analysis.
+- existingCandidateUpdates: Contains updates to existing AI-generated candidates. Only include candidates whose confidence/priority should change. Each update must have the candidate's UUID (from the prompt), the new confidence/priority level, and an updateReason. NEVER include human-generated candidates here.
+- When noMaterialChange is false: rootCauseCandidates should have 0 to 6 NEW items (0 if only existing candidates need updates), actionItems should have 0 to 10 NEW items.
+- rootCauseCandidates: ONLY genuinely NEW hypotheses. Incorporate insights from the follow-up answers. Provide a rationale and confidence level for each.
+- actionItems: ONLY genuinely NEW action items. Include priority, a concrete timeframe, and measurable success criteria.
 - Return ONLY valid JSON. No markdown, no commentary.`;
+
+interface ExistingCandidateUpdate {
+  rootCauses: {
+    id: string;
+    confidenceLabel: ConfidenceLabel;
+    updateReason: string;
+  }[];
+  actionItems: {
+    id: string;
+    priority: Priority;
+    updateReason: string;
+  }[];
+}
 
 interface ReAnalysisResult {
   materialityReasoning?: string;
   noMaterialChange: boolean;
+  existingCandidateUpdates: ExistingCandidateUpdate;
   rootCauseCandidates: {
     causeText: string;
     rationaleText: string;
@@ -124,42 +159,107 @@ function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
       ? obj.materialityReasoning
       : undefined;
 
-  if (noMaterialChange && (obj.rootCauseCandidates.length > 0 || obj.actionItems.length > 0)) {
-    console.warn("AI returned noMaterialChange=true with non-empty arrays; discarding candidates");
+  // Parse and validate existingCandidateUpdates
+  const rawUpdates = obj.existingCandidateUpdates as Record<string, unknown> | undefined;
+  const existingCandidateUpdates: ExistingCandidateUpdate = {
+    rootCauses: [],
+    actionItems: [],
+  };
+
+  if (rawUpdates && typeof rawUpdates === "object") {
+    // Validate root cause updates
+    if (Array.isArray(rawUpdates.rootCauses)) {
+      for (const update of rawUpdates.rootCauses) {
+        if (!update?.id || typeof update.id !== "string" || !UUID_RE.test(update.id)) {
+          throw new Error(`Invalid root cause update: missing or invalid id`);
+        }
+        if (!VALID_CONFIDENCE_LABELS.includes(update.confidenceLabel)) {
+          throw new Error(`Invalid root cause update confidenceLabel: ${update.confidenceLabel}`);
+        }
+        if (!update.updateReason || typeof update.updateReason !== "string") {
+          throw new Error(`Invalid root cause update: missing updateReason for id ${update.id}`);
+        }
+        existingCandidateUpdates.rootCauses.push({
+          id: update.id,
+          confidenceLabel: update.confidenceLabel as ConfidenceLabel,
+          updateReason: update.updateReason,
+        });
+      }
+    }
+
+    // Validate action item updates
+    if (Array.isArray(rawUpdates.actionItems)) {
+      for (const update of rawUpdates.actionItems) {
+        if (!update?.id || typeof update.id !== "string" || !UUID_RE.test(update.id)) {
+          throw new Error(`Invalid action item update: missing or invalid id`);
+        }
+        if (!VALID_PRIORITIES.includes(update.priority)) {
+          throw new Error(`Invalid action item update priority: ${update.priority}`);
+        }
+        if (!update.updateReason || typeof update.updateReason !== "string") {
+          throw new Error(`Invalid action item update: missing updateReason for id ${update.id}`);
+        }
+        existingCandidateUpdates.actionItems.push({
+          id: update.id,
+          priority: update.priority as Priority,
+          updateReason: update.updateReason,
+        });
+      }
+    }
   }
 
-  // When noMaterialChange is true, empty arrays are expected
-  if (!noMaterialChange) {
-    if (obj.rootCauseCandidates.length === 0 || obj.actionItems.length === 0) {
-      throw new Error(
-        "AI returned noMaterialChange=false but provided empty candidates; aborting to prevent data loss"
-      );
+  if (noMaterialChange) {
+    // When noMaterialChange is true, all arrays should be empty
+    if (obj.rootCauseCandidates.length > 0 || obj.actionItems.length > 0) {
+      console.warn("AI returned noMaterialChange=true with non-empty new candidate arrays; discarding");
     }
-
-    for (const c of obj.rootCauseCandidates) {
-      if (!c?.causeText || typeof c.causeText !== "string") {
-        throw new Error("Malformed rootCauseCandidate: missing causeText");
-      }
-      if (!VALID_CONFIDENCE_LABELS.includes(c.confidenceLabel)) {
-        throw new Error(`Invalid confidenceLabel: ${c.confidenceLabel}`);
-      }
+    if (existingCandidateUpdates.rootCauses.length > 0 || existingCandidateUpdates.actionItems.length > 0) {
+      console.warn("AI returned noMaterialChange=true with non-empty existingCandidateUpdates; discarding");
     }
+    return {
+      materialityReasoning,
+      noMaterialChange,
+      existingCandidateUpdates: { rootCauses: [], actionItems: [] },
+      rootCauseCandidates: [],
+      actionItems: [],
+    };
+  }
 
-    for (const a of obj.actionItems) {
-      if (!a?.actionText || typeof a.actionText !== "string") {
-        throw new Error("Malformed actionItem: missing actionText");
-      }
-      if (!VALID_PRIORITIES.includes(a.priority)) {
-        throw new Error(`Invalid priority: ${a.priority}`);
-      }
+  // When noMaterialChange is false, we need either new candidates OR updates to existing ones
+  const hasNewCandidates = obj.rootCauseCandidates.length > 0 || obj.actionItems.length > 0;
+  const hasUpdates = existingCandidateUpdates.rootCauses.length > 0 || existingCandidateUpdates.actionItems.length > 0;
+
+  if (!hasNewCandidates && !hasUpdates) {
+    throw new Error(
+      "AI returned noMaterialChange=false but provided no new candidates and no updates; aborting to prevent data loss"
+    );
+  }
+
+  // Validate new candidates
+  for (const c of obj.rootCauseCandidates) {
+    if (!c?.causeText || typeof c.causeText !== "string") {
+      throw new Error("Malformed rootCauseCandidate: missing causeText");
+    }
+    if (!VALID_CONFIDENCE_LABELS.includes(c.confidenceLabel)) {
+      throw new Error(`Invalid confidenceLabel: ${c.confidenceLabel}`);
+    }
+  }
+
+  for (const a of obj.actionItems) {
+    if (!a?.actionText || typeof a.actionText !== "string") {
+      throw new Error("Malformed actionItem: missing actionText");
+    }
+    if (!VALID_PRIORITIES.includes(a.priority)) {
+      throw new Error(`Invalid priority: ${a.priority}`);
     }
   }
 
   return {
     materialityReasoning,
     noMaterialChange,
-    rootCauseCandidates: noMaterialChange ? [] : obj.rootCauseCandidates,
-    actionItems: noMaterialChange ? [] : obj.actionItems,
+    existingCandidateUpdates,
+    rootCauseCandidates: obj.rootCauseCandidates,
+    actionItems: obj.actionItems,
   } as ReAnalysisResult;
 }
 
@@ -205,18 +305,18 @@ function buildReAnalyzePrompt(
 
   const rcLines =
     rootCauseCandidates.length > 0
-      ? rootCauseCandidates.map(
-          (c, i) =>
-            `[${i + 1}] (existing) ${truncateField(c.causeText)} | Confidence: ${c.confidenceLabel}${c.rationaleText ? ` | Rationale: ${truncateField(c.rationaleText)}` : ""}`
-        )
+      ? rootCauseCandidates.map((c, i) => {
+          const humanMarker = c.generatedBy === "human" ? " [DO NOT RE-EVALUATE]" : "";
+          return `[${i + 1}] id="${c.id}" | generatedBy="${c.generatedBy}"${humanMarker} | ${truncateField(c.causeText)} | Confidence: ${c.confidenceLabel}${c.rationaleText ? ` | Rationale: ${truncateField(c.rationaleText)}` : ""}`;
+        })
       : ["(none)"];
 
   const aiLines =
     actionItemCandidates.length > 0
-      ? actionItemCandidates.map(
-          (a, i) =>
-            `[${i + 1}] (existing) ${truncateField(a.actionText)} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${truncateField(a.timeframeText)}` : ""}${a.rationaleText ? ` | Rationale: ${truncateField(a.rationaleText)}` : ""}${a.successCriteria ? ` | Success Criteria: ${truncateField(a.successCriteria)}` : ""}`
-        )
+      ? actionItemCandidates.map((a, i) => {
+          const humanMarker = a.generatedBy === "human" ? " [DO NOT RE-EVALUATE]" : "";
+          return `[${i + 1}] id="${a.id}" | generatedBy="${a.generatedBy}"${humanMarker} | ${truncateField(a.actionText)} | Priority: ${a.priority}${a.timeframeText ? ` | Timeframe: ${truncateField(a.timeframeText)}` : ""}${a.rationaleText ? ` | Rationale: ${truncateField(a.rationaleText)}` : ""}${a.successCriteria ? ` | Success Criteria: ${truncateField(a.successCriteria)}` : ""}`;
+        })
       : ["(none)"];
 
   return [
@@ -453,7 +553,11 @@ export async function POST(
       });
 
       return NextResponse.json(
-        { noMaterialChange: true, materialityReasoning: materialityReasoning ?? null },
+        {
+          noMaterialChange: true,
+          materialityReasoning: materialityReasoning ?? null,
+          existingCandidateUpdates: { rootCauses: [], actionItems: [] },
+        },
         { status: 200 }
       );
     }
@@ -520,6 +624,7 @@ export async function POST(
       {
         noMaterialChange: result.noMaterialChange,
         materialityReasoning: materialityReasoning ?? null,
+        existingCandidateUpdates: result.existingCandidateUpdates,
         rootCauseCandidates: result.rootCauseCandidates,
         actionItems: result.actionItems,
       },
