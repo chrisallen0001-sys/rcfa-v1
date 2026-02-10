@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { useId, useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker, getDefaultClassNames } from "react-day-picker";
 import { format, parse, isValid } from "date-fns";
@@ -110,17 +110,32 @@ export default function DateInput({
     setIsOpen(false);
   };
 
-  // Calculate dropdown position when opening
-  // Using viewport-relative coordinates since calendar uses position: fixed
-  useEffect(() => {
-    if (!isOpen || !inputRef.current) return;
-
+  // Calculate dropdown position relative to input
+  const updatePosition = useCallback(() => {
+    if (!inputRef.current) return;
     const rect = inputRef.current.getBoundingClientRect();
     setDropdownPosition({
       top: rect.bottom + 4,
       left: rect.left,
     });
-  }, [isOpen]);
+  }, []);
+
+  // Update position when opening and on scroll/resize
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Initial position calculation
+    updatePosition();
+
+    // Update position on scroll and resize
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [isOpen, updatePosition]);
 
   // Close on outside click (check both container and portal calendar)
   useEffect(() => {
