@@ -32,7 +32,11 @@ export default function ActionItemCard({
   const [completing, setCompleting] = useState<"done" | "canceled" | null>(
     null
   );
-  const [completionNotes, setCompletionNotes] = useState("");
+  const [completionNotes, setCompletionNotes] = useState(
+    item.completionNotes ?? ""
+  );
+  const [actionTaken, setActionTaken] = useState(item.completionNotes ?? "");
+  const [savingActionTaken, setSavingActionTaken] = useState(false);
   const queueRef = useRef<Record<string, unknown>[]>([]);
   const inflightRef = useRef(false);
 
@@ -104,7 +108,7 @@ export default function ActionItemCard({
 
   function handleComplete(target: "done" | "canceled") {
     setCompleting(target);
-    setCompletionNotes("");
+    setCompletionNotes(actionTaken);
     setError(null);
   }
 
@@ -112,9 +116,37 @@ export default function ActionItemCard({
     if (!completing) return;
     const notes = completionNotes.trim() || null;
     enqueue({ status: completing, completionNotes: notes });
+    setActionTaken(completionNotes.trim());
     setCompleting(null);
-    setCompletionNotes("");
   }
+
+  async function handleSaveActionTaken() {
+    setSavingActionTaken(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/action-items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completionNotes: actionTaken.trim() || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to save");
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingActionTaken(false);
+    }
+  }
+
+  function handleCancelActionTaken() {
+    setActionTaken(item.completionNotes ?? "");
+  }
+
+  const hasActionTakenChanges =
+    (actionTaken.trim() || null) !== (item.completionNotes || null);
 
   const selectClass =
     "rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
@@ -131,6 +163,12 @@ export default function ActionItemCard({
           {priorityLabels[item.priority]}
         </span>
       </div>
+
+      {item.actionDescription && (
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          {item.actionDescription}
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
@@ -235,6 +273,41 @@ export default function ActionItemCard({
               Back
             </button>
           </div>
+        </div>
+      )}
+
+      {!completing && (
+        <div className="mt-3">
+          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            Action Taken
+          </label>
+          <textarea
+            value={actionTaken}
+            onChange={(e) => setActionTaken(e.target.value)}
+            placeholder="Describe actions taken (optional)"
+            maxLength={2000}
+            rows={2}
+            disabled={savingActionTaken}
+            className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          />
+          {hasActionTakenChanges && (
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={handleSaveActionTaken}
+                disabled={savingActionTaken}
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
+              >
+                {savingActionTaken ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={handleCancelActionTaken}
+                disabled={savingActionTaken}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       )}
 
