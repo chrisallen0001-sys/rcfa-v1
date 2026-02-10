@@ -229,12 +229,9 @@ export default function ReAnalyzeButton({
       </div>
       {dialogState.kind === "noChange" && (
         <InfoDialog title="No Material Change" onClose={handleDialogClose}>
-          The additional information provided does not materially change the
-          evidence supporting the current top root cause contenders or associated
-          action items. Based on the available data, the existing root causes
-          remain the most defensible explanation of the failure mechanism and
-          contributing factors. Click OK to acknowledge and continue, or provide
-          additional evidence if you believe a different conclusion is warranted.
+          No material change detected. The new information does not significantly
+          alter the identified failure mechanisms, and the current root causes
+          and action items remain valid.
         </InfoDialog>
       )}
       {dialogState.kind === "materialChange" && (
