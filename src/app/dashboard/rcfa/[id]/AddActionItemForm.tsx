@@ -14,7 +14,6 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
   const [open, setOpen] = useState(false);
   const [actionText, setActionText] = useState("");
   const [priority, setPriority] = useState("medium");
-  const [successCriteria, setSuccessCriteria] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const { users, loading: loadingUsers } = useUsers(open);
@@ -36,7 +35,6 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
         body: JSON.stringify({
           actionText,
           priority,
-          successCriteria,
           dueDate: dueDate || null,
           ownerUserId: ownerUserId || null,
         }),
@@ -49,7 +47,6 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
 
       setActionText("");
       setPriority("medium");
-      setSuccessCriteria("");
       setDueDate("");
       setOwnerUserId("");
       setOpen(false);
@@ -148,22 +145,6 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
           minToday
         />
       </div>
-      <div>
-        <label
-          htmlFor="successCriteria"
-          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-        >
-          Success Criteria
-        </label>
-        <textarea
-          id="successCriteria"
-          value={successCriteria}
-          onChange={(e) => setSuccessCriteria(e.target.value)}
-          maxLength={2000}
-          rows={2}
-          className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
-      </div>
       {error && (
         <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
       )}
@@ -181,7 +162,6 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
             setOpen(false);
             setActionText("");
             setPriority("medium");
-            setSuccessCriteria("");
             setDueDate("");
             setOwnerUserId("");
             setError(null);
