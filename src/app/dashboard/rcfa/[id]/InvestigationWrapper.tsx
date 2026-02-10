@@ -62,17 +62,6 @@ export default function InvestigationWrapper({
 
   return (
     <>
-      <RcfaActionBar
-        rcfaId={rcfaId}
-        status={status}
-        canEdit={canEdit}
-        isAdmin={isAdmin}
-        hasAnsweredQuestions={hasAnsweredQuestions}
-        hasNewDataForReanalysis={hasNewDataForReanalysis}
-        onFlushAnswers={handleFlushAnswers}
-        allActionItemsComplete={allActionItemsComplete}
-        totalActionItems={totalActionItems}
-      />
       <div className="space-y-4">
         {beforeQuestions}
         {questions.length > 0 && (
@@ -87,6 +76,17 @@ export default function InvestigationWrapper({
         )}
         {afterQuestions}
       </div>
+      <RcfaActionBar
+        rcfaId={rcfaId}
+        status={status}
+        canEdit={canEdit}
+        isAdmin={isAdmin}
+        hasAnsweredQuestions={hasAnsweredQuestions}
+        hasNewDataForReanalysis={hasNewDataForReanalysis}
+        onFlushAnswers={handleFlushAnswers}
+        allActionItemsComplete={allActionItemsComplete}
+        totalActionItems={totalActionItems}
+      />
     </>
   );
 }
