@@ -32,7 +32,7 @@ const STATUS_LABELS: Record<ActionItemStatus, string> = {
   open: "Open",
   in_progress: "In Progress",
   blocked: "Blocked",
-  done: "Done",
+  done: "Complete",
   canceled: "Canceled",
 };
 

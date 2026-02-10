@@ -263,7 +263,7 @@ export default function ActionItemCard({
               {saving
                 ? "Saving..."
                 : completing === "done"
-                  ? "Mark Done"
+                  ? "Mark Complete"
                   : "Confirm Cancel"}
             </button>
             <button
