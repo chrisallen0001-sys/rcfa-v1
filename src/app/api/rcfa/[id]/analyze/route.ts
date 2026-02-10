@@ -16,6 +16,7 @@ import type {
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
 const SYSTEM_PROMPT = `You are an expert reliability engineer performing a Root Cause Failure Analysis (RCFA). Analyze the intake data provided and return valid JSON only with the following structure:
@@ -94,6 +95,10 @@ function validateAnalysisResult(parsed: unknown): AnalysisResult {
     if (!VALID_PRIORITIES.includes(a.priority)) {
       throw new Error(`Invalid priority: ${a.priority}`);
     }
+    // Validate suggestedDueDate format; clear invalid values
+    if (a.suggestedDueDate && !ISO_DATE_RE.test(a.suggestedDueDate)) {
+      a.suggestedDueDate = undefined;
+    }
   }
 
   return obj as unknown as AnalysisResult;
@@ -102,8 +107,7 @@ function validateAnalysisResult(parsed: unknown): AnalysisResult {
 function buildUserPrompt(rcfa: Rcfa): string {
   const today = new Date().toISOString().split("T")[0];
   const lines = [
-    `Today's date is ${today}. Use this to calculate suggested due dates for action items.`,
-    "",
+    `Today's date is ${today}. Use this to calculate suggested due dates for action items.\n`,
     `Equipment Description: ${rcfa.equipmentDescription}`,
     rcfa.equipmentMake && `Equipment Make: ${rcfa.equipmentMake}`,
     rcfa.equipmentModel && `Equipment Model: ${rcfa.equipmentModel}`,
@@ -214,6 +218,9 @@ export async function POST(
           rationaleText: a.rationaleText,
           priority: a.priority,
           timeframeText: a.timeframeText,
+          suggestedDueDate: a.suggestedDueDate
+            ? new Date(a.suggestedDueDate + "T00:00:00Z")
+            : null,
           generatedBy: "ai" as const,
         })),
       });
