@@ -105,8 +105,8 @@ interface ReAnalysisResult {
   }[];
 }
 
-const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["low", "medium", "high"];
-const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
+const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["deprioritized", "low", "medium", "high"];
+const VALID_PRIORITIES: Priority[] = ["deprioritized", "low", "medium", "high"];
 
 function validateReAnalysisResult(parsed: unknown): ReAnalysisResult {
   const obj = parsed as Record<string, unknown>;

@@ -60,8 +60,8 @@ const VALID_QUESTION_CATEGORIES: QuestionCategory[] = [
   "safety",
   "other",
 ];
-const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["low", "medium", "high"];
-const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
+const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["deprioritized", "low", "medium", "high"];
+const VALID_PRIORITIES: Priority[] = ["deprioritized", "low", "medium", "high"];
 
 function validateAnalysisResult(parsed: unknown): AnalysisResult {
   const obj = parsed as Record<string, unknown>;

@@ -6,7 +6,7 @@ import type { Priority } from "@/generated/prisma/client";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
+const VALID_PRIORITIES: Priority[] = ["deprioritized", "low", "medium", "high"];
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
