@@ -13,6 +13,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [actionText, setActionText] = useState("");
+  const [actionDescription, setActionDescription] = useState("");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
@@ -34,6 +35,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           actionText,
+          actionDescription: actionDescription || null,
           priority,
           dueDate: dueDate || null,
           ownerUserId: ownerUserId || null,
@@ -46,6 +48,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
       }
 
       setActionText("");
+      setActionDescription("");
       setPriority("medium");
       setDueDate("");
       setOwnerUserId("");
@@ -82,7 +85,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
           htmlFor="actionText"
           className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
         >
-          Action Text <span className="text-red-500">*</span>
+          Action Title <span className="text-red-500">*</span>
         </label>
         <textarea
           id="actionText"
@@ -91,6 +94,24 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
           required
           maxLength={2000}
           rows={2}
+          placeholder="Short, action-oriented title"
+          className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        />
+      </div>
+      <div>
+        <label
+          htmlFor="actionDescription"
+          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        >
+          Action Description
+        </label>
+        <textarea
+          id="actionDescription"
+          value={actionDescription}
+          onChange={(e) => setActionDescription(e.target.value)}
+          maxLength={2000}
+          rows={3}
+          placeholder="Detailed explanation of the action (optional)"
           className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
         />
       </div>
@@ -161,6 +182,7 @@ export default function AddActionItemForm({ rcfaId }: AddActionItemFormProps) {
           onClick={() => {
             setOpen(false);
             setActionText("");
+            setActionDescription("");
             setPriority("medium");
             setDueDate("");
             setOwnerUserId("");
