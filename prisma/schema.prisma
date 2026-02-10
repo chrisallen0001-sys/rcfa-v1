@@ -256,10 +256,11 @@ model RcfaActionItemCandidate {
   id     String @id @default(uuid()) @db.Uuid
   rcfaId String @map("rcfa_id") @db.Uuid
 
-  actionText      String   @map("action_text")
-  rationaleText   String?  @map("rationale_text")
-  priority        Priority @default(medium)
-  timeframeText   String?  @map("timeframe_text")
+  actionText        String    @map("action_text")
+  rationaleText     String?   @map("rationale_text")
+  priority          Priority  @default(medium)
+  timeframeText     String?   @map("timeframe_text")
+  suggestedDueDate  DateTime? @map("suggested_due_date") @db.Date
 
   generatedBy GeneratedBy @default(ai) @map("generated_by")
   generatedAt DateTime    @default(now()) @map("generated_at") @db.Timestamptz

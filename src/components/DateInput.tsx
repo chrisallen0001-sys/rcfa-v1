@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { DayPicker, getDefaultClassNames } from "react-day-picker";
 import { format, parse, isValid } from "date-fns";
 import "react-day-picker/style.css";
@@ -71,7 +72,10 @@ export default function DateInput({
   const generatedId = useId();
   const inputId = providedId ?? generatedId;
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
 
   // Get default class names from react-day-picker (memoized)
   const defaultClassNames = useMemo(() => getDefaultClassNames(), []);
@@ -106,12 +110,26 @@ export default function DateInput({
     setIsOpen(false);
   };
 
-  // Close on outside click
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (!isOpen || !inputRef.current) return;
+
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY + 4,
+      left: rect.left + window.scrollX,
+    });
+  }, [isOpen]);
+
+  // Close on outside click (check both container and portal calendar)
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const isInsideContainer = containerRef.current?.contains(target);
+      const isInsideCalendar = calendarRef.current?.contains(target);
+      if (!isInsideContainer && !isInsideCalendar) {
         setIsOpen(false);
       }
     };
@@ -146,41 +164,50 @@ export default function DateInput({
     ? "rounded-md border border-zinc-300 bg-white px-2 py-1 pr-14 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 cursor-pointer"
     : "block w-full rounded-md border border-zinc-300 px-3 py-2 pr-16 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 cursor-pointer";
 
-  const calendarContent = (
-    <div className="absolute left-0 z-50 mt-1 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-      <DayPicker
-        mode="single"
-        selected={selectedDate}
-        onSelect={handleSelect}
-        defaultMonth={selectedDate}
-        disabled={minDate ? { before: minDate } : undefined}
-        classNames={{
-          root: `${defaultClassNames.root} text-zinc-900 dark:text-zinc-100`,
-          today: `${defaultClassNames.today} font-bold`,
-          selected: `${defaultClassNames.selected} bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900`,
-          chevron: `${defaultClassNames.chevron} fill-zinc-600 dark:fill-zinc-400`,
-        }}
-      />
-      <div className="mt-2 flex justify-between border-t border-zinc-200 pt-2 dark:border-zinc-700">
-        <button
-          type="button"
-          onClick={() => handleSelect(new Date())}
-          className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          Today
-        </button>
-        {value && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+  // Render calendar dropdown via portal to avoid overflow clipping
+  const calendarPortal =
+    isOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={calendarRef}
+            className="fixed z-50 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
           >
-            Clear
-          </button>
-        )}
-      </div>
-    </div>
-  );
+            <DayPicker
+              mode="single"
+              selected={selectedDate}
+              onSelect={handleSelect}
+              defaultMonth={selectedDate}
+              disabled={minDate ? { before: minDate } : undefined}
+              classNames={{
+                root: `${defaultClassNames.root} text-zinc-900 dark:text-zinc-100`,
+                today: `${defaultClassNames.today} font-bold`,
+                selected: `${defaultClassNames.selected} bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900`,
+                chevron: `${defaultClassNames.chevron} fill-zinc-600 dark:fill-zinc-400`,
+              }}
+            />
+            <div className="mt-2 flex justify-between border-t border-zinc-200 pt-2 dark:border-zinc-700">
+              <button
+                type="button"
+                onClick={() => handleSelect(new Date())}
+                className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              >
+                Today
+              </button>
+              {value && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   if (inline) {
     return (
@@ -189,6 +216,7 @@ export default function DateInput({
           {label && <span>{label}</span>}
           <div className="relative">
             <input
+              ref={inputRef}
               id={inputId}
               type="text"
               readOnly
@@ -218,7 +246,7 @@ export default function DateInput({
             </div>
           </div>
         </label>
-        {isOpen && calendarContent}
+        {calendarPortal}
       </div>
     );
   }
@@ -236,6 +264,7 @@ export default function DateInput({
       )}
       <div className="relative mt-1">
         <input
+          ref={inputRef}
           id={inputId}
           type="text"
           readOnly
@@ -264,7 +293,7 @@ export default function DateInput({
           </span>
         </div>
       </div>
-      {isOpen && calendarContent}
+      {calendarPortal}
     </div>
   );
 }

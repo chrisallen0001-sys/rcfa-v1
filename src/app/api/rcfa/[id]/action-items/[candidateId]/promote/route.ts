@@ -75,6 +75,7 @@ export async function POST(
           rcfaId: id,
           actionText: candidate.actionText,
           priority: candidate.priority,
+          dueDate: candidate.suggestedDueDate,
           selectedFromCandidateId: candidateId,
           createdByUserId: userId,
           status: "open",
