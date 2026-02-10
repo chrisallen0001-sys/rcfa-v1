@@ -210,6 +210,34 @@ function ConfidenceChangeIndicator({
   );
 }
 
+/**
+ * Renders either a confidence change indicator (if candidate was updated)
+ * or a static badge (if no update occurred).
+ */
+function CandidateLevelBadge({
+  candidateId,
+  currentLevel,
+  colorMap,
+  candidateUpdateMap,
+}: {
+  candidateId: string;
+  currentLevel: string;
+  colorMap: Record<string, string>;
+  candidateUpdateMap: Map<string, { previous: string; current: string }>;
+}) {
+  const update = candidateUpdateMap.get(candidateId);
+  if (update) {
+    return (
+      <ConfidenceChangeIndicator
+        previous={update.previous}
+        current={update.current}
+        colorMap={colorMap}
+      />
+    );
+  }
+  return <Badge label={currentLevel} colorClass={colorMap[currentLevel]} />;
+}
+
 export default async function RcfaDetailPage({
   params,
   searchParams,
@@ -573,18 +601,12 @@ export default async function RcfaDetailPage({
                                 </span>
                               )}
                             </div>
-                            {candidateUpdateMap.has(c.id) ? (
-                              <ConfidenceChangeIndicator
-                                previous={candidateUpdateMap.get(c.id)!.previous}
-                                current={candidateUpdateMap.get(c.id)!.current}
-                                colorMap={CONFIDENCE_COLORS}
-                              />
-                            ) : (
-                              <Badge
-                                label={c.confidenceLabel}
-                                colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
-                              />
-                            )}
+                            <CandidateLevelBadge
+                              candidateId={c.id}
+                              currentLevel={c.confidenceLabel}
+                              colorMap={CONFIDENCE_COLORS}
+                              candidateUpdateMap={candidateUpdateMap}
+                            />
                           </div>
                           {c.rationaleText && (
                             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -661,18 +683,12 @@ export default async function RcfaDetailPage({
                                 </span>
                               )}
                             </div>
-                            {candidateUpdateMap.has(a.id) ? (
-                              <ConfidenceChangeIndicator
-                                previous={candidateUpdateMap.get(a.id)!.previous}
-                                current={candidateUpdateMap.get(a.id)!.current}
-                                colorMap={PRIORITY_COLORS}
-                              />
-                            ) : (
-                              <Badge
-                                label={a.priority}
-                                colorClass={PRIORITY_COLORS[a.priority]}
-                              />
-                            )}
+                            <CandidateLevelBadge
+                              candidateId={a.id}
+                              currentLevel={a.priority}
+                              colorMap={PRIORITY_COLORS}
+                              candidateUpdateMap={candidateUpdateMap}
+                            />
                           </div>
                           {a.rationaleText && (
                             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -866,18 +882,12 @@ export default async function RcfaDetailPage({
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {c.causeText}
                     </p>
-                    {candidateUpdateMap.has(c.id) ? (
-                      <ConfidenceChangeIndicator
-                        previous={candidateUpdateMap.get(c.id)!.previous}
-                        current={candidateUpdateMap.get(c.id)!.current}
-                        colorMap={CONFIDENCE_COLORS}
-                      />
-                    ) : (
-                      <Badge
-                        label={c.confidenceLabel}
-                        colorClass={CONFIDENCE_COLORS[c.confidenceLabel]}
-                      />
-                    )}
+                    <CandidateLevelBadge
+                      candidateId={c.id}
+                      currentLevel={c.confidenceLabel}
+                      colorMap={CONFIDENCE_COLORS}
+                      candidateUpdateMap={candidateUpdateMap}
+                    />
                   </div>
                   {c.rationaleText && (
                     <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -928,18 +938,12 @@ export default async function RcfaDetailPage({
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {a.actionText}
                     </p>
-                    {candidateUpdateMap.has(a.id) ? (
-                      <ConfidenceChangeIndicator
-                        previous={candidateUpdateMap.get(a.id)!.previous}
-                        current={candidateUpdateMap.get(a.id)!.current}
-                        colorMap={PRIORITY_COLORS}
-                      />
-                    ) : (
-                      <Badge
-                        label={a.priority}
-                        colorClass={PRIORITY_COLORS[a.priority]}
-                      />
-                    )}
+                    <CandidateLevelBadge
+                      candidateId={a.id}
+                      currentLevel={a.priority}
+                      colorMap={PRIORITY_COLORS}
+                      candidateUpdateMap={candidateUpdateMap}
+                    />
                   </div>
                   {a.rationaleText && (
                     <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
