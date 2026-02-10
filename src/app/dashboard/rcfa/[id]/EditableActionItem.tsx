@@ -23,7 +23,7 @@ const ACTION_STATUS_LABELS: Record<string, string> = {
   open: "Open",
   in_progress: "In Progress",
   blocked: "Blocked",
-  done: "Done",
+  done: "Complete",
   canceled: "Canceled",
 };
 
@@ -317,7 +317,7 @@ export default function EditableActionItem({
                   <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
                   <option value="blocked">Blocked</option>
-                  <option value="done">Done</option>
+                  <option value="done">Complete</option>
                   <option value="canceled">Canceled</option>
                 </select>
               </div>
