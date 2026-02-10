@@ -108,3 +108,14 @@ export function validateStatusTransition(
     allowedTransitions: allowed,
   };
 }
+
+/**
+ * Truncates action item title text with ellipsis if it exceeds the maximum length.
+ * @param text - The title text to truncate
+ * @param maxLength - Maximum length before truncation (default: 90)
+ * @returns Truncated text with ellipsis or original text if under limit
+ */
+export function truncateTitle(text: string, maxLength = 90): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength - 1) + "…";
+}

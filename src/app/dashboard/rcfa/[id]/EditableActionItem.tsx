@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
 import { useUsers } from "./useUsers";
+import { truncateTitle } from "@/lib/rcfa-utils";
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -252,8 +253,8 @@ export default function EditableActionItem({
   return (
     <div className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          {initialActionText}
+        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100" title={initialActionText}>
+          {truncateTitle(initialActionText)}
         </p>
         <div className="flex gap-2">
           <span
