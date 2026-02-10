@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
 import { getAuthContext } from "@/lib/auth-context";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
+import {
+  VALID_CONFIDENCE_LABELS,
+  VALID_PRIORITIES,
+  VALID_QUESTION_CATEGORIES,
+} from "@/lib/validation-constants";
 import type {
   Rcfa,
   QuestionCategory,
@@ -52,16 +57,6 @@ interface AnalysisResult {
   }[];
 }
 
-const VALID_QUESTION_CATEGORIES: QuestionCategory[] = [
-  "failure_mode",
-  "evidence",
-  "operating_context",
-  "maintenance_history",
-  "safety",
-  "other",
-];
-const VALID_CONFIDENCE_LABELS: ConfidenceLabel[] = ["low", "medium", "high"];
-const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
 
 function validateAnalysisResult(parsed: unknown): AnalysisResult {
   const obj = parsed as Record<string, unknown>;
