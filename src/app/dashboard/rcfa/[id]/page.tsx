@@ -739,6 +739,8 @@ export default async function RcfaDetailPage({
                         rcfaId={rcfa.id}
                         actionItemId={a.id}
                         actionText={a.actionText}
+                        actionDescription={a.actionDescription}
+                        completionNotes={a.completionNotes}
                         priority={a.priority}
                         status={a.status}
                         dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
@@ -979,6 +981,8 @@ export default async function RcfaDetailPage({
                   rcfaId={rcfa.id}
                   actionItemId={a.id}
                   actionText={a.actionText}
+                  actionDescription={a.actionDescription}
+                  completionNotes={a.completionNotes}
                   priority={a.priority}
                   status={a.status}
                   dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
