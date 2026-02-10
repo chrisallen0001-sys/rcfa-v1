@@ -39,6 +39,8 @@ const STATUS_LABELS: Record<ActionItemStatus, string> = {
 export type ActionItemRow = {
   id: string;
   actionText: string;
+  actionDescription: string | null;
+  completionNotes: string | null;
   priority: Priority;
   status: ActionItemStatus;
   dueDate: string | null;
@@ -90,6 +92,8 @@ export default async function ActionItemsPage({
   const rows: ActionItemRow[] = items.map((item) => ({
     id: item.id,
     actionText: item.actionText,
+    actionDescription: item.actionDescription,
+    completionNotes: item.completionNotes,
     priority: item.priority,
     status: item.status,
     dueDate: item.dueDate?.toISOString().slice(0, 10) ?? null,
