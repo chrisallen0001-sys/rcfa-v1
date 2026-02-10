@@ -111,13 +111,24 @@ export default function DateInput({
   };
 
   // Calculate dropdown position relative to input
+  // Flips above input if not enough space below viewport
   const updatePosition = useCallback(() => {
     if (!inputRef.current) return;
     const rect = inputRef.current.getBoundingClientRect();
-    setDropdownPosition({
-      top: rect.bottom + 4,
-      left: rect.left,
-    });
+    const calendarHeight = 320; // Approximate height of calendar dropdown
+    const gap = 4;
+    const viewportHeight = window.innerHeight;
+
+    // Check if calendar would extend below viewport
+    const wouldOverflowBelow = rect.bottom + gap + calendarHeight > viewportHeight;
+    const hasSpaceAbove = rect.top - gap - calendarHeight > 0;
+
+    // Position above if it would overflow below and there's space above
+    const top = wouldOverflowBelow && hasSpaceAbove
+      ? rect.top - gap - calendarHeight
+      : rect.bottom + gap;
+
+    setDropdownPosition({ top, left: rect.left });
   }, []);
 
   // Update position when opening and on scroll/resize
