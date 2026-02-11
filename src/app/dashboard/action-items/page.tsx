@@ -1,151 +1,54 @@
-import { prisma } from "@/lib/prisma";
-import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber } from "@/lib/rcfa-utils";
-import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import ActionItemsTable from "./ActionItemsTable";
 import Link from "next/link";
-import ActionItemsFilter from "./ActionItemsFilter";
-import { NewRcfaButton } from "@/components/NewRcfaButton";
 
 export const metadata: Metadata = {
   title: "Action Items – RCFA",
 };
 
-const ITEMS_PER_PAGE = 50;
-
-const PRIORITY_LABELS: Record<Priority, string> = {
-  deprioritized: "Deprioritized",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
-
-const PRIORITY_COLORS: Record<Priority, string> = {
-  deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
-  low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  medium:
-    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-const STATUS_LABELS: Record<ActionItemStatus, string> = {
-  open: "Open",
-  in_progress: "In Progress",
-  blocked: "Blocked",
-  done: "Complete",
-  canceled: "Canceled",
-};
-
-export type ActionItemRow = {
-  id: string;
-  actionItemNumber: number;
-  actionText: string;
-  actionDescription: string | null;
-  completionNotes: string | null;
-  priority: Priority;
-  status: ActionItemStatus;
-  dueDate: string | null;
-  ownerUserId: string | null;
-  rcfaId: string;
-  rcfaNumber: string;
-  rcfaTitle: string;
-};
-
-export type UserOption = {
-  id: string;
-  displayName: string;
-};
-
-export default async function ActionItemsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string }>;
-}) {
-  const { userId } = await getAuthContext();
-  const { page } = await searchParams;
-  const pageNum = Math.max(1, parseInt(page ?? "1", 10) || 1);
-
-  const where = { rcfa: { deletedAt: null } } as const;
-
-  const [items, total, mineTotal, users] = await Promise.all([
-    prisma.rcfaActionItem.findMany({
-      where,
-      skip: (pageNum - 1) * ITEMS_PER_PAGE,
-      take: ITEMS_PER_PAGE,
-      include: {
-        rcfa: { select: { id: true, rcfaNumber: true, title: true } },
-        owner: { select: { id: true, email: true } },
-      },
-      orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
-    }),
-    prisma.rcfaActionItem.count({ where }),
-    prisma.rcfaActionItem.count({
-      where: { AND: [where, { ownerUserId: userId }] },
-    }),
-    prisma.appUser.findMany({
-      select: { id: true, displayName: true },
-      orderBy: { displayName: "asc" },
-    }),
-  ]);
-
-  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
-
-  const rows: ActionItemRow[] = items.map((item) => ({
-    id: item.id,
-    actionItemNumber: item.actionItemNumber,
-    actionText: item.actionText,
-    actionDescription: item.actionDescription,
-    completionNotes: item.completionNotes,
-    priority: item.priority,
-    status: item.status,
-    dueDate: item.dueDate?.toISOString().slice(0, 10) ?? null,
-    ownerUserId: item.ownerUserId,
-    rcfaId: item.rcfa.id,
-    rcfaNumber: formatRcfaNumber(item.rcfa.rcfaNumber),
-    rcfaTitle: item.rcfa.title ?? "Untitled RCFA",
-  }));
-
+function TableSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Action Items
-        </h1>
-        <NewRcfaButton />
+    <div className="animate-pulse space-y-4">
+      <div className="flex gap-2 border-b border-zinc-200 pb-2 dark:border-zinc-800">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-8 w-24 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+        ))}
       </div>
-      <ActionItemsFilter
-        items={rows}
-        totalItems={total}
-        mineTotal={mineTotal}
-        currentUserId={userId}
-        users={users}
-        priorityLabels={PRIORITY_LABELS}
-        priorityColors={PRIORITY_COLORS}
-        statusLabels={STATUS_LABELS}
-      />
-      {totalPages > 1 && (
-        <nav className="mt-6 flex items-center justify-center gap-2">
-          {pageNum > 1 && (
-            <Link
-              href={`/dashboard/action-items?page=${pageNum - 1}`}
-              className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-            >
-              Previous
-            </Link>
-          )}
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            Page {pageNum} of {totalPages}
-          </span>
-          {pageNum < totalPages && (
-            <Link
-              href={`/dashboard/action-items?page=${pageNum + 1}`}
-              className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-            >
-              Next
-            </Link>
-          )}
-        </nav>
-      )}
+      <div className="flex gap-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-8 w-20 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+        ))}
+      </div>
+      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <div className="h-12 border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-14 border-b border-zinc-200 last:border-b-0 dark:border-zinc-800" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default async function ActionItemsPage() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Action Items
+          </h1>
+          <Link
+            href="/dashboard/rcfas"
+            className="text-sm text-zinc-500 hover:text-zinc-700 hover:underline dark:text-zinc-400 dark:hover:text-zinc-300"
+          >
+            View RCFAs →
+          </Link>
+        </div>
+      </div>
+      <Suspense fallback={<TableSkeleton />}>
+        <ActionItemsTable />
+      </Suspense>
     </div>
   );
 }
