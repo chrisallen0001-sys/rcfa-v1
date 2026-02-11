@@ -74,9 +74,16 @@ export async function POST(
         throw new Error("RCFA_STATUS_INVALID");
       }
 
+      // Get next action item number from sequence
+      const [{ nextval }] = await tx.$queryRaw<[{ nextval: bigint }]>`
+        SELECT nextval('action_item_number_seq')
+      `;
+      const actionItemNumber = Number(nextval);
+
       const record = await tx.rcfaActionItem.create({
         data: {
           rcfaId: id,
+          actionItemNumber,
           actionText,
           actionDescription,
           priority,
@@ -95,6 +102,7 @@ export async function POST(
           eventType: "action_item_created",
           eventPayload: {
             actionItemId: record.id,
+            actionItemNumber,
             actionText,
             actionDescription,
             priority,
