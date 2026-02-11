@@ -3,52 +3,24 @@ import { getAuthContext } from "@/lib/auth-context";
 import {
   formatRcfaNumber,
   formatActionItemNumber,
+  formatDueDateWithColor,
   RCFA_STATUS_LABELS,
   RCFA_STATUS_COLORS,
+  PRIORITY_LABELS,
+  PRIORITY_COLORS,
+  ACTION_STATUS_LABELS,
+  ACTION_STATUS_COLORS,
 } from "@/lib/rcfa-utils";
 import { NewRcfaButton } from "@/components/NewRcfaButton";
 import Link from "next/link";
 import type { Metadata } from "next";
-import type {
-  RcfaStatus,
-  Priority,
-  ActionItemStatus,
-} from "@/generated/prisma/client";
+import type { RcfaStatus, Priority, ActionItemStatus } from "@/generated/prisma/client";
 
 export const metadata: Metadata = {
   title: "Home – RCFA",
 };
 
-const PRIORITY_COLORS: Record<Priority, string> = {
-  deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
-  low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-const PRIORITY_LABELS: Record<Priority, string> = {
-  deprioritized: "Deprioritized",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
-
-const ACTION_STATUS_COLORS: Record<ActionItemStatus, string> = {
-  open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  in_progress:
-    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  done: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  canceled: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
-};
-
-const ACTION_STATUS_LABELS: Record<ActionItemStatus, string> = {
-  open: "Open",
-  in_progress: "In Progress",
-  blocked: "Blocked",
-  done: "Complete",
-  canceled: "Canceled",
-};
+const MAX_ITEMS_DISPLAYED = 10;
 
 type MyRcfa = {
   id: string;
@@ -90,50 +62,27 @@ function ChevronRightIcon() {
   );
 }
 
-function formatDueDate(date: Date | null): string {
-  if (!date) return "No due date";
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(date);
-  dueDate.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil(
-    (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (diffDays < 0) return `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? "s" : ""}`;
-  if (diffDays === 0) return "Due today";
-  if (diffDays === 1) return "Due tomorrow";
-  if (diffDays <= 7) return `Due in ${diffDays} days`;
-  return `Due ${dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-}
-
-function getDueDateColor(date: Date | null): string {
-  if (!date) return "text-zinc-500 dark:text-zinc-400";
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(date);
-  dueDate.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil(
-    (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (diffDays < 0) return "text-red-600 dark:text-red-400 font-medium";
-  if (diffDays <= 2) return "text-amber-600 dark:text-amber-400";
-  return "text-zinc-500 dark:text-zinc-400";
-}
-
 export default async function HomePage() {
   const { displayName, userId } = await getAuthContext();
   const firstName = displayName.split(" ")[0];
 
-  // Fetch user's open RCFAs and action items in parallel
-  const [myRcfas, myActionItems] = await Promise.all([
+  // Define query filters
+  const rcfaWhere = {
+    ownerUserId: userId,
+    status: { not: "closed" as const },
+    deletedAt: null,
+  };
+  const openStatuses: ActionItemStatus[] = ["open", "in_progress", "blocked"];
+  const actionItemWhere = {
+    ownerUserId: userId,
+    status: { in: openStatuses },
+    rcfa: { deletedAt: null },
+  };
+
+  // Fetch user's open RCFAs, action items, and total counts in parallel
+  const [myRcfas, rcfaTotalCount, myActionItems, actionItemTotalCount] = await Promise.all([
     prisma.rcfa.findMany({
-      where: {
-        ownerUserId: userId,
-        status: { not: "closed" },
-        deletedAt: null,
-      },
+      where: rcfaWhere,
       select: {
         id: true,
         rcfaNumber: true,
@@ -143,14 +92,11 @@ export default async function HomePage() {
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: MAX_ITEMS_DISPLAYED,
     }),
+    prisma.rcfa.count({ where: rcfaWhere }),
     prisma.rcfaActionItem.findMany({
-      where: {
-        ownerUserId: userId,
-        status: { in: ["open", "in_progress", "blocked"] },
-        rcfa: { deletedAt: null },
-      },
+      where: actionItemWhere,
       select: {
         id: true,
         actionItemNumber: true,
@@ -167,8 +113,9 @@ export default async function HomePage() {
         },
       },
       orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
-      take: 10,
+      take: MAX_ITEMS_DISPLAYED,
     }),
+    prisma.rcfaActionItem.count({ where: actionItemWhere }),
   ]);
 
   const rcfaRows: MyRcfa[] = myRcfas;
@@ -183,6 +130,9 @@ export default async function HomePage() {
     rcfaNumber: item.rcfa.rcfaNumber,
     rcfaTitle: item.rcfa.title || "Untitled RCFA",
   }));
+
+  const hasMoreRcfas = rcfaTotalCount > MAX_ITEMS_DISPLAYED;
+  const hasMoreActionItems = actionItemTotalCount > MAX_ITEMS_DISPLAYED;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -237,10 +187,22 @@ export default async function HomePage() {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             My Open RCFAs
           </h2>
-          {rcfaRows.length > 0 && (
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              {rcfaRows.length} open
-            </span>
+          {rcfaTotalCount > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {hasMoreRcfas
+                  ? `${rcfaRows.length} of ${rcfaTotalCount} open`
+                  : `${rcfaTotalCount} open`}
+              </span>
+              {hasMoreRcfas && (
+                <Link
+                  href="/dashboard/rcfas?filter=mine"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  View all
+                </Link>
+              )}
+            </div>
           )}
         </div>
 
@@ -290,10 +252,22 @@ export default async function HomePage() {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             My Open Action Items
           </h2>
-          {actionItemRows.length > 0 && (
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              {actionItemRows.length} open
-            </span>
+          {actionItemTotalCount > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {hasMoreActionItems
+                  ? `${actionItemRows.length} of ${actionItemTotalCount} open`
+                  : `${actionItemTotalCount} open`}
+              </span>
+              {hasMoreActionItems && (
+                <Link
+                  href="/dashboard/action-items?filter=mine"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  View all
+                </Link>
+              )}
+            </div>
           )}
         </div>
 
@@ -334,9 +308,14 @@ export default async function HomePage() {
                         {formatRcfaNumber(item.rcfaNumber)} · {item.rcfaTitle}
                       </Link>
                       <span className="text-zinc-300 dark:text-zinc-600">·</span>
-                      <span className={getDueDateColor(item.dueDate)}>
-                        {formatDueDate(item.dueDate)}
-                      </span>
+                      {(() => {
+                        const dueDateInfo = formatDueDateWithColor(item.dueDate);
+                        return (
+                          <span className={dueDateInfo.colorClass}>
+                            {dueDateInfo.text}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">

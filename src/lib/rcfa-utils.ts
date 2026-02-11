@@ -1,4 +1,4 @@
-import type { RcfaStatus, OperatingContext } from "@/generated/prisma/client";
+import type { RcfaStatus, OperatingContext, Priority, ActionItemStatus } from "@/generated/prisma/client";
 
 /**
  * Valid operating context values for RCFA equipment.
@@ -50,6 +50,48 @@ export const RCFA_STATUS_COLORS: Record<RcfaStatus, string> = {
     "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   closed:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+};
+
+/**
+ * UI labels for action item priority values.
+ */
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  deprioritized: "Deprioritized",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+/**
+ * Tailwind CSS classes for priority badges.
+ */
+export const PRIORITY_COLORS: Record<Priority, string> = {
+  deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
+  low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+};
+
+/**
+ * UI labels for action item status values.
+ */
+export const ACTION_STATUS_LABELS: Record<ActionItemStatus, string> = {
+  open: "Open",
+  in_progress: "In Progress",
+  blocked: "Blocked",
+  done: "Complete",
+  canceled: "Canceled",
+};
+
+/**
+ * Tailwind CSS classes for action item status badges.
+ */
+export const ACTION_STATUS_COLORS: Record<ActionItemStatus, string> = {
+  open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  in_progress: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  done: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  canceled: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
 };
 
 /**
@@ -127,4 +169,68 @@ export function validateStatusTransition(
 export function truncateTitle(text: string, maxLength = 90): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength - 1) + "…";
+}
+
+/**
+ * Due date display information including human-readable text and color styling.
+ */
+export type DueDateInfo = {
+  text: string;
+  colorClass: string;
+};
+
+/**
+ * Calculates the number of days between today and a due date.
+ * Returns null if date is null.
+ */
+function getDueDateDiffDays(date: Date | null): number | null {
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDate = new Date(date);
+  dueDate.setHours(0, 0, 0, 0);
+  return Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Formats a due date for display with human-readable text and appropriate color styling.
+ * @param date - The due date to format (can be null)
+ * @returns Object with text and colorClass for styling
+ */
+export function formatDueDateWithColor(date: Date | null): DueDateInfo {
+  const diffDays = getDueDateDiffDays(date);
+
+  if (diffDays === null) {
+    return {
+      text: "No due date",
+      colorClass: "text-zinc-500 dark:text-zinc-400",
+    };
+  }
+
+  let text: string;
+  let colorClass: string;
+
+  if (diffDays < 0) {
+    const absDays = Math.abs(diffDays);
+    text = `Overdue by ${absDays} day${absDays !== 1 ? "s" : ""}`;
+    colorClass = "text-red-600 dark:text-red-400 font-medium";
+  } else if (diffDays === 0) {
+    text = "Due today";
+    colorClass = "text-amber-600 dark:text-amber-400";
+  } else if (diffDays === 1) {
+    text = "Due tomorrow";
+    colorClass = "text-amber-600 dark:text-amber-400";
+  } else if (diffDays <= 2) {
+    text = `Due in ${diffDays} days`;
+    colorClass = "text-amber-600 dark:text-amber-400";
+  } else if (diffDays <= 7) {
+    text = `Due in ${diffDays} days`;
+    colorClass = "text-zinc-500 dark:text-zinc-400";
+  } else {
+    const dueDate = new Date(date!);
+    text = `Due ${dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    colorClass = "text-zinc-500 dark:text-zinc-400";
+  }
+
+  return { text, colorClass };
 }
