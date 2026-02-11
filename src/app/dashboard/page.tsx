@@ -7,6 +7,24 @@ export const metadata: Metadata = {
   title: "Home – RCFA",
 };
 
+function ChevronRightIcon() {
+  return (
+    <svg
+      className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1 dark:text-zinc-500"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 5l7 7-7 7"
+      />
+    </svg>
+  );
+}
+
 export default async function HomePage() {
   const { displayName } = await getAuthContext();
   const firstName = displayName.split(" ")[0];
@@ -32,19 +50,7 @@ export default async function HomePage() {
             <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
               RCFAs
             </h2>
-            <svg
-              className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1 dark:text-zinc-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+            <ChevronRightIcon />
           </div>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
             View and manage all Root Cause Failure Analyses
@@ -59,19 +65,7 @@ export default async function HomePage() {
             <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
               Action Items
             </h2>
-            <svg
-              className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1 dark:text-zinc-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+            <ChevronRightIcon />
           </div>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
             Track and complete action items across all RCFAs
