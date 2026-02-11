@@ -59,6 +59,33 @@ function sanitizeHighlight(raw: string): string {
 }
 
 /**
+ * Maps a database row to the API response format.
+ */
+function mapRowToResponse(
+  r: SummaryRow,
+  highlights?: { equip: string; failure: string }
+) {
+  return {
+    id: r.id,
+    rcfaNumber: r.rcfa_number,
+    title: r.title || "Untitled RCFA",
+    equipmentDescription: r.equipment_description,
+    status: r.status,
+    operatingContext: r.operating_context,
+    createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+    ownerUserId: r.owner_user_id,
+    ownerDisplayName: r.owner_display_name,
+    rootCauseCount: Number(r.final_root_cause_count),
+    actionItemCount: Number(r.action_item_count),
+    openActionCount: Number(r.open_action_item_count),
+    ...(highlights && {
+      equipmentHighlight: sanitizeHighlight(highlights.equip),
+      failureHighlight: sanitizeHighlight(highlights.failure),
+    }),
+  };
+}
+
+/**
  * GET /api/rcfa - List RCFAs with filtering, sorting, and pagination
  *
  * Query parameters:
@@ -108,12 +135,13 @@ export async function GET(request: NextRequest) {
       conditions.push(`s.status != 'closed'`);
     }
 
-    // Status filter
+    // Status filter - use IN clause with individual placeholders for proper PostgreSQL handling
     if (statusFilter) {
       const statuses = statusFilter.split(",").filter((s) => VALID_STATUSES.includes(s as RcfaStatus));
       if (statuses.length > 0) {
-        conditions.push(`s.status = ANY($${paramIndex++})`);
-        params.push(statuses as unknown as string);
+        const placeholders = statuses.map(() => `$${paramIndex++}`).join(", ");
+        conditions.push(`s.status IN (${placeholders})`);
+        statuses.forEach((s) => params.push(s));
       }
     }
 
@@ -175,22 +203,9 @@ export async function GET(request: NextRequest) {
       );
 
       const total = searchResults.length > 0 ? Number(searchResults[0].total_count) : 0;
-      const rows = searchResults.map((r) => ({
-        id: r.id,
-        rcfaNumber: r.rcfa_number,
-        title: r.title || "Untitled RCFA",
-        equipmentDescription: r.equipment_description,
-        status: r.status,
-        operatingContext: r.operating_context,
-        createdAt: new Date(r.created_at).toISOString().slice(0, 10),
-        ownerUserId: r.owner_user_id,
-        ownerDisplayName: r.owner_display_name,
-        rootCauseCount: Number(r.final_root_cause_count),
-        actionItemCount: Number(r.action_item_count),
-        openActionCount: Number(r.open_action_item_count),
-        equipmentHighlight: sanitizeHighlight(r.equip_headline),
-        failureHighlight: sanitizeHighlight(r.failure_headline),
-      }));
+      const rows = searchResults.map((r) =>
+        mapRowToResponse(r, { equip: r.equip_headline, failure: r.failure_headline })
+      );
 
       return NextResponse.json({
         rows,
@@ -220,20 +235,7 @@ export async function GET(request: NextRequest) {
     );
 
     const total = browseResults.length > 0 ? Number(browseResults[0].total_count) : 0;
-    const rows = browseResults.map((r) => ({
-      id: r.id,
-      rcfaNumber: r.rcfa_number,
-      title: r.title || "Untitled RCFA",
-      equipmentDescription: r.equipment_description,
-      status: r.status,
-      operatingContext: r.operating_context,
-      createdAt: new Date(r.created_at).toISOString().slice(0, 10),
-      ownerUserId: r.owner_user_id,
-      ownerDisplayName: r.owner_display_name,
-      rootCauseCount: Number(r.final_root_cause_count),
-      actionItemCount: Number(r.action_item_count),
-      openActionCount: Number(r.open_action_item_count),
-    }));
+    const rows = browseResults.map((r) => mapRowToResponse(r));
 
     return NextResponse.json({
       rows,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -15,6 +15,10 @@ import {
   RCFA_STATUS_LABELS,
   RCFA_STATUS_COLORS,
 } from "@/lib/rcfa-utils";
+
+// Module-level cache for users list (rarely changes during a session)
+let usersCache: User[] | null = null;
+let usersFetchPromise: Promise<User[]> | null = null;
 
 export type RcfaTableRow = {
   id: string;
@@ -67,7 +71,8 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
   const [data, setData] = useState<RcfaTableRow[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [users, setUsers] = useState<User[]>([]);
+  // Initialize users from cache if available
+  const [users, setUsers] = useState<User[]>(usersCache ?? []);
   const [search, setSearch] = useState(urlSearch);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RcfaStatus>>(
     urlStatus ? new Set(urlStatus.split(",") as RcfaStatus[]) : new Set()
@@ -82,12 +87,32 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
     pageSize: 25,
   });
 
-  // Fetch users for owner filter dropdown
+  // Debounce search input - only triggers API calls after user stops typing
+  const deferredSearch = useDeferredValue(search);
+
+  // Ref for URL update debounce timer
+  const urlUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Fetch users for owner filter dropdown (with module-level cache)
   useEffect(() => {
-    fetch("/api/users")
-      .then((res) => res.json())
-      .then((data: User[]) => setUsers(data))
-      .catch(console.error);
+    // Skip fetch if we already have cached data
+    if (usersCache) return;
+
+    if (!usersFetchPromise) {
+      usersFetchPromise = fetch("/api/users")
+        .then((res) => res.json())
+        .then((data: User[]) => {
+          usersCache = data;
+          return data;
+        })
+        .catch((err) => {
+          console.error(err);
+          usersFetchPromise = null;
+          return [];
+        });
+    }
+
+    usersFetchPromise.then(setUsers);
   }, []);
 
   // Build API URL from current state
@@ -119,12 +144,12 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
       params.set("owner", selectedOwner);
     }
 
-    if (search.trim()) {
-      params.set("q", search.trim());
+    if (deferredSearch.trim()) {
+      params.set("q", deferredSearch.trim());
     }
 
     return `/api/rcfa?${params.toString()}`;
-  }, [pagination, sorting, selectedStatuses, selectedOwner, search, isMineFilter]);
+  }, [pagination, sorting, selectedStatuses, selectedOwner, deferredSearch, isMineFilter]);
 
   // Fetch data when filters/pagination change
   useEffect(() => {
@@ -149,27 +174,37 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
     return () => controller.abort();
   }, [buildApiUrl]);
 
-  // Update URL when filters change (debounced for search)
-  const updateUrl = useCallback(() => {
-    const params = new URLSearchParams();
-    if (pagination.pageIndex > 0) params.set("page", String(pagination.pageIndex + 1));
-    if (search.trim()) params.set("q", search.trim());
-    if (selectedStatuses.size > 0) params.set("status", Array.from(selectedStatuses).join(","));
-    if (selectedOwner && !isMineFilter) params.set("owner", selectedOwner);
-    if (isMineFilter) params.set("filter", "mine");
-    if (sorting.length > 0) {
-      const sortCol = sorting[0].id === "createdAt" ? "created_at" : sorting[0].id;
-      if (sortCol !== "created_at") params.set("sortBy", sortCol);
-      if (!sorting[0].desc) params.set("sortOrder", "asc");
+  // Update URL when filters change (debounced to prevent history spam)
+  useEffect(() => {
+    // Clear any pending URL update
+    if (urlUpdateTimerRef.current) {
+      clearTimeout(urlUpdateTimerRef.current);
     }
 
-    const newUrl = `/dashboard/rcfas${params.toString() ? `?${params.toString()}` : ""}`;
-    router.replace(newUrl, { scroll: false });
-  }, [pagination.pageIndex, search, selectedStatuses, selectedOwner, isMineFilter, sorting, router]);
+    // Debounce URL updates by 150ms
+    urlUpdateTimerRef.current = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (pagination.pageIndex > 0) params.set("page", String(pagination.pageIndex + 1));
+      if (deferredSearch.trim()) params.set("q", deferredSearch.trim());
+      if (selectedStatuses.size > 0) params.set("status", Array.from(selectedStatuses).join(","));
+      if (selectedOwner && !isMineFilter) params.set("owner", selectedOwner);
+      if (isMineFilter) params.set("filter", "mine");
+      if (sorting.length > 0) {
+        const sortCol = sorting[0].id === "createdAt" ? "created_at" : sorting[0].id;
+        if (sortCol !== "created_at") params.set("sortBy", sortCol);
+        if (!sorting[0].desc) params.set("sortOrder", "asc");
+      }
 
-  useEffect(() => {
-    updateUrl();
-  }, [updateUrl]);
+      const newUrl = `/dashboard/rcfas${params.toString() ? `?${params.toString()}` : ""}`;
+      router.replace(newUrl, { scroll: false });
+    }, 150);
+
+    return () => {
+      if (urlUpdateTimerRef.current) {
+        clearTimeout(urlUpdateTimerRef.current);
+      }
+    };
+  }, [pagination.pageIndex, deferredSearch, selectedStatuses, selectedOwner, isMineFilter, sorting, router]);
 
   // Toggle status filter
   const toggleStatus = (status: RcfaStatus) => {
