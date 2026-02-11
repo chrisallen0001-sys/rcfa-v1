@@ -16,6 +16,8 @@ import {
   RCFA_STATUS_COLORS,
 } from "@/lib/rcfa-utils";
 import { useUsers } from "@/hooks/useUsers";
+import ExportButtons from "@/components/ExportButtons";
+import { exportToCSV, exportToExcel, type ExportColumn } from "@/lib/export-utils";
 
 export type RcfaTableRow = {
   id: string;
@@ -292,6 +294,35 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
     []
   );
 
+  // Export column definitions
+  const exportColumns: ExportColumn<RcfaTableRow>[] = useMemo(
+    () => [
+      { header: "RCFA #", accessor: (row) => formatRcfaNumber(row.rcfaNumber) },
+      { header: "Title", accessor: "title" },
+      { header: "Status", accessor: (row) => RCFA_STATUS_LABELS[row.status] },
+      { header: "Owner", accessor: "ownerDisplayName" },
+      { header: "Created", accessor: "createdAt" },
+      { header: "Equipment", accessor: "equipmentDescription" },
+      { header: "Operating Context", accessor: "operatingContext" },
+      { header: "Root Causes", accessor: "rootCauseCount" },
+      { header: "Action Items", accessor: "actionItemCount" },
+      { header: "Open Actions", accessor: "openActionCount" },
+    ],
+    []
+  );
+
+  // Handle export
+  const handleExport = useCallback(
+    (format: "csv" | "xlsx") => {
+      if (format === "csv") {
+        exportToCSV(data, exportColumns, "rcfas");
+      } else {
+        exportToExcel(data, exportColumns, "rcfas");
+      }
+    },
+    [data, exportColumns]
+  );
+
   return (
     <div className="space-y-4">
       {/* Search input */}
@@ -372,10 +403,17 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
           </select>
         )}
 
-        {/* Result count */}
-        <span className="ml-auto text-xs text-zinc-500 dark:text-zinc-400">
-          {totalRows} RCFA{totalRows !== 1 ? "s" : ""} found
-        </span>
+        {/* Result count and export */}
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            {totalRows} RCFA{totalRows !== 1 ? "s" : ""} found
+          </span>
+          <ExportButtons
+            onExport={handleExport}
+            disabled={data.length === 0 || isLoading}
+            rowCount={data.length}
+          />
+        </div>
       </div>
 
       {/* Data table */}
