@@ -43,25 +43,6 @@ type MyActionItem = {
   rcfaTitle: string;
 };
 
-function ChevronRightIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1 dark:text-zinc-500"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9 5l7 7-7 7"
-      />
-    </svg>
-  );
-}
-
 export default async function HomePage() {
   const { displayName, userId } = await getAuthContext();
   const firstName = displayName.split(" ")[0];
@@ -146,39 +127,6 @@ export default async function HomePage() {
           </p>
         </div>
         <NewRcfaButton />
-      </div>
-
-      {/* Quick navigation */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/dashboard/rcfas"
-          className="group rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-medium text-zinc-900 dark:text-zinc-50">
-              All RCFAs
-            </h2>
-            <ChevronRightIcon />
-          </div>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            View and manage all Root Cause Failure Analyses
-          </p>
-        </Link>
-
-        <Link
-          href="/dashboard/action-items"
-          className="group rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-medium text-zinc-900 dark:text-zinc-50">
-              All Action Items
-            </h2>
-            <ChevronRightIcon />
-          </div>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Track and complete action items across all RCFAs
-          </p>
-        </Link>
       </div>
 
       {/* My Open RCFAs */}
