@@ -215,52 +215,56 @@ export default function EditableActionItem({
       type="button"
       onClick={() => !editing && setIsExpanded(!isExpanded)}
       disabled={editing}
-      className={`flex w-full items-center justify-between px-4 py-3 text-left ${
+      className={`flex w-full px-4 py-3 text-left ${
         editing ? "cursor-default" : "cursor-pointer"
       }`}
       aria-expanded={isExpanded}
       aria-label={isExpanded ? "Collapse action item" : "Expand action item"}
     >
-      <div className="flex flex-1 items-start gap-3 sm:items-center sm:overflow-hidden">
-        <div className="flex flex-1 items-baseline gap-2 sm:overflow-hidden">
+      <div className="flex w-full flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        {/* Row 1 on mobile / Left section on desktop: AI number + title */}
+        <div className="flex items-baseline gap-2 sm:min-w-0 sm:flex-1">
           <span className="shrink-0 font-mono text-xs text-zinc-500 dark:text-zinc-400">
             {formatActionItemNumber(actionItemNumber)}
           </span>
           <p
-            className="flex-1 line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
+            className="line-clamp-2 text-sm font-medium text-zinc-900 sm:truncate dark:text-zinc-100"
             title={initialActionText}
           >
             {initialActionText}
           </p>
         </div>
-        <div className="mt-0.5 flex shrink-0 items-center gap-2 sm:mt-0">
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[initialPriority] ?? ""}`}
+        {/* Row 2 on mobile / Right section on desktop: badges + chevron */}
+        <div className="flex items-center justify-between sm:justify-end sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[initialPriority] ?? ""}`}
+            >
+              {PRIORITY_LABELS[initialPriority] ?? initialPriority}
+            </span>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ACTION_STATUS_COLORS[status] ?? ""}`}
+            >
+              {ACTION_STATUS_LABELS[status] ?? status}
+            </span>
+          </div>
+          <svg
+            className={`h-5 w-5 shrink-0 text-zinc-400 transition-transform duration-200 ${
+              isExpanded ? "rotate-180" : ""
+            }`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            {PRIORITY_LABELS[initialPriority] ?? initialPriority}
-          </span>
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ACTION_STATUS_COLORS[status] ?? ""}`}
-          >
-            {ACTION_STATUS_LABELS[status] ?? status}
-          </span>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </div>
       </div>
-      <svg
-        className={`ml-3 h-5 w-5 shrink-0 text-zinc-400 transition-transform duration-200 ${
-          isExpanded ? "rotate-180" : ""
-        }`}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M19 9l-7 7-7-7"
-        />
-      </svg>
     </button>
   );
 

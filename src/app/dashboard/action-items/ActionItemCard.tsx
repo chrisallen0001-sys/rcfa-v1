@@ -153,20 +153,23 @@ export default function ActionItemCard({
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-baseline gap-2 overflow-hidden">
+      {/* Header: two rows on mobile, single row on desktop */}
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        {/* Row 1 on mobile / Left section on desktop: AI number + title */}
+        <div className="flex items-baseline gap-2 sm:min-w-0 sm:flex-1">
           <span className="shrink-0 font-mono text-xs text-zinc-500 dark:text-zinc-400">
             {formatActionItemNumber(item.actionItemNumber)}
           </span>
           <p
-            className="line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
+            className="line-clamp-2 text-sm font-medium text-zinc-900 sm:truncate dark:text-zinc-100"
             title={item.actionText}
           >
             {item.actionText}
           </p>
         </div>
+        {/* Row 2 on mobile / Right section on desktop: priority badge */}
         <span
-          className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityColors[item.priority]}`}
+          className={`inline-flex w-fit shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityColors[item.priority]}`}
         >
           {priorityLabels[item.priority]}
         </span>
