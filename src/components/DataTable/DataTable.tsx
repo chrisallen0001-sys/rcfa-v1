@@ -18,8 +18,9 @@ import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 
 export interface DataTableProps<TData> {
-  /** Column definitions for the table */
-  columns: ColumnDef<TData, unknown>[];
+  /** Column definitions for the table - uses any for value type to support mixed column types */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  columns: ColumnDef<TData, any>[];
   /** Data rows to display */
   data: TData[];
   /** Whether data is loading */

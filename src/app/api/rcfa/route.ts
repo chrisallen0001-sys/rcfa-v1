@@ -1,8 +1,255 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { OperatingContext } from "@/generated/prisma/client";
+import type { OperatingContext, RcfaStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import { VALID_OPERATING_CONTEXTS } from "@/lib/rcfa-utils";
+
+/**
+ * Row shape from rcfa_summary view for table listing.
+ */
+type SummaryRow = {
+  id: string;
+  rcfa_number: number;
+  title: string;
+  equipment_description: string;
+  status: RcfaStatus;
+  operating_context: OperatingContext;
+  created_at: Date;
+  owner_user_id: string;
+  owner_display_name: string;
+  final_root_cause_count: bigint;
+  action_item_count: bigint;
+  open_action_item_count: bigint;
+  total_count: bigint;
+};
+
+type SearchResultRow = SummaryRow & {
+  equip_headline: string;
+  failure_headline: string;
+  rank: number;
+};
+
+const VALID_SORT_COLUMNS = [
+  "rcfa_number",
+  "title",
+  "status",
+  "owner_display_name",
+  "created_at",
+  "equipment_description",
+  "operating_context",
+  "final_root_cause_count",
+  "action_item_count",
+];
+
+const VALID_STATUSES: RcfaStatus[] = ["draft", "investigation", "actions_open", "closed"];
+
+/**
+ * HTML-escape a string, then replace neutral highlight delimiters with <mark>.
+ */
+function sanitizeHighlight(raw: string): string {
+  const escaped = raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+  return escaped
+    .replace(/\[\[HL\]\]/g, "<mark>")
+    .replace(/\[\[\/HL\]\]/g, "</mark>");
+}
+
+/**
+ * GET /api/rcfa - List RCFAs with filtering, sorting, and pagination
+ *
+ * Query parameters:
+ * - page: Page number (default: 1)
+ * - pageSize: Items per page (default: 25, max: 100)
+ * - sortBy: Column to sort by (default: created_at)
+ * - sortOrder: asc or desc (default: desc)
+ * - status: Comma-separated status values to filter
+ * - owner: Owner user ID to filter
+ * - dateFrom: ISO date string for created_at >= filter
+ * - dateTo: ISO date string for created_at <= filter
+ * - q: Full-text search query
+ * - filter: Special filter ("mine" = current user's RCFAs)
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { userId } = await getAuthContext();
+    const { searchParams } = new URL(request.url);
+
+    // Parse pagination
+    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "25", 10) || 25));
+    const offset = (page - 1) * pageSize;
+
+    // Parse sorting
+    const sortBy = searchParams.get("sortBy") ?? "created_at";
+    const sortOrder = searchParams.get("sortOrder")?.toLowerCase() === "asc" ? "ASC" : "DESC";
+    const validatedSortBy = VALID_SORT_COLUMNS.includes(sortBy) ? sortBy : "created_at";
+
+    // Parse filters
+    const statusFilter = searchParams.get("status");
+    const ownerFilter = searchParams.get("owner");
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+    const searchQuery = searchParams.get("q")?.trim() ?? "";
+    const specialFilter = searchParams.get("filter");
+
+    // Build WHERE conditions
+    const conditions: string[] = [];
+    const params: (string | number | Date)[] = [];
+    let paramIndex = 1;
+
+    // Special filter: "mine" = current user's open RCFAs
+    if (specialFilter === "mine") {
+      conditions.push(`s.owner_user_id = $${paramIndex++}`);
+      params.push(userId);
+      conditions.push(`s.status != 'closed'`);
+    }
+
+    // Status filter
+    if (statusFilter) {
+      const statuses = statusFilter.split(",").filter((s) => VALID_STATUSES.includes(s as RcfaStatus));
+      if (statuses.length > 0) {
+        conditions.push(`s.status = ANY($${paramIndex++})`);
+        params.push(statuses as unknown as string);
+      }
+    }
+
+    // Owner filter
+    if (ownerFilter && !specialFilter) {
+      conditions.push(`s.owner_user_id = $${paramIndex++}`);
+      params.push(ownerFilter);
+    }
+
+    // Date range filters
+    if (dateFrom) {
+      conditions.push(`s.created_at >= $${paramIndex++}`);
+      params.push(new Date(dateFrom));
+    }
+    if (dateTo) {
+      conditions.push(`s.created_at <= $${paramIndex++}`);
+      params.push(new Date(dateTo + "T23:59:59.999Z"));
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    if (searchQuery) {
+      // Full-text search query
+      const searchSql = `
+        WITH matches AS (
+          SELECT
+            s.*,
+            ts_rank(
+              to_tsvector('english', s.equipment_description) ||
+              to_tsvector('english', r.failure_description),
+              plainto_tsquery('english', $${paramIndex})
+            ) AS rank,
+            ts_headline('english', s.equipment_description, plainto_tsquery('english', $${paramIndex}),
+              'StartSel=[[HL]], StopSel=[[/HL]], MaxFragments=1, MaxWords=30') AS equip_headline,
+            ts_headline('english', r.failure_description, plainto_tsquery('english', $${paramIndex}),
+              'StartSel=[[HL]], StopSel=[[/HL]], MaxFragments=1, MaxWords=30') AS failure_headline
+          FROM rcfa_summary s
+          JOIN rcfa r ON r.id = s.id
+          ${whereClause ? whereClause + " AND " : "WHERE "}
+          (
+            to_tsvector('english', s.equipment_description) ||
+            to_tsvector('english', r.failure_description)
+          ) @@ plainto_tsquery('english', $${paramIndex})
+        )
+        SELECT
+          m.*,
+          COUNT(*) OVER() AS total_count
+        FROM matches m
+        ORDER BY m.rank DESC, m.created_at DESC
+        LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
+      `;
+
+      const searchResults = await prisma.$queryRawUnsafe<SearchResultRow[]>(
+        searchSql,
+        ...params,
+        searchQuery,
+        pageSize,
+        offset
+      );
+
+      const total = searchResults.length > 0 ? Number(searchResults[0].total_count) : 0;
+      const rows = searchResults.map((r) => ({
+        id: r.id,
+        rcfaNumber: r.rcfa_number,
+        title: r.title || "Untitled RCFA",
+        equipmentDescription: r.equipment_description,
+        status: r.status,
+        operatingContext: r.operating_context,
+        createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+        ownerUserId: r.owner_user_id,
+        ownerDisplayName: r.owner_display_name,
+        rootCauseCount: Number(r.final_root_cause_count),
+        actionItemCount: Number(r.action_item_count),
+        openActionCount: Number(r.open_action_item_count),
+        equipmentHighlight: sanitizeHighlight(r.equip_headline),
+        failureHighlight: sanitizeHighlight(r.failure_headline),
+      }));
+
+      return NextResponse.json({
+        rows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      });
+    }
+
+    // Browse query (no search)
+    const browseSql = `
+      SELECT
+        s.*,
+        COUNT(*) OVER() AS total_count
+      FROM rcfa_summary s
+      ${whereClause}
+      ORDER BY s.${validatedSortBy} ${sortOrder}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    const browseResults = await prisma.$queryRawUnsafe<SummaryRow[]>(
+      browseSql,
+      ...params,
+      pageSize,
+      offset
+    );
+
+    const total = browseResults.length > 0 ? Number(browseResults[0].total_count) : 0;
+    const rows = browseResults.map((r) => ({
+      id: r.id,
+      rcfaNumber: r.rcfa_number,
+      title: r.title || "Untitled RCFA",
+      equipmentDescription: r.equipment_description,
+      status: r.status,
+      operatingContext: r.operating_context,
+      createdAt: new Date(r.created_at).toISOString().slice(0, 10),
+      ownerUserId: r.owner_user_id,
+      ownerDisplayName: r.owner_display_name,
+      rootCauseCount: Number(r.final_root_cause_count),
+      actionItemCount: Number(r.action_item_count),
+      openActionCount: Number(r.open_action_item_count),
+    }));
+
+    return NextResponse.json({
+      rows,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
+  } catch (error) {
+    console.error("GET /api/rcfa error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
 
 /**
  * POST /api/rcfa - Create a new RCFA
