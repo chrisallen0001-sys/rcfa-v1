@@ -144,14 +144,16 @@ function Section({
   children,
   headerContent,
   status,
+  defaultExpanded,
 }: {
   title: string;
   children: React.ReactNode;
   headerContent?: React.ReactNode;
   status?: SectionStatus;
+  defaultExpanded?: boolean;
 }) {
   return (
-    <CollapsibleSection title={title} headerContent={headerContent} status={status}>
+    <CollapsibleSection title={title} headerContent={headerContent} status={status} defaultExpanded={defaultExpanded}>
       {children}
     </CollapsibleSection>
   );
@@ -242,11 +244,11 @@ export default async function RcfaDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{ new?: string; expandItem?: string }>;
 }) {
   const { userId, role } = await getAuthContext();
   const { id } = await params;
-  const { new: isNew } = await searchParams;
+  const { new: isNew, expandItem } = await searchParams;
   const isNewRcfa = isNew === "true";
 
   if (!UUID_RE.test(id)) {
@@ -377,6 +379,28 @@ export default async function RcfaDetailPage({
 
   // Helper for statuses that allow action item editing
   const canEditActionItems = (rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit;
+
+  // Deep-link: determine which action item to expand
+  // Supports both "AI-XXXX" format and raw UUID
+  const getExpandedActionItemId = (): string | null => {
+    if (!expandItem) return null;
+
+    // Check if it's a UUID directly
+    if (UUID_RE.test(expandItem)) {
+      return rcfa.actionItems.some((a) => a.id === expandItem) ? expandItem : null;
+    }
+
+    // Check if it's an AI-XXXX format (e.g., "AI-0001" or "AI-1")
+    const aiMatch = expandItem.match(/^AI-?(\d+)$/i);
+    if (aiMatch) {
+      const actionItemNumber = parseInt(aiMatch[1], 10);
+      const matchingItem = rcfa.actionItems.find((a) => a.actionItemNumber === actionItemNumber);
+      return matchingItem?.id ?? null;
+    }
+
+    return null;
+  };
+  const expandedActionItemId = getExpandedActionItemId();
 
   // Shared header content (RCFA number, title, badge, owner)
   const headerContent = (
@@ -716,6 +740,7 @@ export default async function RcfaDetailPage({
                 <Section
                   title="Final Action Items"
                   status={sectionStatuses?.trackedActions}
+                  defaultExpanded={!!expandedActionItemId}
                   headerContent={
                     totalActionItems > 0 ? (
                       <div className="flex items-center gap-2">
@@ -750,6 +775,7 @@ export default async function RcfaDetailPage({
                         createdByEmail={a.createdBy.email}
                         createdAt={a.createdAt.toISOString().slice(0, 10)}
                         canEdit={canEditActionItems}
+                        defaultExpanded={a.id === expandedActionItemId}
                       />
                     ))}
                     {canEditActionItems && (
@@ -959,6 +985,7 @@ export default async function RcfaDetailPage({
         {rcfa.status === "closed" && rcfa.actionItems.length > 0 && (
           <Section
             title="Final Action Items"
+            defaultExpanded={!!expandedActionItemId}
             headerContent={
               totalActionItems > 0 ? (
                 <div className="flex items-center gap-2">
@@ -993,6 +1020,7 @@ export default async function RcfaDetailPage({
                   createdByEmail={a.createdBy.email}
                   createdAt={a.createdAt.toISOString().slice(0, 10)}
                   canEdit={false}
+                  defaultExpanded={a.id === expandedActionItemId}
                 />
               ))}
             </div>

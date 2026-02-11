@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
 import { useUsers } from "./useUsers";
@@ -52,6 +52,8 @@ interface EditableActionItemProps {
   createdByEmail: string;
   createdAt: string;
   canEdit: boolean;
+  /** When true, the action item starts expanded and scrolls into view */
+  defaultExpanded?: boolean;
 }
 
 export default function EditableActionItem({
@@ -69,9 +71,16 @@ export default function EditableActionItem({
   createdByEmail,
   createdAt,
   canEdit,
+  defaultExpanded = false,
 }: EditableActionItemProps) {
   const router = useRouter();
-  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Refs
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pendingRef = useRef(false);
+
+  // State
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [editing, setEditing] = useState(false);
   const [actionText, setActionText] = useState(initialActionText);
   const [actionDescription, setActionDescription] = useState(
@@ -84,11 +93,22 @@ export default function EditableActionItem({
   const [editStatus, setEditStatus] = useState(status);
   const [dueDate, setDueDate] = useState(initialDueDate ?? "");
   const [ownerUserId, setOwnerUserId] = useState(initialOwnerUserId ?? "");
-  const { users, loading: loadingUsers } = useUsers(canEdit && (editing || isExpanded));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const pendingRef = useRef(false);
+
+  // Custom hooks
+  const { users, loading: loadingUsers } = useUsers(canEdit && (editing || isExpanded));
+
+  // Scroll into view when defaultExpanded is true (deep-link navigation)
+  useEffect(() => {
+    if (defaultExpanded && containerRef.current) {
+      // Use rAF to ensure DOM is painted before scrolling
+      requestAnimationFrame(() => {
+        containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+  }, [defaultExpanded]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -271,7 +291,7 @@ export default function EditableActionItem({
   // Editing form content
   if (editing) {
     return (
-      <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      <div ref={containerRef} className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
         {headerRow}
         <form onSubmit={handleSave} className="px-4 pb-4">
           <div className="space-y-3">
@@ -388,7 +408,7 @@ export default function EditableActionItem({
 
   // Read-only expanded view
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <div ref={containerRef} className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       {headerRow}
       <div
         className={`overflow-hidden transition-all duration-200 ${
