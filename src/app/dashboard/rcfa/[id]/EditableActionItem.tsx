@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "@/components/DateInput";
 import { useUsers } from "./useUsers";
+import { formatActionItemNumber } from "@/lib/rcfa-utils";
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: "Low",
@@ -39,6 +40,7 @@ const ACTION_STATUS_COLORS: Record<string, string> = {
 interface EditableActionItemProps {
   rcfaId: string;
   actionItemId: string;
+  actionItemNumber: number;
   actionText: string;
   actionDescription: string | null;
   completionNotes: string | null;
@@ -55,6 +57,7 @@ interface EditableActionItemProps {
 export default function EditableActionItem({
   rcfaId,
   actionItemId,
+  actionItemNumber,
   actionText: initialActionText,
   actionDescription: initialActionDescription,
   completionNotes: initialCompletionNotes,
@@ -219,12 +222,17 @@ export default function EditableActionItem({
       aria-label={isExpanded ? "Collapse action item" : "Expand action item"}
     >
       <div className="flex flex-1 items-start gap-3 sm:items-center sm:overflow-hidden">
-        <p
-          className="flex-1 line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
-          title={initialActionText}
-        >
-          {initialActionText}
-        </p>
+        <div className="flex flex-1 items-baseline gap-2 sm:overflow-hidden">
+          <span className="shrink-0 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+            {formatActionItemNumber(actionItemNumber)}
+          </span>
+          <p
+            className="flex-1 line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
+            title={initialActionText}
+          >
+            {initialActionText}
+          </p>
+        </div>
         <div className="mt-0.5 flex shrink-0 items-center gap-2 sm:mt-0">
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[initialPriority] ?? ""}`}
