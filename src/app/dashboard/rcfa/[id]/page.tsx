@@ -144,14 +144,16 @@ function Section({
   children,
   headerContent,
   status,
+  defaultExpanded,
 }: {
   title: string;
   children: React.ReactNode;
   headerContent?: React.ReactNode;
   status?: SectionStatus;
+  defaultExpanded?: boolean;
 }) {
   return (
-    <CollapsibleSection title={title} headerContent={headerContent} status={status}>
+    <CollapsibleSection title={title} headerContent={headerContent} status={status} defaultExpanded={defaultExpanded}>
       {children}
     </CollapsibleSection>
   );
@@ -738,6 +740,7 @@ export default async function RcfaDetailPage({
                 <Section
                   title="Final Action Items"
                   status={sectionStatuses?.trackedActions}
+                  defaultExpanded={!!expandedActionItemId}
                   headerContent={
                     totalActionItems > 0 ? (
                       <div className="flex items-center gap-2">
@@ -982,6 +985,7 @@ export default async function RcfaDetailPage({
         {rcfa.status === "closed" && rcfa.actionItems.length > 0 && (
           <Section
             title="Final Action Items"
+            defaultExpanded={!!expandedActionItemId}
             headerContent={
               totalActionItems > 0 ? (
                 <div className="flex items-center gap-2">

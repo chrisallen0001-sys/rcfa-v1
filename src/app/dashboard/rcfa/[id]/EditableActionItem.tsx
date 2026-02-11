@@ -74,19 +74,13 @@ export default function EditableActionItem({
   defaultExpanded = false,
 }: EditableActionItemProps) {
   const router = useRouter();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  // Scroll into view when defaultExpanded is true (deep-link navigation)
-  useEffect(() => {
-    if (defaultExpanded && containerRef.current) {
-      // Small delay to ensure DOM is fully rendered
-      const timer = setTimeout(() => {
-        containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [defaultExpanded]);
+  // Refs
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pendingRef = useRef(false);
+
+  // State
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [editing, setEditing] = useState(false);
   const [actionText, setActionText] = useState(initialActionText);
   const [actionDescription, setActionDescription] = useState(
@@ -99,11 +93,22 @@ export default function EditableActionItem({
   const [editStatus, setEditStatus] = useState(status);
   const [dueDate, setDueDate] = useState(initialDueDate ?? "");
   const [ownerUserId, setOwnerUserId] = useState(initialOwnerUserId ?? "");
-  const { users, loading: loadingUsers } = useUsers(canEdit && (editing || isExpanded));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const pendingRef = useRef(false);
+
+  // Custom hooks
+  const { users, loading: loadingUsers } = useUsers(canEdit && (editing || isExpanded));
+
+  // Scroll into view when defaultExpanded is true (deep-link navigation)
+  useEffect(() => {
+    if (defaultExpanded && containerRef.current) {
+      // Use rAF to ensure DOM is painted before scrolling
+      requestAnimationFrame(() => {
+        containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+  }, [defaultExpanded]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
