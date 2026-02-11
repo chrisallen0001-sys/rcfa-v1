@@ -262,6 +262,9 @@ model RcfaActionItemCandidate {
   timeframeText     String?   @map("timeframe_text")
   suggestedDueDate  DateTime? @map("suggested_due_date") @db.Date
 
+  // Stores the action item number when first promoted (for re-promotion)
+  assignedActionItemNumber Int? @map("assigned_action_item_number")
+
   generatedBy GeneratedBy @default(ai) @map("generated_by")
   generatedAt DateTime    @default(now()) @map("generated_at") @db.Timestamptz
 
@@ -278,8 +281,9 @@ model RcfaActionItemCandidate {
 // -----------------------------
 
 model RcfaActionItem {
-  id     String @id @default(uuid()) @db.Uuid
-  rcfaId String @map("rcfa_id") @db.Uuid
+  id               String @id @default(uuid()) @db.Uuid
+  rcfaId           String @map("rcfa_id") @db.Uuid
+  actionItemNumber Int    @unique @map("action_item_number")
 
   actionText        String  @map("action_text")
   actionDescription String? @map("action_description")

@@ -70,9 +70,29 @@ export async function POST(
         throw new Error("ALREADY_PROMOTED");
       }
 
+      // Determine action item number (re-use if previously promoted, otherwise get next)
+      let actionItemNumber: number;
+      if (candidate.assignedActionItemNumber) {
+        // Re-promotion: reuse previously assigned number
+        actionItemNumber = candidate.assignedActionItemNumber;
+      } else {
+        // First-time promotion: get next from sequence
+        const [{ nextval }] = await tx.$queryRaw<[{ nextval: bigint }]>`
+          SELECT nextval('action_item_number_seq')
+        `;
+        actionItemNumber = Number(nextval);
+
+        // Store on candidate for potential re-promotion
+        await tx.rcfaActionItemCandidate.update({
+          where: { id: candidateId },
+          data: { assignedActionItemNumber: actionItemNumber },
+        });
+      }
+
       const created = await tx.rcfaActionItem.create({
         data: {
           rcfaId: id,
+          actionItemNumber,
           actionText: candidate.actionText,
           actionDescription: candidate.rationaleText,
           priority: candidate.priority,
@@ -91,6 +111,7 @@ export async function POST(
           eventPayload: {
             candidateId,
             actionItemId: created.id,
+            actionItemNumber,
             actionText: candidate.actionText,
             actionDescription: candidate.rationaleText,
           },
