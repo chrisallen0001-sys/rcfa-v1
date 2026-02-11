@@ -34,3 +34,8 @@ ALTER TABLE "rcfa_action_item" ALTER COLUMN "action_item_number" SET NOT NULL;
 -- Add unique constraint
 ALTER TABLE "rcfa_action_item" ADD CONSTRAINT "rcfa_action_item_action_item_number_key"
   UNIQUE ("action_item_number");
+
+-- Add partial index on assigned_action_item_number for re-promotion lookups
+CREATE INDEX "rcfa_action_item_candidate_assigned_action_item_number_idx"
+  ON "rcfa_action_item_candidate" ("assigned_action_item_number")
+  WHERE assigned_action_item_number IS NOT NULL;
