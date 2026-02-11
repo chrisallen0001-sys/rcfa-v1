@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import ExportButtons from "@/components/ExportButtons";
+import { exportToCSV, exportToExcel, type ExportColumn } from "@/lib/export-utils";
 import Link from "next/link";
 import {
   DataTable,
@@ -381,6 +383,35 @@ export default function ActionItemsTable() {
     []
   );
 
+  // Export column definitions
+  const exportColumns: ExportColumn<ActionItemTableRow>[] = useMemo(
+    () => [
+      { header: "ID", accessor: (row) => formatActionItemNumber(row.actionItemNumber) },
+      { header: "Title", accessor: "actionText" },
+      { header: "Description", accessor: "actionDescription" },
+      { header: "Status", accessor: (row) => ACTION_STATUS_LABELS[row.status] },
+      { header: "Priority", accessor: (row) => PRIORITY_LABELS[row.priority] },
+      { header: "Owner", accessor: (row) => row.ownerDisplayName ?? "Unassigned" },
+      { header: "Due Date", accessor: "dueDate" },
+      { header: "Created", accessor: "createdAt" },
+      { header: "RCFA #", accessor: (row) => formatRcfaNumber(row.rcfaNumber) },
+      { header: "RCFA Title", accessor: "rcfaTitle" },
+    ],
+    []
+  );
+
+  // Handle export
+  const handleExport = useCallback(
+    (format: "csv" | "xlsx") => {
+      if (format === "csv") {
+        exportToCSV(data, exportColumns, "action-items");
+      } else {
+        exportToExcel(data, exportColumns, "action-items");
+      }
+    },
+    [data, exportColumns]
+  );
+
   return (
     <div className="space-y-4">
       {/* Tab navigation */}
@@ -457,10 +488,17 @@ export default function ActionItemsTable() {
           </select>
         )}
 
-        {/* Result count */}
-        <span className="ml-auto text-xs text-zinc-500 dark:text-zinc-400">
-          {totalRows} action item{totalRows !== 1 ? "s" : ""} found
-        </span>
+        {/* Result count and export */}
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            {totalRows} action item{totalRows !== 1 ? "s" : ""} found
+          </span>
+          <ExportButtons
+            onExport={handleExport}
+            disabled={data.length === 0 || isLoading}
+            rowCount={data.length}
+          />
+        </div>
       </div>
 
       {/* Data table */}
