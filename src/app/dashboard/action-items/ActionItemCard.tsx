@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import type { ActionItemRow, UserOption } from "./page";
 import DateInput from "@/components/DateInput";
+import { formatActionItemNumber } from "@/lib/rcfa-utils";
 
 type Props = {
   item: ActionItemRow;
@@ -153,12 +154,17 @@ export default function ActionItemCard({
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-start justify-between gap-2">
-        <p
-          className="line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
-          title={item.actionText}
-        >
-          {item.actionText}
-        </p>
+        <div className="flex items-baseline gap-2 overflow-hidden">
+          <span className="shrink-0 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+            {formatActionItemNumber(item.actionItemNumber)}
+          </span>
+          <p
+            className="line-clamp-3 text-sm font-medium text-zinc-900 sm:block sm:truncate sm:line-clamp-none dark:text-zinc-100"
+            title={item.actionText}
+          >
+            {item.actionText}
+          </p>
+        </div>
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityColors[item.priority]}`}
         >

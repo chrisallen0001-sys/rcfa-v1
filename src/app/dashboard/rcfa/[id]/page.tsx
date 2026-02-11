@@ -738,6 +738,7 @@ export default async function RcfaDetailPage({
                         key={a.id}
                         rcfaId={rcfa.id}
                         actionItemId={a.id}
+                        actionItemNumber={a.actionItemNumber}
                         actionText={a.actionText}
                         actionDescription={a.actionDescription}
                         completionNotes={a.completionNotes}
@@ -980,6 +981,7 @@ export default async function RcfaDetailPage({
                   key={a.id}
                   rcfaId={rcfa.id}
                   actionItemId={a.id}
+                  actionItemNumber={a.actionItemNumber}
                   actionText={a.actionText}
                   actionDescription={a.actionDescription}
                   completionNotes={a.completionNotes}

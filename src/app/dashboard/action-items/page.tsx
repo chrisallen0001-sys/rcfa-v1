@@ -38,6 +38,7 @@ const STATUS_LABELS: Record<ActionItemStatus, string> = {
 
 export type ActionItemRow = {
   id: string;
+  actionItemNumber: number;
   actionText: string;
   actionDescription: string | null;
   completionNotes: string | null;
@@ -91,6 +92,7 @@ export default async function ActionItemsPage({
 
   const rows: ActionItemRow[] = items.map((item) => ({
     id: item.id,
+    actionItemNumber: item.actionItemNumber,
     actionText: item.actionText,
     actionDescription: item.actionDescription,
     completionNotes: item.completionNotes,
