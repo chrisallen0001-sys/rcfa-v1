@@ -3,6 +3,8 @@ import type { ActionItemStatus, Priority } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Row shape for action items table listing.
  */
@@ -140,6 +142,9 @@ export async function GET(request: NextRequest) {
 
     // Owner filter (only if not using "mine" filter)
     if (ownerFilter && !specialFilter) {
+      if (!UUID_RE.test(ownerFilter)) {
+        return NextResponse.json({ error: "Invalid owner ID" }, { status: 400 });
+      }
       conditions.push(`ai.owner_user_id = $${paramIndex++}`);
       params.push(ownerFilter);
     }
@@ -148,7 +153,7 @@ export async function GET(request: NextRequest) {
 
     // Handle NULL sorting for due_date (NULLs last for ASC, first for DESC)
     const orderByClause = validatedSortBy === "due_date"
-      ? `ORDER BY ai.due_date IS NULL ${sortOrder === "ASC" ? "ASC" : "DESC"}, ai.due_date ${sortOrder}`
+      ? `ORDER BY ai.due_date ${sortOrder} NULLS ${sortOrder === "ASC" ? "LAST" : "FIRST"}`
       : `ORDER BY ${validatedSortBy === "owner_display_name" ? "u.display_name" : validatedSortBy === "rcfa_number" ? "r.rcfa_number" : `ai.${validatedSortBy}`} ${sortOrder}`;
 
     const sql = `

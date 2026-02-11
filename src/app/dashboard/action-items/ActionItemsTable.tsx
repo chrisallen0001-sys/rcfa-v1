@@ -19,10 +19,7 @@ import {
   PRIORITY_COLORS,
   formatDueDateWithColor,
 } from "@/lib/rcfa-utils";
-
-// Module-level cache for users list (rarely changes during a session)
-let usersCache: User[] | null = null;
-let usersFetchPromise: Promise<User[]> | null = null;
+import { useUsers } from "@/hooks/useUsers";
 
 export type ActionItemTableRow = {
   id: string;
@@ -46,11 +43,6 @@ type ApiResponse = {
   page: number;
   pageSize: number;
   totalPages: number;
-};
-
-type User = {
-  id: string;
-  displayName: string;
 };
 
 const ALL_STATUSES: ActionItemStatus[] = ["open", "in_progress", "blocked", "done", "canceled"];
@@ -79,6 +71,7 @@ const STATUS_TABS: StatusTabInfo[] = [
 export default function ActionItemsTable() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const users = useUsers();
 
   // Parse initial state from URL
   const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
@@ -94,8 +87,6 @@ export default function ActionItemsTable() {
   const [data, setData] = useState<ActionItemTableRow[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  // Initialize users from cache if available
-  const [users, setUsers] = useState<User[]>(usersCache ?? []);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<ActionItemStatus>>(
     urlStatus ? new Set(urlStatus.split(",") as ActionItemStatus[]) : new Set()
   );
@@ -122,28 +113,6 @@ export default function ActionItemsTable() {
 
   // Ref for URL update debounce timer
   const urlUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  // Fetch users for owner filter dropdown (with module-level cache)
-  useEffect(() => {
-    // Skip fetch if we already have cached data
-    if (usersCache) return;
-
-    if (!usersFetchPromise) {
-      usersFetchPromise = fetch("/api/users")
-        .then((res) => res.json())
-        .then((data: User[]) => {
-          usersCache = data;
-          return data;
-        })
-        .catch((err) => {
-          console.error(err);
-          usersFetchPromise = null;
-          return [];
-        });
-    }
-
-    usersFetchPromise.then(setUsers);
-  }, []);
 
   // Build API URL from current state
   const buildApiUrl = useCallback(() => {
@@ -185,7 +154,7 @@ export default function ActionItemsTable() {
     return `/api/action-items?${params.toString()}`;
   }, [pagination, sorting, selectedStatuses, selectedPriorities, selectedOwner, isMineFilter, activeTab]);
 
-  // Fetch counts for tabs
+  // Fetch counts for tabs (refreshes when data changes)
   useEffect(() => {
     const controller = new AbortController();
 
@@ -197,11 +166,17 @@ export default function ActionItemsTable() {
           fetch("/api/action-items?pageSize=1&filter=mine", { signal: controller.signal }),
         ]);
 
+        // Check if aborted before parsing JSON
+        if (controller.signal.aborted) return;
+
         const [allData, openData, mineData] = await Promise.all([
           allRes.json(),
           openRes.json(),
           mineRes.json(),
         ]);
+
+        // Check again before setting state
+        if (controller.signal.aborted) return;
 
         setStatusCounts({
           all: allData.total ?? 0,
@@ -218,7 +193,7 @@ export default function ActionItemsTable() {
     fetchCounts();
 
     return () => controller.abort();
-  }, []);
+  }, [data]); // Refresh counts when main data changes
 
   // Fetch data when filters/pagination change
   useEffect(() => {
@@ -308,11 +283,7 @@ export default function ActionItemsTable() {
     setActiveTab(tab);
     setIsMineFilter(tab === "mine");
     // Clear status filter when switching tabs to avoid confusion
-    if (tab === "open") {
-      setSelectedStatuses(new Set());
-    } else if (tab === "all") {
-      setSelectedStatuses(new Set());
-    }
+    setSelectedStatuses(new Set());
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 

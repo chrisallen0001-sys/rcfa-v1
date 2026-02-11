@@ -15,10 +15,7 @@ import {
   RCFA_STATUS_LABELS,
   RCFA_STATUS_COLORS,
 } from "@/lib/rcfa-utils";
-
-// Module-level cache for users list (rarely changes during a session)
-let usersCache: User[] | null = null;
-let usersFetchPromise: Promise<User[]> | null = null;
+import { useUsers } from "@/hooks/useUsers";
 
 export type RcfaTableRow = {
   id: string;
@@ -45,11 +42,6 @@ type ApiResponse = {
   totalPages: number;
 };
 
-type User = {
-  id: string;
-  displayName: string;
-};
-
 const ALL_STATUSES: RcfaStatus[] = ["draft", "investigation", "actions_open", "closed"];
 
 const columnHelper = createColumnHelper<RcfaTableRow>();
@@ -57,6 +49,7 @@ const columnHelper = createColumnHelper<RcfaTableRow>();
 export default function RcfaTable({ initialFilter }: { initialFilter?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const users = useUsers();
 
   // Parse initial state from URL
   const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
@@ -71,8 +64,6 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
   const [data, setData] = useState<RcfaTableRow[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  // Initialize users from cache if available
-  const [users, setUsers] = useState<User[]>(usersCache ?? []);
   const [search, setSearch] = useState(urlSearch);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RcfaStatus>>(
     urlStatus ? new Set(urlStatus.split(",") as RcfaStatus[]) : new Set()
@@ -92,28 +83,6 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
 
   // Ref for URL update debounce timer
   const urlUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  // Fetch users for owner filter dropdown (with module-level cache)
-  useEffect(() => {
-    // Skip fetch if we already have cached data
-    if (usersCache) return;
-
-    if (!usersFetchPromise) {
-      usersFetchPromise = fetch("/api/users")
-        .then((res) => res.json())
-        .then((data: User[]) => {
-          usersCache = data;
-          return data;
-        })
-        .catch((err) => {
-          console.error(err);
-          usersFetchPromise = null;
-          return [];
-        });
-    }
-
-    usersFetchPromise.then(setUsers);
-  }, []);
 
   // Build API URL from current state
   const buildApiUrl = useCallback(() => {
