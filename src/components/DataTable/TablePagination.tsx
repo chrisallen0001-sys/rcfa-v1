@@ -20,7 +20,7 @@ export default function TablePagination<TData>({
 
   // Calculate row range for display
   const totalRowCount = totalRows ?? table.getFilteredRowModel().rows.length;
-  const startRow = pageIndex * pageSize + 1;
+  const startRow = totalRowCount > 0 ? pageIndex * pageSize + 1 : 0;
   const endRow = Math.min((pageIndex + 1) * pageSize, totalRowCount);
 
   return (
@@ -69,7 +69,7 @@ export default function TablePagination<TData>({
             aria-label="Go to previous page"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
 

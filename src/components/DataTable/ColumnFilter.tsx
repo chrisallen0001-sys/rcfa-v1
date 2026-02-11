@@ -1,7 +1,7 @@
 "use client";
 
 import { type Column } from "@tanstack/react-table";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface ColumnFilterProps<TData> {
   column: Column<TData, unknown>;
@@ -25,7 +25,15 @@ export default function ColumnFilter<TData>({ column }: ColumnFilterProps<TData>
 
   const columnFilterValue = column.getFilterValue() as string | undefined;
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   // Debounced text filter update
   const handleTextChange = useCallback(
@@ -73,7 +81,6 @@ export default function ColumnFilter<TData>({ column }: ColumnFilterProps<TData>
   // This avoids needing to sync React state with external filter state
   return (
     <input
-      ref={inputRef}
       key={columnFilterValue === undefined ? "empty" : "filled"}
       type="text"
       defaultValue={columnFilterValue ?? ""}

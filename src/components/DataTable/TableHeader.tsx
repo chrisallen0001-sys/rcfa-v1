@@ -69,10 +69,13 @@ export default function TableHeader<TData>({
     }
   };
 
+  // TanStack Table default column size is 150 - only apply custom width if different
+  const TANSTACK_DEFAULT_COLUMN_SIZE = 150;
+
   return (
     <th
       className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-400"
-      style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
+      style={{ width: header.getSize() !== TANSTACK_DEFAULT_COLUMN_SIZE ? header.getSize() : undefined }}
     >
       <div className="flex flex-col gap-2">
         {/* Header label with sort toggle */}
