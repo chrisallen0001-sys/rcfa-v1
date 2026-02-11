@@ -114,9 +114,8 @@ export function exportToExcel<T extends Record<string, unknown>>(
   // Auto-size columns based on content
   const colWidths = columns.map((col, i) => {
     const headerLen = col.header.length;
-    const maxDataLen = Math.max(
-      ...wsData.slice(1).map((row) => String(row[i] ?? "").length)
-    );
+    const dataLengths = wsData.slice(1).map((row) => String(row[i] ?? "").length);
+    const maxDataLen = dataLengths.length > 0 ? Math.max(...dataLengths) : 0;
     return { wch: Math.min(Math.max(headerLen, maxDataLen) + 2, 50) };
   });
   ws["!cols"] = colWidths;
