@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { NewRcfaButton } from "@/components/NewRcfaButton";
 import RcfaTable from "./RcfaTable";
 import Link from "next/link";
 
@@ -55,19 +54,16 @@ export default async function RcfasPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            RCFAs
-          </h1>
-          <Link
-            href="/dashboard/action-items"
-            className="text-sm text-zinc-500 hover:text-zinc-700 hover:underline dark:text-zinc-400 dark:hover:text-zinc-300"
-          >
-            View Action Items →
-          </Link>
-        </div>
-        <NewRcfaButton />
+      <div className="mb-6 flex items-center gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          RCFAs
+        </h1>
+        <Link
+          href="/dashboard/action-items"
+          className="text-sm text-zinc-500 hover:text-zinc-700 hover:underline dark:text-zinc-400 dark:hover:text-zinc-300"
+        >
+          View Action Items →
+        </Link>
       </div>
       <Suspense fallback={<TableSkeleton />}>
         <RcfaTable initialFilter={filter} />

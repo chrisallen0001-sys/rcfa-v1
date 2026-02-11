@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NewRcfaButton } from "./NewRcfaButton";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", exact: true },
@@ -38,6 +39,7 @@ export default function DashboardNav() {
           </Link>
         );
       })}
+      <NewRcfaButton />
     </nav>
   );
 }
