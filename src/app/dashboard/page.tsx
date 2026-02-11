@@ -11,7 +11,6 @@ import {
   ACTION_STATUS_LABELS,
   ACTION_STATUS_COLORS,
 } from "@/lib/rcfa-utils";
-import { NewRcfaButton } from "@/components/NewRcfaButton";
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { RcfaStatus, Priority, ActionItemStatus } from "@/generated/prisma/client";
@@ -117,16 +116,13 @@ export default async function HomePage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Welcome back, {firstName}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Your personalized dashboard for RCFAs and action items.
-          </p>
-        </div>
-        <NewRcfaButton />
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Welcome back, {firstName}
+        </h1>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Your personalized dashboard for RCFAs and action items.
+        </p>
       </div>
 
       {/* My Open RCFAs */}
