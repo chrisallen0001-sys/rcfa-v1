@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { RcfaStatus } from "@/generated/prisma/client";
-import type { RcfaRow } from "./page";
+import type { RcfaRow } from "./rcfas/page";
 import { formatRcfaNumber } from "@/lib/rcfa-utils";
 
 type Props = {
