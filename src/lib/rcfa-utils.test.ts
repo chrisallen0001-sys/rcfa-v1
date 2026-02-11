@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatRcfaNumber,
+  formatActionItemNumber,
   validateStatusTransition,
   VALID_STATUS_TRANSITIONS,
   PATCH_ALLOWED_TRANSITIONS,
@@ -30,6 +31,33 @@ describe("rcfa-utils", () => {
     it("handles numbers larger than 3 digits", () => {
       expect(formatRcfaNumber(1000)).toBe("RCFA-1000");
       expect(formatRcfaNumber(12345)).toBe("RCFA-12345");
+    });
+  });
+
+  describe("formatActionItemNumber", () => {
+    it("formats single digit numbers with leading zeros", () => {
+      expect(formatActionItemNumber(1)).toBe("AI-0001");
+      expect(formatActionItemNumber(9)).toBe("AI-0009");
+    });
+
+    it("formats double digit numbers with leading zeros", () => {
+      expect(formatActionItemNumber(10)).toBe("AI-0010");
+      expect(formatActionItemNumber(99)).toBe("AI-0099");
+    });
+
+    it("formats triple digit numbers with leading zero", () => {
+      expect(formatActionItemNumber(100)).toBe("AI-0100");
+      expect(formatActionItemNumber(999)).toBe("AI-0999");
+    });
+
+    it("formats four digit numbers without padding", () => {
+      expect(formatActionItemNumber(1000)).toBe("AI-1000");
+      expect(formatActionItemNumber(9999)).toBe("AI-9999");
+    });
+
+    it("handles numbers larger than 4 digits", () => {
+      expect(formatActionItemNumber(10000)).toBe("AI-10000");
+      expect(formatActionItemNumber(123456)).toBe("AI-123456");
     });
   });
 

@@ -21,6 +21,15 @@ export function formatRcfaNumber(rcfaNumber: number): string {
 }
 
 /**
+ * Formats an action item number for display.
+ * @param actionItemNumber - The numeric action item identifier
+ * @returns Formatted string like "AI-0001"
+ */
+export function formatActionItemNumber(actionItemNumber: number): string {
+  return `AI-${String(actionItemNumber).padStart(4, "0")}`;
+}
+
+/**
  * UI labels for RCFA status values.
  */
 export const RCFA_STATUS_LABELS: Record<RcfaStatus, string> = {
