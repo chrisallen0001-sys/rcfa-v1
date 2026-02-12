@@ -2,6 +2,8 @@
 
 import { type Column } from "@tanstack/react-table";
 import { useCallback, useEffect, useRef } from "react";
+import MultiSelectFilter from "./MultiSelectFilter";
+import DateRangeFilter from "./DateRangeFilter";
 
 interface ColumnFilterProps<TData> {
   column: Column<TData, unknown>;
@@ -9,12 +11,13 @@ interface ColumnFilterProps<TData> {
 
 /**
  * Filter types supported by the column filter.
- * Set via column meta: { filterType: "text" | "select", filterOptions: [...] }
+ * Set via column meta: { filterType: "text" | "select" | "multi-select" | "date-range", ... }
  */
-type FilterMeta = {
-  filterType?: "text" | "select";
+export type FilterMeta = {
+  filterType?: "text" | "select" | "multi-select" | "date-range";
   filterOptions?: { label: string; value: string }[];
   filterPlaceholder?: string;
+  filterColorMap?: Record<string, string>;
 };
 
 export default function ColumnFilter<TData>({ column }: ColumnFilterProps<TData>) {
@@ -22,6 +25,7 @@ export default function ColumnFilter<TData>({ column }: ColumnFilterProps<TData>
   const filterType = meta?.filterType ?? "text";
   const filterOptions = meta?.filterOptions;
   const placeholder = meta?.filterPlaceholder ?? "Filter...";
+  const filterColorMap = meta?.filterColorMap;
 
   const columnFilterValue = column.getFilterValue() as string | undefined;
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -59,6 +63,20 @@ export default function ColumnFilter<TData>({ column }: ColumnFilterProps<TData>
     },
     [column]
   );
+
+  if (filterType === "multi-select" && filterOptions) {
+    return (
+      <MultiSelectFilter
+        column={column}
+        options={filterOptions}
+        colorMap={filterColorMap}
+      />
+    );
+  }
+
+  if (filterType === "date-range") {
+    return <DateRangeFilter column={column} />;
+  }
 
   if (filterType === "select" && filterOptions) {
     return (
