@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { type Column } from "@tanstack/react-table";
+import { usePopoverDismiss } from "@/hooks/usePopoverDismiss";
+import { usePopoverPosition } from "@/hooks/usePopoverPosition";
 
 interface MultiSelectFilterProps<TData> {
   column: Column<TData, unknown>;
@@ -21,6 +23,12 @@ export default function MultiSelectFilter<TData>({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
+  const close = useCallback(() => setIsOpen(false), []);
+  const dismissRefs = useMemo(() => [buttonRef, popoverRef], []);
+
+  usePopoverDismiss(isOpen, close, dismissRefs);
+  const popoverStyle = usePopoverPosition(isOpen, buttonRef, { minWidth: 180 });
+
   const toggle = useCallback(
     (value: string) => {
       const next = selected.includes(value)
@@ -31,61 +39,16 @@ export default function MultiSelectFilter<TData>({
     [column, selected]
   );
 
+  const selectAll = useCallback(() => {
+    column.setFilterValue(options.map((o) => o.value));
+  }, [column, options]);
+
   const clear = useCallback(() => {
     column.setFilterValue(undefined);
     setIsOpen(false);
   }, [column]);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        !buttonRef.current?.contains(target) &&
-        !popoverRef.current?.contains(target)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsOpen(false);
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
-
-  // Compute popover position
-  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
-
-  useEffect(() => {
-    if (!isOpen || !buttonRef.current) return;
-
-    const rect = buttonRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openAbove = spaceBelow < 240;
-
-    setPopoverStyle({
-      position: "fixed",
-      left: rect.left,
-      ...(openAbove
-        ? { bottom: window.innerHeight - rect.top + 4 }
-        : { top: rect.bottom + 4 }),
-      zIndex: 50,
-      minWidth: Math.max(rect.width, 180),
-    });
-  }, [isOpen]);
+  const allSelected = selected.length === options.length && options.length > 0;
 
   const label =
     selected.length === 0
@@ -100,6 +63,8 @@ export default function MultiSelectFilter<TData>({
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
         className={`w-full truncate rounded border px-2 py-1 text-left text-xs transition-colors ${
           selected.length > 0
             ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-950 dark:text-blue-300"
@@ -114,9 +79,22 @@ export default function MultiSelectFilter<TData>({
         createPortal(
           <div
             ref={popoverRef}
+            role="listbox"
+            aria-label="Filter options"
             style={popoverStyle}
             className="max-h-56 overflow-y-auto rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
           >
+            {/* Select All / Deselect All */}
+            <div className="border-b border-zinc-200 px-3 py-1.5 dark:border-zinc-700">
+              <button
+                type="button"
+                onClick={allSelected ? clear : selectAll}
+                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+              >
+                {allSelected ? "Deselect all" : "Select all"}
+              </button>
+            </div>
+
             {options.map((option) => {
               const isChecked = selected.includes(option.value);
               const colorClass = colorMap?.[option.value];
@@ -124,6 +102,8 @@ export default function MultiSelectFilter<TData>({
               return (
                 <label
                   key={option.value}
+                  role="option"
+                  aria-selected={isChecked}
                   className="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 >
                   <input

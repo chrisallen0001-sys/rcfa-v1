@@ -7,6 +7,7 @@ export type { FilterMeta } from "./ColumnFilter";
 export { default as MultiSelectFilter } from "./MultiSelectFilter";
 export { default as DateRangeFilter } from "./DateRangeFilter";
 export { parseDateRangeValue, serializeDateRange } from "./DateRangeFilter";
+export { multiSelectFilterFn, dateRangeFilterFn } from "./filterFns";
 
 // Re-export useful types from TanStack Table for column definitions
 export {

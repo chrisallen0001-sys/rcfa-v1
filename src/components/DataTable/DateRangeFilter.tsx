@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker, getDefaultClassNames } from "react-day-picker";
 import { format, parse, isValid } from "date-fns";
 import { type Column } from "@tanstack/react-table";
+import { usePopoverDismiss } from "@/hooks/usePopoverDismiss";
+import { usePopoverPosition } from "@/hooks/usePopoverPosition";
 import "react-day-picker/style.css";
 
 type DateRangeMode = "after" | "before" | "range";
+
+/** Parse an ISO date string (yyyy-MM-dd) to a Date, or undefined if invalid. */
+function parseDate(str: string): Date | undefined {
+  if (!str) return undefined;
+  const d = parse(str, "yyyy-MM-dd", new Date());
+  return isValid(d) ? d : undefined;
+}
 
 /**
  * Parses a serialized date range filter value.
@@ -28,6 +37,8 @@ export function parseDateRangeValue(value: string): {
     const [from, to] = value.slice(6).split(",");
     return { mode: "range", from, to };
   }
+  // Fallback for unexpected formats — default to "after" mode with no date
+  // so the UI stays usable rather than crashing.
   return { mode: "after" };
 }
 
@@ -55,6 +66,17 @@ const MODE_LABELS: Record<DateRangeMode, string> = {
   range: "Range",
 };
 
+/**
+ * Format a date for the compact button label, including the year
+ * when it differs from the current year.
+ */
+function formatShortDate(d: Date): string {
+  const currentYear = new Date().getFullYear();
+  return d.getFullYear() === currentYear
+    ? format(d, "MMM d")
+    : format(d, "MMM d, yyyy");
+}
+
 export default function DateRangeFilter<TData>({
   column,
 }: DateRangeFilterProps<TData>) {
@@ -62,6 +84,15 @@ export default function DateRangeFilter<TData>({
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const close = useCallback(() => setIsOpen(false), []);
+  const dismissRefs = useMemo(() => [buttonRef, popoverRef], []);
+
+  usePopoverDismiss(isOpen, close, dismissRefs);
+  const popoverStyle = usePopoverPosition(isOpen, buttonRef, {
+    spaceThreshold: 380,
+    width: 288,
+  });
 
   // Parse current committed filter value for display label
   const parsed = useMemo(
@@ -76,12 +107,6 @@ export default function DateRangeFilter<TData>({
 
   const defaultClassNames = useMemo(() => getDefaultClassNames(), []);
 
-  const parseDate = (str: string) => {
-    if (!str) return undefined;
-    const d = parse(str, "yyyy-MM-dd", new Date());
-    return isValid(d) ? d : undefined;
-  };
-
   const apply = useCallback(() => {
     const serialized = serializeDateRange(mode, fromDate, toDate);
     column.setFilterValue(serialized);
@@ -95,73 +120,22 @@ export default function DateRangeFilter<TData>({
     setIsOpen(false);
   }, [column]);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        !buttonRef.current?.contains(target) &&
-        !popoverRef.current?.contains(target)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsOpen(false);
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
-
-  // Popover position
-  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
-
-  useEffect(() => {
-    if (!isOpen || !buttonRef.current) return;
-
-    const rect = buttonRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openAbove = spaceBelow < 380;
-
-    setPopoverStyle({
-      position: "fixed",
-      left: Math.min(rect.left, window.innerWidth - 300),
-      ...(openAbove
-        ? { bottom: window.innerHeight - rect.top + 4 }
-        : { top: rect.bottom + 4 }),
-      zIndex: 50,
-      width: 288,
-    });
-  }, [isOpen]);
-
   // Display label
   const displayLabel = useMemo(() => {
     if (!parsed) return "All dates";
     if (parsed.mode === "after" && parsed.from) {
       const d = parseDate(parsed.from);
-      return d ? `After ${format(d, "MMM d")}` : "All dates";
+      return d ? `After ${formatShortDate(d)}` : "All dates";
     }
     if (parsed.mode === "before" && parsed.to) {
       const d = parseDate(parsed.to);
-      return d ? `Before ${format(d, "MMM d")}` : "All dates";
+      return d ? `Before ${formatShortDate(d)}` : "All dates";
     }
     if (parsed.mode === "range" && parsed.from && parsed.to) {
       const f = parseDate(parsed.from);
       const t = parseDate(parsed.to);
       return f && t
-        ? `${format(f, "MMM d")} – ${format(t, "MMM d")}`
+        ? `${formatShortDate(f)} – ${formatShortDate(t)}`
         : "All dates";
     }
     return "All dates";
@@ -190,6 +164,16 @@ export default function DateRangeFilter<TData>({
     (mode === "before" && toDate) ||
     (mode === "range" && fromDate && toDate);
 
+  // Summary text for the footer — mode-aware to avoid blank state
+  const summaryText = (() => {
+    if (mode === "after" && fromDate) return `After ${fromDate}`;
+    if (mode === "before" && toDate) return `Before ${toDate}`;
+    if (mode === "range" && fromDate && !toDate) return `From ${fromDate}…`;
+    if (mode === "range" && fromDate && toDate)
+      return `${fromDate} – ${toDate}`;
+    return "Select a date";
+  })();
+
   return (
     <>
       <button
@@ -211,6 +195,8 @@ export default function DateRangeFilter<TData>({
           }
           setIsOpen(!isOpen);
         }}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
         className={`w-full truncate rounded border px-2 py-1 text-left text-xs transition-colors ${
           filterValue
             ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-950 dark:text-blue-300"
@@ -225,6 +211,8 @@ export default function DateRangeFilter<TData>({
         createPortal(
           <div
             ref={popoverRef}
+            role="dialog"
+            aria-label="Date range filter"
             style={popoverStyle}
             className="rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
           >
@@ -263,9 +251,19 @@ export default function DateRangeFilter<TData>({
                         : undefined
                   }
                   onSelect={(range) => {
-                    if (range?.from) setFromDate(format(range.from, "yyyy-MM-dd"));
-                    if (range?.to) setToDate(format(range.to, "yyyy-MM-dd"));
-                    if (!range) { setFromDate(""); setToDate(""); }
+                    if (!range) {
+                      setFromDate("");
+                      setToDate("");
+                    } else {
+                      // Always set both fields so a stale toDate from a
+                      // previous selection is cleared when starting a new range.
+                      setFromDate(
+                        range.from ? format(range.from, "yyyy-MM-dd") : ""
+                      );
+                      setToDate(
+                        range.to ? format(range.to, "yyyy-MM-dd") : ""
+                      );
+                    }
                   }}
                   defaultMonth={calendarMonth}
                   classNames={{
@@ -299,14 +297,7 @@ export default function DateRangeFilter<TData>({
             {/* Summary + Actions */}
             <div className="flex items-center justify-between border-t border-zinc-200 px-3 py-2 dark:border-zinc-700">
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {mode === "after" && fromDate && `After ${fromDate}`}
-                {mode === "before" && toDate && `Before ${toDate}`}
-                {mode === "range" && fromDate && !toDate && `From ${fromDate}…`}
-                {mode === "range" &&
-                  fromDate &&
-                  toDate &&
-                  `${fromDate} – ${toDate}`}
-                {!fromDate && !toDate && "Select a date"}
+                {summaryText}
               </span>
               <div className="flex gap-2">
                 {filterValue && (
