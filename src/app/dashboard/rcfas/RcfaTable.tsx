@@ -514,7 +514,7 @@ export default function RcfaTable() {
         onRemoveFilter={(id) =>
           handleFiltersChange((prev) => prev.filter((f) => f.id !== id))
         }
-        onClearAll={() => handleFiltersChange([])}
+        onClearAll={() => handleFiltersChange([{ id: "status", value: [...DEFAULT_STATUSES] }])}
         defaultStatuses={DEFAULT_STATUSES}
       />
 

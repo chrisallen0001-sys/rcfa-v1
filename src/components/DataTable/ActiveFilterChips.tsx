@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { type ColumnDef, type ColumnFiltersState } from "@tanstack/react-table";
 import { parseDateRangeValue } from "./DateRangeFilter";
 import type { FilterMeta } from "./ColumnFilter";
@@ -22,11 +23,12 @@ interface ActiveFilterChipsProps {
 function formatDateRange(value: string): string | null {
   const { mode, from, to } = parseDateRangeValue(value);
 
+  const currentYear = new Date().getFullYear();
+
   const formatDate = (iso: string): string => {
     // Parse as local date (yyyy-MM-dd) to avoid timezone shifts
     const [year, month, day] = iso.split("-").map(Number);
     const d = new Date(year, month - 1, day);
-    const currentYear = new Date().getFullYear();
     const options: Intl.DateTimeFormatOptions =
       d.getFullYear() === currentYear
         ? { month: "short", day: "numeric" }
@@ -83,73 +85,94 @@ export default function ActiveFilterChips({
   defaultStatuses,
 }: ActiveFilterChipsProps) {
   // Build a lookup from column ID to column definition for header text and meta
-  const columnMap = new Map<
-    string,
-    { header: string; meta?: FilterMeta }
-  >();
-  for (const col of columns) {
-    // accessorKey is available on accessor columns
-    const id =
-      ("accessorKey" in col ? (col.accessorKey as string) : undefined) ??
-      col.id;
-    if (id) {
-      columnMap.set(id, {
-        header: typeof col.header === "string" ? col.header : id,
-        meta: col.meta as FilterMeta | undefined,
-      });
+  const columnMap = useMemo(() => {
+    const map = new Map<string, { header: string; meta?: FilterMeta }>();
+    for (const col of columns) {
+      // accessorKey is available on accessor columns
+      const id =
+        ("accessorKey" in col ? (col.accessorKey as string) : undefined) ??
+        col.id;
+      if (id) {
+        map.set(id, {
+          header: typeof col.header === "string" ? col.header : id,
+          meta: col.meta as FilterMeta | undefined,
+        });
+      }
     }
-  }
+    return map;
+  }, [columns]);
 
   // Build chip data for each active filter
-  const chips: { columnId: string; label: string }[] = [];
+  const chips = useMemo(() => {
+    const result: { columnId: string; label: string }[] = [];
 
-  for (const filter of columnFilters) {
-    const colInfo = columnMap.get(filter.id);
-    const headerLabel = colInfo?.header ?? filter.id;
-    const meta = colInfo?.meta;
-    const filterType = meta?.filterType ?? "text";
+    for (const filter of columnFilters) {
+      const colInfo = columnMap.get(filter.id);
+      const headerLabel = colInfo?.header ?? filter.id;
+      const meta = colInfo?.meta;
+      const filterType = meta?.filterType ?? "text";
 
-    // Multi-select filters (including status)
-    if (filterType === "multi-select" && Array.isArray(filter.value)) {
-      const values = filter.value as string[];
-
-      // Hide the status chip when it matches defaults
-      if (
-        filter.id === "status" &&
-        defaultStatuses &&
-        isDefaultStatusFilter(values, defaultStatuses)
-      ) {
+      // Select filters (single value from dropdown)
+      if (filterType === "select" && typeof filter.value === "string" && filter.value.length > 0) {
+        const option = meta?.filterOptions?.find((o) => o.value === filter.value);
+        const displayValue = option?.label ?? filter.value;
+        result.push({ columnId: filter.id, label: `${headerLabel}: ${displayValue}` });
         continue;
       }
 
-      if (values.length === 0) continue;
+      // Multi-select filters (including status)
+      if (filterType === "multi-select" && Array.isArray(filter.value)) {
+        const values = filter.value as string[];
 
-      const displayValue = resolveMultiSelectLabels(
-        values,
-        meta?.filterOptions
-      );
-      chips.push({ columnId: filter.id, label: `${headerLabel}: ${displayValue}` });
-      continue;
+        // Hide the status chip when it matches defaults
+        if (
+          filter.id === "status" &&
+          defaultStatuses &&
+          isDefaultStatusFilter(values, defaultStatuses)
+        ) {
+          continue;
+        }
+
+        if (values.length === 0) continue;
+
+        const resolved = resolveMultiSelectLabels(values, meta?.filterOptions);
+        // Truncate long lists: show first 2 labels then "+N more"
+        const MAX_VISIBLE = 2;
+        let displayValue: string;
+        if (values.length > MAX_VISIBLE) {
+          const visibleLabels = resolveMultiSelectLabels(
+            values.slice(0, MAX_VISIBLE),
+            meta?.filterOptions
+          );
+          displayValue = `${visibleLabels}, +${values.length - MAX_VISIBLE} more`;
+        } else {
+          displayValue = resolved;
+        }
+        result.push({ columnId: filter.id, label: `${headerLabel}: ${displayValue}` });
+        continue;
+      }
+
+      // Date-range filters
+      if (filterType === "date-range" && typeof filter.value === "string") {
+        const displayValue = formatDateRange(filter.value);
+        if (!displayValue) continue;
+        result.push({ columnId: filter.id, label: `${headerLabel}: ${displayValue}` });
+        continue;
+      }
+
+      // Text filters
+      if (typeof filter.value === "string" && filter.value.length > 0) {
+        result.push({ columnId: filter.id, label: `${headerLabel}: ${filter.value}` });
+      }
     }
 
-    // Date-range filters
-    if (filterType === "date-range" && typeof filter.value === "string") {
-      const displayValue = formatDateRange(filter.value);
-      if (!displayValue) continue;
-      chips.push({ columnId: filter.id, label: `${headerLabel}: ${displayValue}` });
-      continue;
-    }
-
-    // Text filters (and select)
-    if (typeof filter.value === "string" && filter.value.length > 0) {
-      chips.push({ columnId: filter.id, label: `${headerLabel}: ${filter.value}` });
-    }
-  }
+    return result;
+  }, [columnFilters, columnMap, defaultStatuses]);
 
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div role="region" aria-label="Active filters" className="flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
         <span
           key={chip.columnId}
@@ -159,7 +182,7 @@ export default function ActiveFilterChips({
           <button
             type="button"
             onClick={() => onRemoveFilter(chip.columnId)}
-            className="ml-1.5 hover:text-zinc-900 dark:hover:text-zinc-100"
+            className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
             aria-label={`Remove ${chip.label} filter`}
           >
             &times;
