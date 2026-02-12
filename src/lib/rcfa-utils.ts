@@ -1,5 +1,24 @@
 import type { RcfaStatus, OperatingContext, Priority, ActionItemStatus, QuestionCategory } from "@/generated/prisma/client";
 
+// ---------------------------------------------------------------------------
+// Currency formatting
+// ---------------------------------------------------------------------------
+
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+/**
+ * Formats a value as USD currency. Returns null if the value is null,
+ * undefined, or not a valid number.
+ */
+export function formatUsd(value: unknown): string | null {
+  if (value == null) return null;
+  const num = Number(value);
+  return Number.isNaN(num) ? null : usdFormatter.format(num);
+}
+
 /**
  * UI labels for operating context values.
  */

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, formatUsd, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle } from "@/lib/rcfa-utils";
 import { fetchRcfaById } from "@/lib/rcfa-queries";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import InvestigationWrapper from "./InvestigationWrapper";
@@ -44,15 +44,6 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
-
-const usdFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-function formatUsd(value: unknown): string | null {
-  return value != null ? usdFormatter.format(Number(value)) : null;
-}
 
 interface SectionStatusData {
   status: string;
