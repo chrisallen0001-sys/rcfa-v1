@@ -80,8 +80,18 @@ function fromApiSortColumn(col: string): string {
   return map[col] ?? col;
 }
 
+/** Validate an ISO date string (yyyy-MM-dd) both syntactically and semantically. */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isValidDate(value: string): boolean {
+  return ISO_DATE_RE.test(value) && !isNaN(new Date(value).getTime());
+}
+
+/** Default status filter: show only actionable items (matches old "Open" tab). */
+const DEFAULT_STATUSES: ActionItemStatus[] = ["open", "in_progress", "blocked"];
+
 /**
  * Parse URL search params into initial ColumnFiltersState.
+ * Malformed date values are silently dropped to prevent 400 errors from the API.
  */
 function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
   const filters: ColumnFiltersState = [];
@@ -93,7 +103,13 @@ function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
   if (title) filters.push({ id: "actionText", value: title });
 
   const status = sp.get("status");
-  if (status) filters.push({ id: "status", value: status.split(",") });
+  if (status) {
+    filters.push({ id: "status", value: status.split(",") });
+  } else if (!sp.get("filter")) {
+    // Default to open/actionable statuses when no explicit status or legacy filter is set.
+    // Matches the previous "Open" tab default behavior.
+    filters.push({ id: "status", value: [...DEFAULT_STATUSES] });
+  }
 
   const priority = sp.get("priority");
   if (priority) filters.push({ id: "priority", value: priority.split(",") });
@@ -101,29 +117,33 @@ function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
   const owner = sp.get("owner");
   if (owner) filters.push({ id: "ownerDisplayName", value: owner.split(",") });
 
-  // Due date: combine dueDateFrom/dueDateTo into serialized value
+  // Due date: combine dueDateFrom/dueDateTo into serialized value (skip malformed dates)
   const dueDateFrom = sp.get("dueDateFrom");
   const dueDateTo = sp.get("dueDateTo");
-  if (dueDateFrom && dueDateTo) {
-    filters.push({ id: "dueDate", value: `range:${dueDateFrom},${dueDateTo}` });
-  } else if (dueDateFrom) {
-    filters.push({ id: "dueDate", value: `after:${dueDateFrom}` });
-  } else if (dueDateTo) {
-    filters.push({ id: "dueDate", value: `before:${dueDateTo}` });
+  const validDueDateFrom = dueDateFrom && isValidDate(dueDateFrom) ? dueDateFrom : null;
+  const validDueDateTo = dueDateTo && isValidDate(dueDateTo) ? dueDateTo : null;
+  if (validDueDateFrom && validDueDateTo) {
+    filters.push({ id: "dueDate", value: `range:${validDueDateFrom},${validDueDateTo}` });
+  } else if (validDueDateFrom) {
+    filters.push({ id: "dueDate", value: `after:${validDueDateFrom}` });
+  } else if (validDueDateTo) {
+    filters.push({ id: "dueDate", value: `before:${validDueDateTo}` });
   }
 
   const rcfa = sp.get("rcfa");
   if (rcfa) filters.push({ id: "rcfaNumber", value: rcfa });
 
-  // Created date: combine createdFrom/createdTo
+  // Created date: combine createdFrom/createdTo (skip malformed dates)
   const createdFrom = sp.get("createdFrom");
   const createdTo = sp.get("createdTo");
-  if (createdFrom && createdTo) {
-    filters.push({ id: "createdAt", value: `range:${createdFrom},${createdTo}` });
-  } else if (createdFrom) {
-    filters.push({ id: "createdAt", value: `after:${createdFrom}` });
-  } else if (createdTo) {
-    filters.push({ id: "createdAt", value: `before:${createdTo}` });
+  const validCreatedFrom = createdFrom && isValidDate(createdFrom) ? createdFrom : null;
+  const validCreatedTo = createdTo && isValidDate(createdTo) ? createdTo : null;
+  if (validCreatedFrom && validCreatedTo) {
+    filters.push({ id: "createdAt", value: `range:${validCreatedFrom},${validCreatedTo}` });
+  } else if (validCreatedFrom) {
+    filters.push({ id: "createdAt", value: `after:${validCreatedFrom}` });
+  } else if (validCreatedTo) {
+    filters.push({ id: "createdAt", value: `before:${validCreatedTo}` });
   }
 
   return filters;
@@ -242,6 +262,7 @@ export default function ActionItemsTable() {
   const [data, setData] = useState<ActionItemTableRow[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
     () => parseFiltersFromUrl(searchParams)
   );
@@ -285,14 +306,26 @@ export default function ActionItemsTable() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     fetch(buildApiUrl(), { signal: controller.signal })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((body: { error?: string }) => {
+            throw new Error(body.error ?? `HTTP ${res.status}`);
+          });
+        }
+        return res.json();
+      })
       .then((response: ApiResponse) => {
         setData(response.rows);
         setTotalRows(response.total);
+        setFetchError(null);
+        // Clear legacy filter after initial load so subsequent interactions
+        // aren't permanently scoped to "mine" (see backward-compat note above).
+        legacyFilterRef.current = null;
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
           console.error("Failed to fetch action items:", err);
+          setFetchError(err instanceof Error ? err.message : "Failed to load action items.");
         }
       })
       .finally(() => setIsLoading(false));
@@ -327,9 +360,11 @@ export default function ActionItemsTable() {
     };
   }, [pagination.pageIndex, sorting, columnFilters, router]);
 
-  // Reset pagination to page 1 when filters change
+  // Reset pagination to page 1 when filters change.
+  // Also clears legacy filter=mine so explicit user interaction takes precedence.
   const handleFiltersChange = useCallback(
     (updater: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => {
+      legacyFilterRef.current = null;
       setColumnFilters(updater);
       setPagination((p) => ({ ...p, pageIndex: 0 }));
     },
@@ -342,7 +377,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("actionItemNumber", {
         header: "ID",
         size: 90,
-        meta: { filterType: "text" as const, filterPlaceholder: "Search ID..." },
+        meta: { filterType: "text", filterPlaceholder: "Search ID..." },
         cell: (info) => (
           <Link
             href={`/dashboard/rcfa/${info.row.original.rcfaId}?expandItem=${info.row.original.id}`}
@@ -355,7 +390,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("actionText", {
         header: "Title",
         size: 250,
-        meta: { filterType: "text" as const, filterPlaceholder: "Search title..." },
+        meta: { filterType: "text", filterPlaceholder: "Search title..." },
         cell: (info) => (
           <div className="max-w-[250px] truncate" title={info.getValue()}>
             {info.getValue()}
@@ -366,7 +401,7 @@ export default function ActionItemsTable() {
         header: "Status",
         size: 110,
         meta: {
-          filterType: "multi-select" as const,
+          filterType: "multi-select",
           filterOptions: ALL_STATUSES.map((s) => ({
             label: ACTION_STATUS_LABELS[s],
             value: s,
@@ -388,7 +423,7 @@ export default function ActionItemsTable() {
         header: "Priority",
         size: 100,
         meta: {
-          filterType: "multi-select" as const,
+          filterType: "multi-select",
           filterOptions: ALL_PRIORITIES.map((p) => ({
             label: PRIORITY_LABELS[p],
             value: p,
@@ -410,7 +445,10 @@ export default function ActionItemsTable() {
         header: "Owner",
         size: 120,
         meta: {
-          filterType: "multi-select" as const,
+          filterType: "multi-select",
+          // Options populate once useUsers() resolves; until then the filter button
+          // briefly shows "N selected" instead of names. Self-corrects when users load
+          // because this memo depends on [users].
           filterOptions: users.map((u) => ({
             label: u.displayName,
             value: u.id,
@@ -421,7 +459,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("dueDate", {
         header: "Due Date",
         size: 130,
-        meta: { filterType: "date-range" as const },
+        meta: { filterType: "date-range" },
         cell: (info) => {
           const dueDate = info.getValue();
           const status = info.row.original.status;
@@ -435,7 +473,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("rcfaNumber", {
         header: "RCFA",
         size: 100,
-        meta: { filterType: "text" as const, filterPlaceholder: "Search RCFA..." },
+        meta: { filterType: "text", filterPlaceholder: "Search RCFA..." },
         cell: (info) => (
           <Link
             href={`/dashboard/rcfa/${info.row.original.rcfaId}`}
@@ -448,7 +486,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("createdAt", {
         header: "Created",
         size: 100,
-        meta: { filterType: "date-range" as const },
+        meta: { filterType: "date-range" },
       }),
     ],
     [users]
@@ -485,6 +523,13 @@ export default function ActionItemsTable() {
 
   return (
     <div className="space-y-4">
+      {/* Error banner */}
+      {fetchError && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+          {fetchError}
+        </div>
+      )}
+
       {/* Result count and export */}
       <div className="flex items-center justify-between">
         <span className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -509,6 +554,7 @@ export default function ActionItemsTable() {
         }
         showPagination={true}
         enableFilters={true}
+        columnFilters={columnFilters}
         pageSize={pagination.pageSize}
         pageSizeOptions={[10, 25, 50]}
         totalRows={totalRows}
