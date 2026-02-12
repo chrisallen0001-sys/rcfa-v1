@@ -97,9 +97,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // Parse pagination
-    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "25", 10) || 25));
-    const offset = (page - 1) * pageSize;
+    // pageSize=0 means "return all results" (used by CSV/Excel export)
+    const rawPageSize = parseInt(searchParams.get("pageSize") ?? "25", 10) || 25;
+    const unlimitedExport = rawPageSize === 0;
+    const page = unlimitedExport ? 1 : Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+    const pageSize = unlimitedExport ? 0 : Math.min(100, Math.max(1, rawPageSize));
+    const offset = unlimitedExport ? 0 : (page - 1) * pageSize;
 
     // Parse sorting
     const sortBy = searchParams.get("sortBy") ?? "due_date";
@@ -225,6 +228,10 @@ export async function GET(request: NextRequest) {
       ? `ORDER BY ai.due_date ${sortOrder} NULLS ${sortOrder === "ASC" ? "LAST" : "FIRST"}`
       : `ORDER BY ${validatedSortBy === "owner_display_name" ? "u.display_name" : validatedSortBy === "rcfa_number" ? "r.rcfa_number" : `ai.${validatedSortBy}`} ${sortOrder}`;
 
+    const paginationClause = unlimitedExport
+      ? ""
+      : `LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+
     const sql = `
       SELECT
         ai.id,
@@ -246,14 +253,13 @@ export async function GET(request: NextRequest) {
       LEFT JOIN app_user u ON u.id = ai.owner_user_id
       ${whereClause}
       ${orderByClause}
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      ${paginationClause}
     `;
 
     const results = await prisma.$queryRawUnsafe<ActionItemRow[]>(
       sql,
       ...params,
-      pageSize,
-      offset
+      ...(unlimitedExport ? [] : [pageSize, offset])
     );
 
     const total = results.length > 0 ? Number(results[0].total_count) : 0;
@@ -263,8 +269,8 @@ export async function GET(request: NextRequest) {
       rows,
       total,
       page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
+      pageSize: unlimitedExport ? total : pageSize,
+      totalPages: unlimitedExport ? 1 : Math.ceil(total / pageSize),
     });
   } catch (error) {
     console.error("GET /api/action-items error:", error);

@@ -110,9 +110,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // Parse pagination
-    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "25", 10) || 25));
-    const offset = (page - 1) * pageSize;
+    // pageSize=0 means "return all results" (used by CSV/Excel export)
+    const rawPageSize = parseInt(searchParams.get("pageSize") ?? "25", 10) || 25;
+    const unlimitedExport = rawPageSize === 0;
+    const page = unlimitedExport ? 1 : Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+    const pageSize = unlimitedExport ? 0 : Math.min(100, Math.max(1, rawPageSize));
+    const offset = unlimitedExport ? 0 : (page - 1) * pageSize;
 
     // Parse sorting
     const sortBy = searchParams.get("sortBy") ?? "created_at";
@@ -213,6 +216,10 @@ export async function GET(request: NextRequest) {
 
     if (searchQuery) {
       // Full-text search query
+      const searchPaginationClause = unlimitedExport
+        ? ""
+        : `LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}`;
+
       const searchSql = `
         WITH matches AS (
           SELECT
@@ -239,15 +246,14 @@ export async function GET(request: NextRequest) {
           COUNT(*) OVER() AS total_count
         FROM matches m
         ORDER BY m.rank DESC, m.${validatedSortBy} ${sortOrder}
-        LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
+        ${searchPaginationClause}
       `;
 
       const searchResults = await prisma.$queryRawUnsafe<SearchResultRow[]>(
         searchSql,
         ...params,
         searchQuery,
-        pageSize,
-        offset
+        ...(unlimitedExport ? [] : [pageSize, offset])
       );
 
       const total = searchResults.length > 0 ? Number(searchResults[0].total_count) : 0;
@@ -259,12 +265,16 @@ export async function GET(request: NextRequest) {
         rows,
         total,
         page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
+        pageSize: unlimitedExport ? total : pageSize,
+        totalPages: unlimitedExport ? 1 : Math.ceil(total / pageSize),
       });
     }
 
     // Browse query (no search)
+    const browsePaginationClause = unlimitedExport
+      ? ""
+      : `LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+
     const browseSql = `
       SELECT
         s.*,
@@ -272,14 +282,13 @@ export async function GET(request: NextRequest) {
       FROM rcfa_summary s
       ${whereClause}
       ORDER BY s.${validatedSortBy} ${sortOrder}
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      ${browsePaginationClause}
     `;
 
     const browseResults = await prisma.$queryRawUnsafe<SummaryRow[]>(
       browseSql,
       ...params,
-      pageSize,
-      offset
+      ...(unlimitedExport ? [] : [pageSize, offset])
     );
 
     const total = browseResults.length > 0 ? Number(browseResults[0].total_count) : 0;
@@ -289,8 +298,8 @@ export async function GET(request: NextRequest) {
       rows,
       total,
       page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
+      pageSize: unlimitedExport ? total : pageSize,
+      totalPages: unlimitedExport ? 1 : Math.ceil(total / pageSize),
     });
   } catch (error) {
     console.error("GET /api/rcfa error:", error);

@@ -5,9 +5,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 type ExportFormat = "csv" | "xlsx";
 
 interface ExportButtonsProps {
-  onExport: (format: ExportFormat) => void;
+  onExport: (format: ExportFormat) => void | Promise<void>;
   disabled?: boolean;
-  /** Number of rows that will be exported */
+  /** Number of rows that will be exported (shown in dropdown hint) */
   rowCount?: number;
 }
 
@@ -50,11 +50,11 @@ export default function ExportButtons({
     }
   }, [isOpen]);
 
-  const handleExport = (format: ExportFormat) => {
+  const handleExport = async (format: ExportFormat) => {
     setIsExporting(true);
     setIsOpen(false);
     try {
-      onExport(format);
+      await onExport(format);
     } finally {
       setIsExporting(false);
     }

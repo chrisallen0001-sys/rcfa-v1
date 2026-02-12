@@ -474,16 +474,49 @@ export default function RcfaTable() {
     []
   );
 
-  // Handle export
+  // Build API URL for export (all filtered rows, no pagination limit)
+  const buildExportApiUrl = useCallback(() => {
+    const params = new URLSearchParams();
+    params.set("pageSize", "0");
+
+    if (sorting.length > 0) {
+      params.set("sortBy", toApiSortColumn(sorting[0].id));
+      params.set("sortOrder", sorting[0].desc ? "desc" : "asc");
+    }
+
+    applyFiltersToApiParams(params, columnFilters);
+
+    if (legacyFilterRef.current === "mine") {
+      params.set("filter", "mine");
+    }
+
+    return `/api/rcfa?${params.toString()}`;
+  }, [sorting, columnFilters]);
+
+  // Handle export — fetches all filtered rows (not just current page) then exports
   const handleExport = useCallback(
-    (format: "csv" | "xlsx") => {
+    async (format: "csv" | "xlsx") => {
+      const res = await fetch(buildExportApiUrl());
+      if (!res.ok) {
+        let message = `Export failed (HTTP ${res.status})`;
+        try {
+          const body = await res.json();
+          if (body.error) message = body.error;
+        } catch {
+          // non-JSON response
+        }
+        setFetchError(message);
+        return;
+      }
+      const { rows } = (await res.json()) as ApiResponse;
       if (format === "csv") {
-        exportToCSV(data, exportColumns, "rcfas");
+        exportToCSV(rows, exportColumns, "rcfas");
       } else {
-        exportToExcel(data, exportColumns, "rcfas");
+        exportToExcel(rows, exportColumns, "rcfas");
       }
     },
-    [data, exportColumns]
+    // setFetchError is a stable state setter; listed here for React Compiler lint compliance.
+    [buildExportApiUrl, exportColumns, setFetchError]
   );
 
   return (
@@ -502,8 +535,8 @@ export default function RcfaTable() {
         </span>
         <ExportButtons
           onExport={handleExport}
-          disabled={data.length === 0 || isLoading}
-          rowCount={data.length}
+          disabled={totalRows === 0 || isLoading}
+          rowCount={totalRows}
         />
       </div>
 
