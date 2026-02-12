@@ -3,8 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { RcfaStatus } from "@/generated/prisma/client";
-import type { RcfaRow } from "./rcfas/page";
 import { formatRcfaNumber } from "@/lib/rcfa-utils";
+
+type RcfaRow = {
+  id: string;
+  rcfaNumber: number;
+  title: string;
+  equipmentDescription: string;
+  status: RcfaStatus;
+  createdAt: string;
+  ownerDisplayName: string;
+  rootCauseCount: number;
+  actionItemCount: number;
+  openActionCount: number;
+  equipmentHighlight?: string;
+  failureHighlight?: string;
+};
 
 type Props = {
   items: RcfaRow[];

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   DataTable,
   createColumnHelper,
+  parseDateRangeValue,
   type SortingState,
   type PaginationState,
+  type ColumnFiltersState,
 } from "@/components/DataTable";
 import type { RcfaStatus, OperatingContext } from "@/generated/prisma/client";
 import {
@@ -32,8 +34,6 @@ export type RcfaTableRow = {
   rootCauseCount: number;
   actionItemCount: number;
   openActionCount: number;
-  equipmentHighlight?: string;
-  failureHighlight?: string;
 };
 
 type ApiResponse = {
@@ -48,40 +48,190 @@ const ALL_STATUSES: RcfaStatus[] = ["draft", "investigation", "actions_open", "c
 
 const columnHelper = createColumnHelper<RcfaTableRow>();
 
-export default function RcfaTable({ initialFilter }: { initialFilter?: string }) {
+/** Map a column ID to the API sort column name. */
+function toApiSortColumn(id: string): string {
+  const map: Record<string, string> = {
+    createdAt: "created_at",
+    ownerDisplayName: "owner_display_name",
+    rcfaNumber: "rcfa_number",
+    rootCauseCount: "final_root_cause_count",
+    actionItemCount: "action_item_count",
+    equipmentDescription: "equipment_description",
+  };
+  return map[id] ?? id;
+}
+
+/** Reverse: API sort column -> column ID. */
+function fromApiSortColumn(col: string): string {
+  const map: Record<string, string> = {
+    created_at: "createdAt",
+    owner_display_name: "ownerDisplayName",
+    rcfa_number: "rcfaNumber",
+    final_root_cause_count: "rootCauseCount",
+    action_item_count: "actionItemCount",
+    equipment_description: "equipmentDescription",
+  };
+  return map[col] ?? col;
+}
+
+/** Validate an ISO date string (yyyy-MM-dd) syntactically and semantically.
+ *  Round-trips through toISOString() to reject overflow dates (e.g. Feb 30 -> Mar 2). */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isValidDate(value: string): boolean {
+  if (!ISO_DATE_RE.test(value)) return false;
+  const d = new Date(value);
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(value);
+}
+
+/** Default status filter: show active (non-closed) RCFAs. */
+const DEFAULT_STATUSES: RcfaStatus[] = ["draft", "investigation", "actions_open"];
+
+/**
+ * Parse URL search params into initial ColumnFiltersState.
+ * Malformed date values are silently dropped to prevent 400 errors from the API.
+ */
+function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
+  const filters: ColumnFiltersState = [];
+
+  const rcfaNum = sp.get("rcfaNum");
+  if (rcfaNum) filters.push({ id: "rcfaNumber", value: rcfaNum });
+
+  const title = sp.get("title");
+  if (title) filters.push({ id: "title", value: title });
+
+  const status = sp.get("status");
+  if (status) {
+    filters.push({ id: "status", value: status.split(",") });
+  } else if (sp.get("filter") !== "mine") {
+    // Default to active statuses unless the legacy ?filter=mine is active
+    // (which lets the API control the full result set). Matches old behavior.
+    filters.push({ id: "status", value: [...DEFAULT_STATUSES] });
+  }
+
+  const owner = sp.get("owner");
+  if (owner) filters.push({ id: "ownerDisplayName", value: owner.split(",") });
+
+  // Created date: combine dateFrom/dateTo (skip malformed dates)
+  const dateFrom = sp.get("dateFrom");
+  const dateTo = sp.get("dateTo");
+  const validDateFrom = dateFrom && isValidDate(dateFrom) ? dateFrom : null;
+  const validDateTo = dateTo && isValidDate(dateTo) ? dateTo : null;
+  if (validDateFrom && validDateTo) {
+    filters.push({ id: "createdAt", value: `range:${validDateFrom},${validDateTo}` });
+  } else if (validDateFrom) {
+    filters.push({ id: "createdAt", value: `after:${validDateFrom}` });
+  } else if (validDateTo) {
+    filters.push({ id: "createdAt", value: `before:${validDateTo}` });
+  }
+
+  const equipment = sp.get("equipment");
+  if (equipment) filters.push({ id: "equipmentDescription", value: equipment });
+
+  return filters;
+}
+
+/**
+ * Map columnFilters to API query params on the URL.
+ */
+function applyFiltersToApiParams(
+  params: URLSearchParams,
+  columnFilters: ColumnFiltersState
+) {
+  for (const filter of columnFilters) {
+    const val = filter.value;
+    switch (filter.id) {
+      case "rcfaNumber":
+        params.set("rcfaNumber", val as string);
+        break;
+      case "title":
+        params.set("title", val as string);
+        break;
+      case "status":
+        params.set("status", (val as string[]).join(","));
+        break;
+      case "ownerDisplayName":
+        params.set("owner", (val as string[]).join(","));
+        break;
+      case "createdAt": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if (mode === "after" && from) params.set("dateFrom", from);
+        if (mode === "before" && to) params.set("dateTo", to);
+        if (mode === "range") {
+          if (from) params.set("dateFrom", from);
+          if (to) params.set("dateTo", to);
+        }
+        break;
+      }
+      case "equipmentDescription":
+        params.set("equipment", val as string);
+        break;
+    }
+  }
+}
+
+/**
+ * Serialize columnFilters to URL search params for the browser URL bar.
+ */
+function filtersToUrlParams(
+  params: URLSearchParams,
+  columnFilters: ColumnFiltersState
+) {
+  for (const filter of columnFilters) {
+    const val = filter.value;
+    switch (filter.id) {
+      case "rcfaNumber":
+        params.set("rcfaNum", val as string);
+        break;
+      case "title":
+        params.set("title", val as string);
+        break;
+      case "status":
+        params.set("status", (val as string[]).join(","));
+        break;
+      case "ownerDisplayName":
+        params.set("owner", (val as string[]).join(","));
+        break;
+      case "createdAt": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if ((mode === "after" || mode === "range") && from) params.set("dateFrom", from);
+        if ((mode === "before" || mode === "range") && to) params.set("dateTo", to);
+        break;
+      }
+      case "equipmentDescription":
+        params.set("equipment", val as string);
+        break;
+    }
+  }
+}
+
+export default function RcfaTable() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const users = useUsers();
 
   // Parse initial state from URL
   const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
-  const urlSearch = searchParams.get("q") ?? "";
-  const urlStatus = searchParams.get("status") ?? "";
-  const urlOwner = searchParams.get("owner") ?? "";
   const urlSortBy = searchParams.get("sortBy") ?? "created_at";
   const urlSortOrder = searchParams.get("sortOrder") ?? "desc";
-  const urlFilter = searchParams.get("filter") ?? initialFilter ?? "";
+
+  // Backward compat: dashboard links to ?filter=mine — pass through to API
+  const legacyFilterRef = useRef(searchParams.get("filter"));
 
   // State
   const [data, setData] = useState<RcfaTableRow[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState(urlSearch);
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<RcfaStatus>>(
-    urlStatus ? new Set(urlStatus.split(",") as RcfaStatus[]) : new Set()
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
+    () => parseFiltersFromUrl(searchParams)
   );
-  const [selectedOwner, setSelectedOwner] = useState(urlFilter === "mine" ? "" : urlOwner);
-  const [isMineFilter, setIsMineFilter] = useState(urlFilter === "mine");
   const [sorting, setSorting] = useState<SortingState>([
-    { id: urlSortBy === "created_at" ? "createdAt" : urlSortBy, desc: urlSortOrder === "desc" },
+    { id: fromApiSortColumn(urlSortBy), desc: urlSortOrder === "desc" },
   ]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: urlPage - 1,
     pageSize: 25,
   });
-
-  // Debounce search input - only triggers API calls after user stops typing
-  const deferredSearch = useDeferredValue(search);
 
   // Ref for URL update debounce timer
   const urlUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -93,34 +243,21 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
     params.set("pageSize", String(pagination.pageSize));
 
     if (sorting.length > 0) {
-      const sortCol = sorting[0].id === "createdAt" ? "created_at" :
-        sorting[0].id === "ownerDisplayName" ? "owner_display_name" :
-        sorting[0].id === "rcfaNumber" ? "rcfa_number" :
-        sorting[0].id === "rootCauseCount" ? "final_root_cause_count" :
-        sorting[0].id === "actionItemCount" ? "action_item_count" :
-        sorting[0].id;
-      params.set("sortBy", sortCol);
+      params.set("sortBy", toApiSortColumn(sorting[0].id));
       params.set("sortOrder", sorting[0].desc ? "desc" : "asc");
     }
 
-    if (isMineFilter) {
+    applyFiltersToApiParams(params, columnFilters);
+
+    // Read from ref (not a dependency) so the legacy ?filter=mine param is included
+    // on the first fetch but automatically drops out once cleared in .then() or
+    // handleFiltersChange, without triggering a re-fetch cycle.
+    if (legacyFilterRef.current === "mine") {
       params.set("filter", "mine");
     }
 
-    if (selectedStatuses.size > 0) {
-      params.set("status", Array.from(selectedStatuses).join(","));
-    }
-
-    if (selectedOwner && !isMineFilter) {
-      params.set("owner", selectedOwner);
-    }
-
-    if (deferredSearch.trim()) {
-      params.set("q", deferredSearch.trim());
-    }
-
     return `/api/rcfa?${params.toString()}`;
-  }, [pagination, sorting, selectedStatuses, selectedOwner, deferredSearch, isMineFilter]);
+  }, [pagination, sorting, columnFilters]);
 
   // Fetch data when filters/pagination change
   useEffect(() => {
@@ -129,15 +266,32 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
     // Setting loading before async operation is intentional to show loading state immediately
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
+    setFetchError(null);
     fetch(buildApiUrl(), { signal: controller.signal })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          let message = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body.error) message = body.error;
+          } catch {
+            // Response body is not JSON (e.g., gateway HTML error page)
+          }
+          throw new Error(message);
+        }
+        return res.json();
+      })
       .then((response: ApiResponse) => {
         setData(response.rows);
         setTotalRows(response.total);
+        // Clear legacy filter after initial load so subsequent interactions
+        // aren't permanently scoped to "mine" (see backward-compat note above).
+        legacyFilterRef.current = null;
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
           console.error("Failed to fetch RCFAs:", err);
+          setFetchError(err instanceof Error ? err.message : "Failed to load RCFAs.");
         }
       })
       .finally(() => setIsLoading(false));
@@ -147,24 +301,19 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
 
   // Update URL when filters change (debounced to prevent history spam)
   useEffect(() => {
-    // Clear any pending URL update
     if (urlUpdateTimerRef.current) {
       clearTimeout(urlUpdateTimerRef.current);
     }
 
-    // Debounce URL updates by 150ms
     urlUpdateTimerRef.current = setTimeout(() => {
       const params = new URLSearchParams();
       if (pagination.pageIndex > 0) params.set("page", String(pagination.pageIndex + 1));
-      if (deferredSearch.trim()) params.set("q", deferredSearch.trim());
-      if (selectedStatuses.size > 0) params.set("status", Array.from(selectedStatuses).join(","));
-      if (selectedOwner && !isMineFilter) params.set("owner", selectedOwner);
-      if (isMineFilter) params.set("filter", "mine");
       if (sorting.length > 0) {
-        const sortCol = sorting[0].id === "createdAt" ? "created_at" : sorting[0].id;
+        const sortCol = toApiSortColumn(sorting[0].id);
         if (sortCol !== "created_at") params.set("sortBy", sortCol);
         if (!sorting[0].desc) params.set("sortOrder", "asc");
       }
+      filtersToUrlParams(params, columnFilters);
 
       const newUrl = `/dashboard/rcfas${params.toString() ? `?${params.toString()}` : ""}`;
       router.replace(newUrl, { scroll: false });
@@ -175,30 +324,19 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
         clearTimeout(urlUpdateTimerRef.current);
       }
     };
-  }, [pagination.pageIndex, deferredSearch, selectedStatuses, selectedOwner, isMineFilter, sorting, router]);
+  }, [pagination.pageIndex, sorting, columnFilters, router]);
 
-  // Toggle status filter
-  const toggleStatus = (status: RcfaStatus) => {
-    setSelectedStatuses((prev) => {
-      const next = new Set(prev);
-      if (next.has(status)) {
-        next.delete(status);
-      } else {
-        next.add(status);
-      }
-      return next;
-    });
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
-
-  // Handle "mine" filter toggle
-  const toggleMineFilter = () => {
-    setIsMineFilter((prev) => !prev);
-    if (!isMineFilter) {
-      setSelectedOwner("");
-    }
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
+  // Reset pagination to page 1 when filters change.
+  // Also clears legacy filter=mine so explicit user interaction takes precedence.
+  const handleFiltersChange = useCallback(
+    (updater: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => {
+      legacyFilterRef.current = null;
+      setColumnFilters(updater);
+      setPagination((p) => ({ ...p, pageIndex: 0 }));
+    },
+    // setColumnFilters is a stable state setter; listed here for React Compiler lint compliance.
+    [setColumnFilters]
+  );
 
   // Column definitions
   const columns = useMemo(
@@ -206,6 +344,7 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
       columnHelper.accessor("rcfaNumber", {
         header: "RCFA #",
         size: 100,
+        meta: { filterType: "text", filterPlaceholder: "Search #..." },
         cell: (info) => (
           <Link
             href={`/dashboard/rcfa/${info.row.original.id}`}
@@ -218,6 +357,7 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
       columnHelper.accessor("title", {
         header: "Title",
         size: 250,
+        meta: { filterType: "text", filterPlaceholder: "Search title..." },
         cell: (info) => (
           <div className="max-w-[250px] truncate" title={info.getValue()}>
             {info.getValue() || "Untitled RCFA"}
@@ -227,7 +367,14 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
       columnHelper.accessor("status", {
         header: "Status",
         size: 120,
-        enableColumnFilter: false,
+        meta: {
+          filterType: "multi-select",
+          filterOptions: ALL_STATUSES.map((s) => ({
+            label: RCFA_STATUS_LABELS[s],
+            value: s,
+          })),
+          filterColorMap: RCFA_STATUS_COLORS,
+        },
         cell: (info) => {
           const status = info.getValue();
           return (
@@ -242,40 +389,39 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
       columnHelper.accessor("ownerDisplayName", {
         header: "Owner",
         size: 150,
-        enableColumnFilter: false,
+        meta: {
+          filterType: "multi-select",
+          filterOptions: users.map((u) => ({
+            label: u.displayName,
+            value: u.id,
+          })),
+        },
       }),
       columnHelper.accessor("createdAt", {
         header: "Created",
         size: 100,
+        meta: { filterType: "date-range" },
       }),
       columnHelper.accessor("equipmentDescription", {
         header: "Equipment",
         size: 200,
-        cell: (info) => {
-          const highlight = info.row.original.equipmentHighlight;
-          if (highlight) {
-            return (
-              <div
-                className="max-w-[200px] truncate text-xs"
-                dangerouslySetInnerHTML={{ __html: highlight }}
-              />
-            );
-          }
-          return (
-            <div className="max-w-[200px] truncate text-xs" title={info.getValue()}>
-              {info.getValue()}
-            </div>
-          );
-        },
+        meta: { filterType: "text", filterPlaceholder: "Search equipment..." },
+        cell: (info) => (
+          <div className="max-w-[200px] truncate text-xs" title={info.getValue()}>
+            {info.getValue()}
+          </div>
+        ),
       }),
       columnHelper.accessor("rootCauseCount", {
         header: "Root Causes",
         size: 100,
+        enableColumnFilter: false,
         cell: (info) => info.getValue(),
       }),
       columnHelper.accessor("actionItemCount", {
         header: "Actions",
         size: 80,
+        enableColumnFilter: false,
         cell: (info) => {
           const count = info.getValue();
           const open = info.row.original.openActionCount;
@@ -291,7 +437,7 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
         },
       }),
     ],
-    []
+    [users]
   );
 
   // Export column definitions
@@ -325,95 +471,23 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
 
   return (
     <div className="space-y-4">
-      {/* Search input */}
-      <div className="relative">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPagination((p) => ({ ...p, pageIndex: 0 }));
-          }}
-          placeholder="Search equipment or failure descriptions..."
-          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
+      {/* Error banner */}
+      {fetchError && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+          {fetchError}
+        </div>
+      )}
+
+      {/* Result count and export */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          {totalRows} RCFA{totalRows !== 1 ? "s" : ""} found
+        </span>
+        <ExportButtons
+          onExport={handleExport}
+          disabled={data.length === 0 || isLoading}
+          rowCount={data.length}
         />
-        {search && (
-          <button
-            onClick={() => {
-              setSearch("");
-              setPagination((p) => ({ ...p, pageIndex: 0 }));
-            }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-            aria-label="Clear search"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {/* Filters row */}
-      <div className="flex flex-wrap items-center gap-4">
-        {/* "My RCFAs" toggle */}
-        <button
-          onClick={toggleMineFilter}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            isMineFilter
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          }`}
-        >
-          My RCFAs
-        </button>
-
-        {/* Status filter buttons */}
-        <div className="flex flex-wrap gap-1.5">
-          {ALL_STATUSES.map((status) => (
-            <button
-              key={status}
-              onClick={() => toggleStatus(status)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                selectedStatuses.has(status)
-                  ? RCFA_STATUS_COLORS[status]
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-              }`}
-            >
-              {RCFA_STATUS_LABELS[status]}
-            </button>
-          ))}
-        </div>
-
-        {/* Owner filter dropdown */}
-        {!isMineFilter && (
-          <select
-            value={selectedOwner}
-            onChange={(e) => {
-              setSelectedOwner(e.target.value);
-              setPagination((p) => ({ ...p, pageIndex: 0 }));
-            }}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-          >
-            <option value="">All Owners</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.displayName}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Result count and export */}
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {totalRows} RCFA{totalRows !== 1 ? "s" : ""} found
-          </span>
-          <ExportButtons
-            onExport={handleExport}
-            disabled={data.length === 0 || isLoading}
-            rowCount={data.length}
-          />
-        </div>
       </div>
 
       {/* Data table */}
@@ -422,14 +496,13 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
         data={data}
         isLoading={isLoading}
         emptyMessage={
-          search
-            ? "No RCFAs match your search."
-            : selectedStatuses.size > 0 || selectedOwner || isMineFilter
-              ? "No RCFAs match the selected filters."
-              : "No RCFAs yet. Click 'New RCFA' to get started."
+          columnFilters.length > 0
+            ? "No RCFAs match the selected filters."
+            : "No RCFAs yet. Click 'New RCFA' to get started."
         }
         showPagination={true}
-        enableFilters={false}
+        enableFilters={true}
+        columnFilters={columnFilters}
         pageSize={pagination.pageSize}
         pageSizeOptions={[10, 25, 50]}
         totalRows={totalRows}
@@ -439,6 +512,7 @@ export default function RcfaTable({ initialFilter }: { initialFilter?: string })
         manualFiltering={true}
         onPaginationChange={setPagination}
         onSortingChange={setSorting}
+        onFiltersChange={handleFiltersChange}
       />
     </div>
   );
