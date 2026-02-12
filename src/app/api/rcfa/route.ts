@@ -3,6 +3,7 @@ import type { OperatingContext, RcfaStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import { VALID_OPERATING_CONTEXTS } from "@/lib/rcfa-utils";
+import { UUID_RE, escapeLike, isValidISODate } from "@/lib/sql-utils";
 
 /**
  * Row shape from rcfa_summary view for table listing.
@@ -42,13 +43,6 @@ const VALID_SORT_COLUMNS = [
 ];
 
 const VALID_STATUSES: RcfaStatus[] = ["draft", "investigation", "actions_open", "closed"];
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Escape LIKE/ILIKE wildcard characters in user input. */
-function escapeLike(input: string): string {
-  return input.replace(/[%_\\]/g, "\\$&");
-}
 
 /**
  * HTML-escape a string, then replace neutral highlight delimiters with <mark>.
@@ -141,7 +135,10 @@ export async function GET(request: NextRequest) {
     const params: (string | number | Date)[] = [];
     let paramIndex = 1;
 
-    // Backward-compatible "mine" filter (used by dashboard until #325 migrates to column filters)
+    // Backward-compatible "mine" filter (used by dashboard until #325 migrates to column filters).
+    // Intentionally excludes closed RCFAs — "my RCFAs" means active work.
+    // The action-items route does NOT have this status restriction since
+    // action items don't have a terminal "closed" lifecycle state.
     if (specialFilter === "mine") {
       conditions.push(`s.owner_user_id = $${paramIndex++}`);
       params.push(userId);
@@ -174,14 +171,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Date range filters (validate format before parsing)
+    // Date range filters (validate format and semantic validity before parsing)
     for (const [label, val] of [
       ["dateFrom", dateFrom],
       ["dateTo", dateTo],
     ] as const) {
-      if (val && !ISO_DATE_RE.test(val)) {
+      if (val && !isValidISODate(val)) {
         return NextResponse.json(
-          { error: `Invalid ${label} format (expected yyyy-MM-dd)` },
+          { error: `Invalid ${label} (expected a valid yyyy-MM-dd date)` },
           { status: 400 }
         );
       }

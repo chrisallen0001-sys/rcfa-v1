@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ActionItemStatus, Priority } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Escape LIKE/ILIKE wildcard characters in user input. */
-function escapeLike(input: string): string {
-  return input.replace(/[%_\\]/g, "\\$&");
-}
+import { UUID_RE, escapeLike, isValidISODate } from "@/lib/sql-utils";
 
 /**
  * Row shape for action items table listing.
@@ -192,16 +185,16 @@ export async function GET(request: NextRequest) {
       params.push(`%${escapeLike(rcfaNumberFilter)}%`);
     }
 
-    // Date range filters (validate format before parsing)
+    // Date range filters (validate format and semantic validity before parsing)
     for (const [label, val] of [
       ["dueDateFrom", dueDateFrom],
       ["dueDateTo", dueDateTo],
       ["createdFrom", createdFrom],
       ["createdTo", createdTo],
     ] as const) {
-      if (val && !ISO_DATE_RE.test(val)) {
+      if (val && !isValidISODate(val)) {
         return NextResponse.json(
-          { error: `Invalid ${label} format (expected yyyy-MM-dd)` },
+          { error: `Invalid ${label} (expected a valid yyyy-MM-dd date)` },
           { status: 400 }
         );
       }
