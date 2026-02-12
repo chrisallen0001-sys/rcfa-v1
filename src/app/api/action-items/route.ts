@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ActionItemStatus, Priority } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_RE, escapeLike, isValidISODate } from "@/lib/sql-utils";
 
 /**
  * Row shape for action items table listing.
@@ -82,8 +81,15 @@ function mapRowToResponse(r: ActionItemRow) {
  * - sortOrder: asc or desc (default: asc)
  * - status: Comma-separated status values to filter
  * - priority: Comma-separated priority values to filter
- * - owner: Owner user ID to filter
+ * - owner: Comma-separated owner user IDs to filter
  * - filter: Special filter ("mine" = current user's action items)
+ * - actionItemNumber: Text search on action item number
+ * - actionText: Text search on action text (case-insensitive)
+ * - rcfaNumber: Text search on RCFA number
+ * - dueDateFrom: ISO date string for due_date >= filter
+ * - dueDateTo: ISO date string for due_date <= filter
+ * - createdFrom: ISO date string for created_at >= filter
+ * - createdTo: ISO date string for created_at <= filter
  */
 export async function GET(request: NextRequest) {
   try {
@@ -105,6 +111,13 @@ export async function GET(request: NextRequest) {
     const priorityFilter = searchParams.get("priority");
     const ownerFilter = searchParams.get("owner");
     const specialFilter = searchParams.get("filter");
+    const actionItemNumberFilter = searchParams.get("actionItemNumber");
+    const actionTextFilter = searchParams.get("actionText");
+    const rcfaNumberFilter = searchParams.get("rcfaNumber");
+    const dueDateFrom = searchParams.get("dueDateFrom");
+    const dueDateTo = searchParams.get("dueDateTo");
+    const createdFrom = searchParams.get("createdFrom");
+    const createdTo = searchParams.get("createdTo");
 
     // Build WHERE conditions
     const conditions: string[] = [];
@@ -114,7 +127,7 @@ export async function GET(request: NextRequest) {
     // Always exclude deleted RCFAs
     conditions.push(`r.deleted_at IS NULL`);
 
-    // Special filter: "mine" = current user's action items
+    // Backward-compatible "mine" filter (used by dashboard until #324 migrates to column filters)
     if (specialFilter === "mine") {
       conditions.push(`ai.owner_user_id = $${paramIndex++}`);
       params.push(userId);
@@ -140,13 +153,67 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Owner filter (only if not using "mine" filter)
-    if (ownerFilter && !specialFilter) {
-      if (!UUID_RE.test(ownerFilter)) {
-        return NextResponse.json({ error: "Invalid owner ID" }, { status: 400 });
+    // Owner filter - accepts comma-separated UUIDs (skipped when filter=mine is active)
+    if (ownerFilter && specialFilter !== "mine") {
+      const ownerIds = ownerFilter.split(",").filter((id) => UUID_RE.test(id.trim()));
+      if (ownerIds.length === 1) {
+        conditions.push(`ai.owner_user_id = $${paramIndex++}`);
+        params.push(ownerIds[0].trim());
+      } else if (ownerIds.length > 1) {
+        const placeholders = ownerIds.map(() => `$${paramIndex++}`).join(", ");
+        conditions.push(`ai.owner_user_id IN (${placeholders})`);
+        ownerIds.forEach((id) => params.push(id.trim()));
+      } else {
+        // All provided UUIDs were invalid — match nothing
+        conditions.push(`FALSE`);
       }
-      conditions.push(`ai.owner_user_id = $${paramIndex++}`);
-      params.push(ownerFilter);
+    }
+
+    // Text search filters
+    if (actionItemNumberFilter) {
+      conditions.push(`CAST(ai.action_item_number AS TEXT) LIKE $${paramIndex++}`);
+      params.push(`%${escapeLike(actionItemNumberFilter)}%`);
+    }
+
+    if (actionTextFilter) {
+      conditions.push(`ai.action_text ILIKE $${paramIndex++}`);
+      params.push(`%${escapeLike(actionTextFilter)}%`);
+    }
+
+    if (rcfaNumberFilter) {
+      conditions.push(`CAST(r.rcfa_number AS TEXT) LIKE $${paramIndex++}`);
+      params.push(`%${escapeLike(rcfaNumberFilter)}%`);
+    }
+
+    // Date range filters (validate format and semantic validity before parsing)
+    for (const [label, val] of [
+      ["dueDateFrom", dueDateFrom],
+      ["dueDateTo", dueDateTo],
+      ["createdFrom", createdFrom],
+      ["createdTo", createdTo],
+    ] as const) {
+      if (val && !isValidISODate(val)) {
+        return NextResponse.json(
+          { error: `Invalid ${label} (expected a valid yyyy-MM-dd date)` },
+          { status: 400 }
+        );
+      }
+    }
+    if (dueDateFrom) {
+      conditions.push(`ai.due_date >= $${paramIndex++}`);
+      params.push(new Date(dueDateFrom));
+    }
+    if (dueDateTo) {
+      conditions.push(`ai.due_date <= $${paramIndex++}`);
+      params.push(new Date(dueDateTo + "T23:59:59.999Z"));
+    }
+    if (createdFrom) {
+      conditions.push(`ai.created_at >= $${paramIndex++}`);
+      params.push(new Date(createdFrom));
+    }
+    if (createdTo) {
+      conditions.push(`ai.created_at <= $${paramIndex++}`);
+      params.push(new Date(createdTo + "T23:59:59.999Z"));
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
