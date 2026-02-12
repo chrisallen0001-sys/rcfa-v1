@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, truncateTitle } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle } from "@/lib/rcfa-utils";
 import { fetchRcfaById } from "@/lib/rcfa-queries";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import InvestigationWrapper from "./InvestigationWrapper";
@@ -25,7 +25,6 @@ import ExportPdfButton from "./ExportPdfButton";
 import type {
   ConfidenceLabel,
   Priority,
-  OperatingContext,
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,15 +37,6 @@ const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
 };
 
 const CONFIDENCE_ORDER: Record<ConfidenceLabel, number> = { high: 0, medium: 1, low: 2, deprioritized: 3 };
-
-const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
-  running: "Running",
-  startup: "Startup",
-  shutdown: "Shutdown",
-  maintenance: "Maintenance",
-  unknown: "Unknown",
-};
-
 
 const PRIORITY_COLORS: Record<Priority, string> = {
   deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",

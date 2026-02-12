@@ -103,7 +103,7 @@ export default function ExportPdfButton({ rcfaId }: ExportPdfButtonProps) {
         )}
       </button>
       {error && (
-        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
       )}
     </div>
   );

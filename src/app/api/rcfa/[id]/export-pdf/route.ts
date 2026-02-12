@@ -12,7 +12,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await getAuthContext();
+    try {
+      await getAuthContext();
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
 
     if (!UUID_RE.test(id)) {
@@ -33,6 +38,8 @@ export async function GET(
     // component wraps <Document> internally. The type assertion is necessary
     // because react-pdf's strict typing expects the Document element directly.
     const element = React.createElement(RcfaPdfDocument, { rcfa });
+    // NOTE: For very large RCFAs, consider switching to reactPdf.renderToStream
+    // to avoid buffering the entire PDF in memory.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffer = await reactPdf.renderToBuffer(element as any);
 

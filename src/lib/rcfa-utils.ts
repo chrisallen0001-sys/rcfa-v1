@@ -1,4 +1,27 @@
-import type { RcfaStatus, OperatingContext, Priority, ActionItemStatus } from "@/generated/prisma/client";
+import type { RcfaStatus, OperatingContext, Priority, ActionItemStatus, QuestionCategory } from "@/generated/prisma/client";
+
+/**
+ * UI labels for operating context values.
+ */
+export const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
+  running: "Running",
+  startup: "Startup",
+  shutdown: "Shutdown",
+  maintenance: "Maintenance",
+  unknown: "Unknown",
+};
+
+/**
+ * UI labels for follow-up question category values.
+ */
+export const QUESTION_CATEGORY_LABELS: Record<QuestionCategory, string> = {
+  failure_mode: "Failure Mode",
+  evidence: "Evidence",
+  operating_context: "Operating Context",
+  maintenance_history: "Maintenance History",
+  safety: "Safety",
+  other: "Other",
+};
 
 /**
  * Valid operating context values for RCFA equipment.
