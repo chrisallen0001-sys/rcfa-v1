@@ -207,16 +207,18 @@ export default function DataTable<TData>({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        style={isLoading && contentHeightRef.current > 0 ? { minHeight: contentHeightRef.current } : undefined}
-        className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800"
+        style={{
+          maxHeight: "calc(100vh - var(--app-header-h, 0px) - 12rem)",
+          ...(isLoading && contentHeightRef.current > 0 ? { minHeight: contentHeightRef.current } : {}),
+        }}
+        className="overflow-auto rounded-lg border border-zinc-200 dark:border-zinc-800"
       >
         <table
           style={isLoading && contentWidthRef.current > 0 ? { minWidth: contentWidthRef.current } : undefined}
           className="w-full min-w-[600px] text-sm"
         >
           <thead
-            className="sticky z-20 border-b border-zinc-200 bg-zinc-50 shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
-            style={{ top: "var(--app-header-h, 0px)" }}
+            className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-50 shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
           >
             {headerGroups.map((headerGroup) => (
               <tr key={headerGroup.id}>
