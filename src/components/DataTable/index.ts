@@ -8,6 +8,7 @@ export { default as MultiSelectFilter } from "./MultiSelectFilter";
 export { default as DateRangeFilter } from "./DateRangeFilter";
 export { parseDateRangeValue, serializeDateRange } from "./DateRangeFilter";
 export { multiSelectFilterFn, dateRangeFilterFn } from "./filterFns";
+export { default as ActiveFilterChips } from "./ActiveFilterChips";
 
 // Re-export useful types from TanStack Table for column definitions
 export {
