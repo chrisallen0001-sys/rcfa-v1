@@ -3,7 +3,7 @@ import type { OperatingContext, RcfaStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import { VALID_OPERATING_CONTEXTS } from "@/lib/rcfa-utils";
-import { UUID_RE, escapeLike, isValidISODate } from "@/lib/sql-utils";
+import { UUID_RE, escapeLike, isValidISODate, stripNumericPrefix } from "@/lib/sql-utils";
 
 /**
  * Row shape from rcfa_summary view for table listing.
@@ -194,8 +194,9 @@ export async function GET(request: NextRequest) {
 
     // Text search filters
     if (rcfaNumberFilter) {
+      const normalized = stripNumericPrefix(rcfaNumberFilter, "RCFA-");
       conditions.push(`CAST(s.rcfa_number AS TEXT) LIKE $${paramIndex++}`);
-      params.push(`%${escapeLike(rcfaNumberFilter)}%`);
+      params.push(`%${escapeLike(normalized)}%`);
     }
 
     if (titleFilter) {

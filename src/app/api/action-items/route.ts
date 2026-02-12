@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ActionItemStatus, Priority } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import { UUID_RE, escapeLike, isValidISODate } from "@/lib/sql-utils";
+import { UUID_RE, escapeLike, isValidISODate, stripNumericPrefix } from "@/lib/sql-utils";
 
 /**
  * Row shape for action items table listing.
@@ -171,8 +171,9 @@ export async function GET(request: NextRequest) {
 
     // Text search filters
     if (actionItemNumberFilter) {
+      const normalized = stripNumericPrefix(actionItemNumberFilter, "AI-");
       conditions.push(`CAST(ai.action_item_number AS TEXT) LIKE $${paramIndex++}`);
-      params.push(`%${escapeLike(actionItemNumberFilter)}%`);
+      params.push(`%${escapeLike(normalized)}%`);
     }
 
     if (actionTextFilter) {
@@ -181,8 +182,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (rcfaNumberFilter) {
+      const normalized = stripNumericPrefix(rcfaNumberFilter, "RCFA-");
       conditions.push(`CAST(r.rcfa_number AS TEXT) LIKE $${paramIndex++}`);
-      params.push(`%${escapeLike(rcfaNumberFilter)}%`);
+      params.push(`%${escapeLike(normalized)}%`);
     }
 
     // Date range filters (validate format and semantic validity before parsing)
