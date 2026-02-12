@@ -204,18 +204,24 @@ export default function DataTable<TData>({
 
   return (
     <div className="w-full">
-      {/* Table container with horizontal scroll on mobile */}
+      {/* Table container — uses overflow-x:clip so position:sticky works on
+          the thead while still respecting the rounded border.  overflow-x:clip
+          does NOT create a scroll container, so the thead sticks relative to
+          the viewport (offset by the AppHeader height via --app-header-h). */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
         style={isLoading && contentHeightRef.current > 0 ? { minHeight: contentHeightRef.current } : undefined}
-        className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800"
+        className="rounded-lg border border-zinc-200 [overflow-x:clip] dark:border-zinc-800"
       >
         <table
           style={isLoading && contentWidthRef.current > 0 ? { minWidth: contentWidthRef.current } : undefined}
           className="w-full min-w-[600px] text-sm"
         >
-          <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+          <thead
+            className="sticky z-20 border-b border-zinc-200 bg-zinc-50 shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
+            style={{ top: "var(--app-header-h, 0px)" }}
+          >
             {headerGroups.map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
