@@ -44,6 +44,9 @@ const VALID_SORT_COLUMNS = [
 
 const VALID_STATUSES: RcfaStatus[] = ["draft", "investigation", "actions_open", "closed"];
 
+/** Hard cap for unlimited exports to protect against DoS. */
+const EXPORT_MAX_ROWS = 10_000;
+
 /**
  * HTML-escape a string, then replace neutral highlight delimiters with <mark>.
  */
@@ -111,7 +114,8 @@ export async function GET(request: NextRequest) {
 
     // Parse pagination
     // pageSize=0 means "return all results" (used by CSV/Excel export)
-    const rawPageSize = parseInt(searchParams.get("pageSize") ?? "25", 10) || 25;
+    const parsed = parseInt(searchParams.get("pageSize") ?? "25", 10);
+    const rawPageSize = Number.isNaN(parsed) ? 25 : parsed;
     const unlimitedExport = rawPageSize === 0;
     const page = unlimitedExport ? 1 : Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
     const pageSize = unlimitedExport ? 0 : Math.min(100, Math.max(1, rawPageSize));
@@ -217,7 +221,7 @@ export async function GET(request: NextRequest) {
     if (searchQuery) {
       // Full-text search query
       const searchPaginationClause = unlimitedExport
-        ? ""
+        ? `LIMIT ${EXPORT_MAX_ROWS}`
         : `LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}`;
 
       const searchSql = `
@@ -272,7 +276,7 @@ export async function GET(request: NextRequest) {
 
     // Browse query (no search)
     const browsePaginationClause = unlimitedExport
-      ? ""
+      ? `LIMIT ${EXPORT_MAX_ROWS}`
       : `LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
     const browseSql = `

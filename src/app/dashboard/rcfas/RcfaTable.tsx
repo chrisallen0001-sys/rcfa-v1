@@ -229,6 +229,7 @@ export default function RcfaTable() {
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
     () => parseFiltersFromUrl(searchParams)
   );
@@ -243,11 +244,10 @@ export default function RcfaTable() {
   // Ref for URL update debounce timer
   const urlUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Build API URL from current state
-  const buildApiUrl = useCallback(() => {
+  // Build the common URLSearchParams shared by data fetch and export.
+  // Includes sorting, column filters, and the legacy ?filter=mine param.
+  const buildBaseApiParams = useCallback(() => {
     const params = new URLSearchParams();
-    params.set("page", String(pagination.pageIndex + 1));
-    params.set("pageSize", String(pagination.pageSize));
 
     if (sorting.length > 0) {
       params.set("sortBy", toApiSortColumn(sorting[0].id));
@@ -263,8 +263,16 @@ export default function RcfaTable() {
       params.set("filter", "mine");
     }
 
+    return params;
+  }, [sorting, columnFilters]);
+
+  // Build API URL from current state
+  const buildApiUrl = useCallback(() => {
+    const params = buildBaseApiParams();
+    params.set("page", String(pagination.pageIndex + 1));
+    params.set("pageSize", String(pagination.pageSize));
     return `/api/rcfa?${params.toString()}`;
-  }, [pagination, sorting, columnFilters]);
+  }, [pagination, buildBaseApiParams]);
 
   // Fetch data when filters/pagination change
   useEffect(() => {
@@ -476,55 +484,55 @@ export default function RcfaTable() {
 
   // Build API URL for export (all filtered rows, no pagination limit)
   const buildExportApiUrl = useCallback(() => {
-    const params = new URLSearchParams();
+    const params = buildBaseApiParams();
     params.set("pageSize", "0");
-
-    if (sorting.length > 0) {
-      params.set("sortBy", toApiSortColumn(sorting[0].id));
-      params.set("sortOrder", sorting[0].desc ? "desc" : "asc");
-    }
-
-    applyFiltersToApiParams(params, columnFilters);
-
-    if (legacyFilterRef.current === "mine") {
-      params.set("filter", "mine");
-    }
-
     return `/api/rcfa?${params.toString()}`;
-  }, [sorting, columnFilters]);
+  }, [buildBaseApiParams]);
 
   // Handle export — fetches all filtered rows (not just current page) then exports
   const handleExport = useCallback(
     async (format: "csv" | "xlsx") => {
-      const res = await fetch(buildExportApiUrl());
-      if (!res.ok) {
-        let message = `Export failed (HTTP ${res.status})`;
-        try {
-          const body = await res.json();
-          if (body.error) message = body.error;
-        } catch {
-          // non-JSON response
+      try {
+        setExportError(null);
+        const res = await fetch(buildExportApiUrl());
+        if (!res.ok) {
+          let message = `Export failed: HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body.error) message = `Export failed: ${body.error}`;
+          } catch {
+            // non-JSON response
+          }
+          setExportError(message);
+          return;
         }
-        setFetchError(message);
-        return;
-      }
-      const { rows } = (await res.json()) as ApiResponse;
-      if (format === "csv") {
-        exportToCSV(rows, exportColumns, "rcfas");
-      } else {
-        exportToExcel(rows, exportColumns, "rcfas");
+        const { rows } = (await res.json()) as ApiResponse;
+        if (format === "csv") {
+          exportToCSV(rows, exportColumns, "rcfas");
+        } else {
+          exportToExcel(rows, exportColumns, "rcfas");
+        }
+      } catch (err) {
+        setExportError(
+          err instanceof Error ? `Export failed: ${err.message}` : "Export failed due to a network error."
+        );
       }
     },
-    // setFetchError is a stable state setter; listed here for React Compiler lint compliance.
-    [buildExportApiUrl, exportColumns, setFetchError]
+    // setExportError is a stable state setter; listed here for React Compiler lint compliance.
+    [buildExportApiUrl, exportColumns, setExportError]
   );
 
   return (
     <div className="space-y-4">
-      {/* Error banner */}
+      {/* Error banners */}
       {fetchError && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
           {fetchError}
+        </div>
+      )}
+      {exportError && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+          {exportError}
         </div>
       )}
 

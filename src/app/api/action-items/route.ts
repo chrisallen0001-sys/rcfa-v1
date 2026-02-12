@@ -50,6 +50,9 @@ const VALID_PRIORITIES: Priority[] = [
   "high",
 ];
 
+/** Hard cap for unlimited exports to protect against DoS. */
+const EXPORT_MAX_ROWS = 10_000;
+
 /**
  * Maps a database row to the API response format.
  */
@@ -98,7 +101,8 @@ export async function GET(request: NextRequest) {
 
     // Parse pagination
     // pageSize=0 means "return all results" (used by CSV/Excel export)
-    const rawPageSize = parseInt(searchParams.get("pageSize") ?? "25", 10) || 25;
+    const parsed = parseInt(searchParams.get("pageSize") ?? "25", 10);
+    const rawPageSize = Number.isNaN(parsed) ? 25 : parsed;
     const unlimitedExport = rawPageSize === 0;
     const page = unlimitedExport ? 1 : Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
     const pageSize = unlimitedExport ? 0 : Math.min(100, Math.max(1, rawPageSize));
@@ -229,7 +233,7 @@ export async function GET(request: NextRequest) {
       : `ORDER BY ${validatedSortBy === "owner_display_name" ? "u.display_name" : validatedSortBy === "rcfa_number" ? "r.rcfa_number" : `ai.${validatedSortBy}`} ${sortOrder}`;
 
     const paginationClause = unlimitedExport
-      ? ""
+      ? `LIMIT ${EXPORT_MAX_ROWS}`
       : `LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
     const sql = `
