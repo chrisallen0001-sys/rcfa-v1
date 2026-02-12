@@ -170,7 +170,7 @@ export default function ExportButtons({
           ref={menuRef}
           role="menu"
           aria-orientation="vertical"
-          className="absolute right-0 z-10 mt-1 w-48 rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          className="absolute right-0 z-30 mt-1 w-48 rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           <div className="py-1">
             {rowCount !== undefined && (
