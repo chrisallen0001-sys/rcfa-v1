@@ -4,14 +4,18 @@ import { parseDateRangeValue } from "./DateRangeFilter";
 /**
  * Client-side filter function for multi-select columns.
  * Expects filterValue to be a string[] of selected values.
+ * Cell values may be a single string or an array of strings.
  */
 export const multiSelectFilterFn: FilterFn<unknown> = (
   row,
   columnId,
   filterValue: string[]
 ) => {
-  const value = row.getValue(columnId) as string;
-  return filterValue.includes(value);
+  const cellValue = row.getValue(columnId);
+  if (Array.isArray(cellValue)) {
+    return cellValue.some((v) => filterValue.includes(v as string));
+  }
+  return filterValue.includes(cellValue as string);
 };
 
 /**

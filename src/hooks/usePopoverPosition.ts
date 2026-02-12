@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, type RefObject } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  type RefObject,
+} from "react";
 
 interface PopoverPositionOptions {
   /** Minimum vertical space (px) below anchor to prefer opening downward. */
@@ -13,8 +19,8 @@ interface PopoverPositionOptions {
 
 /**
  * Computes fixed-position styles for a popover anchored to a button.
- * Recalculates on scroll (capture phase) and resize so the popover
- * follows its anchor when the page or a scrollable container moves.
+ * Uses useLayoutEffect for the initial position (avoids first-frame flash)
+ * and rAF-throttled scroll/resize listeners so the popover tracks its anchor.
  */
 export function usePopoverPosition(
   isOpen: boolean,
@@ -52,17 +58,29 @@ export function usePopoverPosition(
     setStyle(computed);
   }, [anchorRef, spaceThreshold, width, minWidth]);
 
+  // Compute position synchronously before paint to avoid a first-frame flash.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    compute();
+  }, [isOpen, compute]);
+
+  // Recompute on scroll/resize, throttled to one update per animation frame.
   useEffect(() => {
     if (!isOpen) return;
 
-    compute();
+    let rafId: number;
+    const throttled = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(compute);
+    };
 
     // Capture phase catches scrolling inside nested containers (e.g. table overflow)
-    window.addEventListener("scroll", compute, true);
-    window.addEventListener("resize", compute);
+    window.addEventListener("scroll", throttled, true);
+    window.addEventListener("resize", throttled);
     return () => {
-      window.removeEventListener("scroll", compute, true);
-      window.removeEventListener("resize", compute);
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("scroll", throttled, true);
+      window.removeEventListener("resize", throttled);
     };
   }, [isOpen, compute]);
 

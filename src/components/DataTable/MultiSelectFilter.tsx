@@ -24,6 +24,7 @@ export default function MultiSelectFilter<TData>({
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => setIsOpen(false), []);
+  // Refs are stable across renders; empty deps is intentional.
   const dismissRefs = useMemo(() => [buttonRef, popoverRef], []);
 
   usePopoverDismiss(isOpen, close, dismissRefs);
@@ -42,6 +43,10 @@ export default function MultiSelectFilter<TData>({
   const selectAll = useCallback(() => {
     column.setFilterValue(options.map((o) => o.value));
   }, [column, options]);
+
+  const deselectAll = useCallback(() => {
+    column.setFilterValue(undefined);
+  }, [column]);
 
   const clear = useCallback(() => {
     column.setFilterValue(undefined);
@@ -64,7 +69,7 @@ export default function MultiSelectFilter<TData>({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
-        aria-haspopup="listbox"
+        aria-haspopup="true"
         className={`w-full truncate rounded border px-2 py-1 text-left text-xs transition-colors ${
           selected.length > 0
             ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-950 dark:text-blue-300"
@@ -75,11 +80,9 @@ export default function MultiSelectFilter<TData>({
       </button>
 
       {isOpen &&
-        typeof document !== "undefined" &&
         createPortal(
           <div
             ref={popoverRef}
-            role="listbox"
             aria-label="Filter options"
             style={popoverStyle}
             className="max-h-56 overflow-y-auto rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
@@ -88,7 +91,7 @@ export default function MultiSelectFilter<TData>({
             <div className="border-b border-zinc-200 px-3 py-1.5 dark:border-zinc-700">
               <button
                 type="button"
-                onClick={allSelected ? clear : selectAll}
+                onClick={allSelected ? deselectAll : selectAll}
                 className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
               >
                 {allSelected ? "Deselect all" : "Select all"}
@@ -102,8 +105,6 @@ export default function MultiSelectFilter<TData>({
               return (
                 <label
                   key={option.value}
-                  role="option"
-                  aria-selected={isChecked}
                   className="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 >
                   <input

@@ -11,10 +11,12 @@ import "react-day-picker/style.css";
 
 type DateRangeMode = "after" | "before" | "range";
 
+const EPOCH = new Date(0);
+
 /** Parse an ISO date string (yyyy-MM-dd) to a Date, or undefined if invalid. */
 function parseDate(str: string): Date | undefined {
   if (!str) return undefined;
-  const d = parse(str, "yyyy-MM-dd", new Date());
+  const d = parse(str, "yyyy-MM-dd", EPOCH);
   return isValid(d) ? d : undefined;
 }
 
@@ -86,6 +88,7 @@ export default function DateRangeFilter<TData>({
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => setIsOpen(false), []);
+  // Refs are stable across renders; empty deps is intentional.
   const dismissRefs = useMemo(() => [buttonRef, popoverRef], []);
 
   usePopoverDismiss(isOpen, close, dismissRefs);
@@ -207,7 +210,6 @@ export default function DateRangeFilter<TData>({
       </button>
 
       {isOpen &&
-        typeof document !== "undefined" &&
         createPortal(
           <div
             ref={popoverRef}
