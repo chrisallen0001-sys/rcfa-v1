@@ -94,15 +94,17 @@ function mapRowToResponse(
  * - sortBy: Column to sort by (default: created_at)
  * - sortOrder: asc or desc (default: desc)
  * - status: Comma-separated status values to filter
- * - owner: Owner user ID to filter
+ * - owner: Comma-separated owner user IDs to filter
  * - dateFrom: ISO date string for created_at >= filter
  * - dateTo: ISO date string for created_at <= filter
  * - q: Full-text search query
- * - filter: Special filter ("mine" = current user's RCFAs)
+ * - rcfaNumber: Text search on RCFA number
+ * - title: Text search on title (case-insensitive)
+ * - equipment: Text search on equipment description (case-insensitive)
  */
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await getAuthContext();
+    await getAuthContext();
     const { searchParams } = new URL(request.url);
 
     // Parse pagination
@@ -121,19 +123,16 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const searchQuery = searchParams.get("q")?.trim() ?? "";
-    const specialFilter = searchParams.get("filter");
+    const rcfaNumberFilter = searchParams.get("rcfaNumber");
+    const titleFilter = searchParams.get("title");
+    const equipmentFilter = searchParams.get("equipment");
+
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     // Build WHERE conditions
     const conditions: string[] = [];
     const params: (string | number | Date)[] = [];
     let paramIndex = 1;
-
-    // Special filter: "mine" = current user's open RCFAs
-    if (specialFilter === "mine") {
-      conditions.push(`s.owner_user_id = $${paramIndex++}`);
-      params.push(userId);
-      conditions.push(`s.status != 'closed'`);
-    }
 
     // Status filter - use IN clause with individual placeholders for proper PostgreSQL handling
     if (statusFilter) {
@@ -145,10 +144,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Owner filter
-    if (ownerFilter && !specialFilter) {
-      conditions.push(`s.owner_user_id = $${paramIndex++}`);
-      params.push(ownerFilter);
+    // Owner filter - accepts comma-separated UUIDs
+    if (ownerFilter) {
+      const ownerIds = ownerFilter.split(",").filter((id) => UUID_RE.test(id.trim()));
+      if (ownerIds.length === 1) {
+        conditions.push(`s.owner_user_id = $${paramIndex++}`);
+        params.push(ownerIds[0].trim());
+      } else if (ownerIds.length > 1) {
+        const placeholders = ownerIds.map(() => `$${paramIndex++}`).join(", ");
+        conditions.push(`s.owner_user_id IN (${placeholders})`);
+        ownerIds.forEach((id) => params.push(id.trim()));
+      }
     }
 
     // Date range filters
@@ -159,6 +165,22 @@ export async function GET(request: NextRequest) {
     if (dateTo) {
       conditions.push(`s.created_at <= $${paramIndex++}`);
       params.push(new Date(dateTo + "T23:59:59.999Z"));
+    }
+
+    // Text search filters
+    if (rcfaNumberFilter) {
+      conditions.push(`CAST(s.rcfa_number AS TEXT) LIKE $${paramIndex++}`);
+      params.push(`%${rcfaNumberFilter}%`);
+    }
+
+    if (titleFilter) {
+      conditions.push(`s.title ILIKE $${paramIndex++}`);
+      params.push(`%${titleFilter}%`);
+    }
+
+    if (equipmentFilter) {
+      conditions.push(`s.equipment_description ILIKE $${paramIndex++}`);
+      params.push(`%${equipmentFilter}%`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
