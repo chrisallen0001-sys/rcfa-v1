@@ -13,7 +13,7 @@ import {
   type PaginationState,
   type OnChangeFn,
 } from "@tanstack/react-table";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useLayoutEffect } from "react";
 import TableHeader from "./TableHeader";
 import TablePagination from "./TablePagination";
 
@@ -155,10 +155,32 @@ export default function DataTable<TData>({
   const headerGroups = table.getHeaderGroups();
   const rows = table.getRowModel().rows;
 
+  // Preserve horizontal scroll position across re-renders (e.g. when filters change)
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollLeftRef = useRef(0);
+
+  // Capture scroll position on every scroll event
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
+    }
+  };
+
+  // Restore scroll position after React re-renders the table content
+  useLayoutEffect(() => {
+    if (scrollContainerRef.current && scrollLeftRef.current > 0) {
+      scrollContainerRef.current.scrollLeft = scrollLeftRef.current;
+    }
+  });
+
   return (
     <div className="w-full">
       {/* Table container with horizontal scroll on mobile */}
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800"
+      >
         <table className="w-full min-w-[600px] text-sm">
           <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
             {headerGroups.map((headerGroup) => (
