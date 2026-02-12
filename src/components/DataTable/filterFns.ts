@@ -12,10 +12,11 @@ export const multiSelectFilterFn: FilterFn<unknown> = (
   filterValue: string[]
 ) => {
   const cellValue = row.getValue(columnId);
+  if (cellValue == null) return false;
   if (Array.isArray(cellValue)) {
-    return cellValue.some((v) => filterValue.includes(v as string));
+    return cellValue.some((v) => filterValue.includes(String(v)));
   }
-  return filterValue.includes(cellValue as string);
+  return filterValue.includes(String(cellValue));
 };
 
 /**

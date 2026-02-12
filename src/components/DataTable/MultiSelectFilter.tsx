@@ -83,6 +83,7 @@ export default function MultiSelectFilter<TData>({
         createPortal(
           <div
             ref={popoverRef}
+            role="group"
             aria-label="Filter options"
             style={popoverStyle}
             className="max-h-56 overflow-y-auto rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
