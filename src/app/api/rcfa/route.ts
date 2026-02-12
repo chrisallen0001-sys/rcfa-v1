@@ -42,6 +42,13 @@ const VALID_SORT_COLUMNS = [
 ];
 
 const VALID_STATUSES: RcfaStatus[] = ["draft", "investigation", "actions_open", "closed"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Escape LIKE/ILIKE wildcard characters in user input. */
+function escapeLike(input: string): string {
+  return input.replace(/[%_\\]/g, "\\$&");
+}
 
 /**
  * HTML-escape a string, then replace neutral highlight delimiters with <mark>.
@@ -95,6 +102,7 @@ function mapRowToResponse(
  * - sortOrder: asc or desc (default: desc)
  * - status: Comma-separated status values to filter
  * - owner: Comma-separated owner user IDs to filter
+ * - filter: Special filter ("mine" = current user's open RCFAs)
  * - dateFrom: ISO date string for created_at >= filter
  * - dateTo: ISO date string for created_at <= filter
  * - q: Full-text search query
@@ -104,7 +112,7 @@ function mapRowToResponse(
  */
 export async function GET(request: NextRequest) {
   try {
-    await getAuthContext();
+    const { userId } = await getAuthContext();
     const { searchParams } = new URL(request.url);
 
     // Parse pagination
@@ -120,6 +128,7 @@ export async function GET(request: NextRequest) {
     // Parse filters
     const statusFilter = searchParams.get("status");
     const ownerFilter = searchParams.get("owner");
+    const specialFilter = searchParams.get("filter");
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const searchQuery = searchParams.get("q")?.trim() ?? "";
@@ -127,12 +136,17 @@ export async function GET(request: NextRequest) {
     const titleFilter = searchParams.get("title");
     const equipmentFilter = searchParams.get("equipment");
 
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
     // Build WHERE conditions
     const conditions: string[] = [];
     const params: (string | number | Date)[] = [];
     let paramIndex = 1;
+
+    // Backward-compatible "mine" filter (used by dashboard until #325 migrates to column filters)
+    if (specialFilter === "mine") {
+      conditions.push(`s.owner_user_id = $${paramIndex++}`);
+      params.push(userId);
+      conditions.push(`s.status != 'closed'`);
+    }
 
     // Status filter - use IN clause with individual placeholders for proper PostgreSQL handling
     if (statusFilter) {
@@ -144,8 +158,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Owner filter - accepts comma-separated UUIDs
-    if (ownerFilter) {
+    // Owner filter - accepts comma-separated UUIDs (skipped when filter=mine is active)
+    if (ownerFilter && specialFilter !== "mine") {
       const ownerIds = ownerFilter.split(",").filter((id) => UUID_RE.test(id.trim()));
       if (ownerIds.length === 1) {
         conditions.push(`s.owner_user_id = $${paramIndex++}`);
@@ -154,10 +168,24 @@ export async function GET(request: NextRequest) {
         const placeholders = ownerIds.map(() => `$${paramIndex++}`).join(", ");
         conditions.push(`s.owner_user_id IN (${placeholders})`);
         ownerIds.forEach((id) => params.push(id.trim()));
+      } else {
+        // All provided UUIDs were invalid — match nothing
+        conditions.push(`FALSE`);
       }
     }
 
-    // Date range filters
+    // Date range filters (validate format before parsing)
+    for (const [label, val] of [
+      ["dateFrom", dateFrom],
+      ["dateTo", dateTo],
+    ] as const) {
+      if (val && !ISO_DATE_RE.test(val)) {
+        return NextResponse.json(
+          { error: `Invalid ${label} format (expected yyyy-MM-dd)` },
+          { status: 400 }
+        );
+      }
+    }
     if (dateFrom) {
       conditions.push(`s.created_at >= $${paramIndex++}`);
       params.push(new Date(dateFrom));
@@ -170,17 +198,17 @@ export async function GET(request: NextRequest) {
     // Text search filters
     if (rcfaNumberFilter) {
       conditions.push(`CAST(s.rcfa_number AS TEXT) LIKE $${paramIndex++}`);
-      params.push(`%${rcfaNumberFilter}%`);
+      params.push(`%${escapeLike(rcfaNumberFilter)}%`);
     }
 
     if (titleFilter) {
       conditions.push(`s.title ILIKE $${paramIndex++}`);
-      params.push(`%${titleFilter}%`);
+      params.push(`%${escapeLike(titleFilter)}%`);
     }
 
     if (equipmentFilter) {
       conditions.push(`s.equipment_description ILIKE $${paramIndex++}`);
-      params.push(`%${equipmentFilter}%`);
+      params.push(`%${escapeLike(equipmentFilter)}%`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -212,7 +240,7 @@ export async function GET(request: NextRequest) {
           m.*,
           COUNT(*) OVER() AS total_count
         FROM matches m
-        ORDER BY m.rank DESC, m.created_at DESC
+        ORDER BY m.rank DESC, m.${validatedSortBy} ${sortOrder}
         LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
       `;
 

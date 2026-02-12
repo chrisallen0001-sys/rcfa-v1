@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Escape LIKE/ILIKE wildcard characters in user input. */
+function escapeLike(input: string): string {
+  return input.replace(/[%_\\]/g, "\\$&");
+}
 
 /**
  * Row shape for action items table listing.
@@ -83,6 +89,7 @@ function mapRowToResponse(r: ActionItemRow) {
  * - status: Comma-separated status values to filter
  * - priority: Comma-separated priority values to filter
  * - owner: Comma-separated owner user IDs to filter
+ * - filter: Special filter ("mine" = current user's action items)
  * - actionItemNumber: Text search on action item number
  * - actionText: Text search on action text (case-insensitive)
  * - rcfaNumber: Text search on RCFA number
@@ -93,7 +100,7 @@ function mapRowToResponse(r: ActionItemRow) {
  */
 export async function GET(request: NextRequest) {
   try {
-    await getAuthContext();
+    const { userId } = await getAuthContext();
     const { searchParams } = new URL(request.url);
 
     // Parse pagination
@@ -110,6 +117,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get("status");
     const priorityFilter = searchParams.get("priority");
     const ownerFilter = searchParams.get("owner");
+    const specialFilter = searchParams.get("filter");
     const actionItemNumberFilter = searchParams.get("actionItemNumber");
     const actionTextFilter = searchParams.get("actionText");
     const rcfaNumberFilter = searchParams.get("rcfaNumber");
@@ -125,6 +133,12 @@ export async function GET(request: NextRequest) {
 
     // Always exclude deleted RCFAs
     conditions.push(`r.deleted_at IS NULL`);
+
+    // Backward-compatible "mine" filter (used by dashboard until #324 migrates to column filters)
+    if (specialFilter === "mine") {
+      conditions.push(`ai.owner_user_id = $${paramIndex++}`);
+      params.push(userId);
+    }
 
     // Status filter - use IN clause with individual placeholders
     if (statusFilter) {
@@ -146,8 +160,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Owner filter - accepts comma-separated UUIDs
-    if (ownerFilter) {
+    // Owner filter - accepts comma-separated UUIDs (skipped when filter=mine is active)
+    if (ownerFilter && specialFilter !== "mine") {
       const ownerIds = ownerFilter.split(",").filter((id) => UUID_RE.test(id.trim()));
       if (ownerIds.length === 1) {
         conditions.push(`ai.owner_user_id = $${paramIndex++}`);
@@ -156,26 +170,42 @@ export async function GET(request: NextRequest) {
         const placeholders = ownerIds.map(() => `$${paramIndex++}`).join(", ");
         conditions.push(`ai.owner_user_id IN (${placeholders})`);
         ownerIds.forEach((id) => params.push(id.trim()));
+      } else {
+        // All provided UUIDs were invalid — match nothing
+        conditions.push(`FALSE`);
       }
     }
 
     // Text search filters
     if (actionItemNumberFilter) {
       conditions.push(`CAST(ai.action_item_number AS TEXT) LIKE $${paramIndex++}`);
-      params.push(`%${actionItemNumberFilter}%`);
+      params.push(`%${escapeLike(actionItemNumberFilter)}%`);
     }
 
     if (actionTextFilter) {
       conditions.push(`ai.action_text ILIKE $${paramIndex++}`);
-      params.push(`%${actionTextFilter}%`);
+      params.push(`%${escapeLike(actionTextFilter)}%`);
     }
 
     if (rcfaNumberFilter) {
       conditions.push(`CAST(r.rcfa_number AS TEXT) LIKE $${paramIndex++}`);
-      params.push(`%${rcfaNumberFilter}%`);
+      params.push(`%${escapeLike(rcfaNumberFilter)}%`);
     }
 
-    // Date range filters
+    // Date range filters (validate format before parsing)
+    for (const [label, val] of [
+      ["dueDateFrom", dueDateFrom],
+      ["dueDateTo", dueDateTo],
+      ["createdFrom", createdFrom],
+      ["createdTo", createdTo],
+    ] as const) {
+      if (val && !ISO_DATE_RE.test(val)) {
+        return NextResponse.json(
+          { error: `Invalid ${label} format (expected yyyy-MM-dd)` },
+          { status: 400 }
+        );
+      }
+    }
     if (dueDateFrom) {
       conditions.push(`ai.due_date >= $${paramIndex++}`);
       params.push(new Date(dueDateFrom));
