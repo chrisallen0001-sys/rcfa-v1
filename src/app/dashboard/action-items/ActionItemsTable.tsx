@@ -220,9 +220,15 @@ function filtersToUrlParams(
       case "actionText":
         params.set("title", val as string);
         break;
-      case "status":
-        params.set("status", (val as string[]).join(","));
+      case "status": {
+        // Skip serializing the default status filter to keep the URL clean
+        const sorted = [...(val as string[])].sort().join(",");
+        const defaultSorted = [...DEFAULT_STATUSES].sort().join(",");
+        if (sorted !== defaultSorted) {
+          params.set("status", (val as string[]).join(","));
+        }
         break;
+      }
       case "priority":
         params.set("priority", (val as string[]).join(","));
         break;
@@ -330,7 +336,17 @@ export default function ActionItemsTable() {
         setTotalRows(response.total);
         // Clear legacy filter after initial load so subsequent interactions
         // aren't permanently scoped to "mine" (see backward-compat note above).
-        legacyFilterRef.current = null;
+        if (legacyFilterRef.current === "mine") {
+          legacyFilterRef.current = null;
+          // Inject default status filter so closed items don't appear on subsequent interactions
+          setColumnFilters((prev) => {
+            const hasStatus = prev.some((f) => f.id === "status");
+            if (!hasStatus) {
+              return [...prev, { id: "status", value: [...DEFAULT_STATUSES] }];
+            }
+            return prev;
+          });
+        }
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
