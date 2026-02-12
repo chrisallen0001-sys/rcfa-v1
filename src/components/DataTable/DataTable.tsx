@@ -51,6 +51,8 @@ export interface DataTableProps<TData> {
   manualSorting?: boolean;
   /** Whether filtering is server-side controlled (default: false) */
   manualFiltering?: boolean;
+  /** Controlled column filters state (pass when manualFiltering is true to sync filter UI with parent) */
+  columnFilters?: ColumnFiltersState;
 }
 
 function LoadingSkeleton({ columnCount }: { columnCount: number }) {
@@ -86,14 +88,20 @@ export default function DataTable<TData>({
   manualPagination = false,
   manualSorting = false,
   manualFiltering = false,
+  columnFilters: controlledColumnFilters,
 }: DataTableProps<TData>) {
   // Internal state for client-side mode
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [internalColumnFilters, setInternalColumnFilters] = useState<ColumnFiltersState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: controlledPageIndex ?? 0,
     pageSize,
   });
+
+  // Use controlled column filters when provided (server-side filtering),
+  // otherwise fall back to internal state (client-side filtering).
+  const isControlledFilters = controlledColumnFilters !== undefined;
+  const effectiveColumnFilters = isControlledFilters ? controlledColumnFilters : internalColumnFilters;
 
   // Use controlled or internal state
   const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
@@ -102,8 +110,13 @@ export default function DataTable<TData>({
   };
 
   const handleFiltersChange: OnChangeFn<ColumnFiltersState> = (updater) => {
-    setColumnFilters(updater);
-    onFiltersChange?.(updater);
+    if (isControlledFilters) {
+      // Controlled mode: only forward to parent, no internal state update
+      onFiltersChange?.(updater);
+    } else {
+      setInternalColumnFilters(updater);
+      onFiltersChange?.(updater);
+    }
   };
 
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
@@ -119,7 +132,7 @@ export default function DataTable<TData>({
     columns,
     state: {
       sorting,
-      columnFilters,
+      columnFilters: effectiveColumnFilters,
       pagination: manualPagination
         ? { pageIndex: controlledPageIndex ?? 0, pageSize: pagination.pageSize }
         : pagination,

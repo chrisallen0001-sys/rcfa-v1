@@ -8,8 +8,10 @@ import Link from "next/link";
 import {
   DataTable,
   createColumnHelper,
+  parseDateRangeValue,
   type SortingState,
   type PaginationState,
+  type ColumnFiltersState,
 } from "@/components/DataTable";
 import type { ActionItemStatus, Priority } from "@/generated/prisma/client";
 import {
@@ -52,23 +54,199 @@ const ALL_PRIORITIES: Priority[] = ["high", "medium", "low", "deprioritized"];
 
 const columnHelper = createColumnHelper<ActionItemTableRow>();
 
-type StatusTabInfo = {
-  key: "all" | "open" | "mine";
-  label: string;
-  getCount: (counts: StatusCounts) => number;
-};
+/** Map a column ID to the API sort column name. */
+function toApiSortColumn(id: string): string {
+  const map: Record<string, string> = {
+    dueDate: "due_date",
+    createdAt: "created_at",
+    ownerDisplayName: "owner_display_name",
+    actionItemNumber: "action_item_number",
+    actionText: "action_text",
+    rcfaNumber: "rcfa_number",
+  };
+  return map[id] ?? id;
+}
 
-type StatusCounts = {
-  all: number;
-  open: number;
-  mine: number;
-};
+/** Reverse: API sort column → column ID. */
+function fromApiSortColumn(col: string): string {
+  const map: Record<string, string> = {
+    due_date: "dueDate",
+    created_at: "createdAt",
+    owner_display_name: "ownerDisplayName",
+    action_item_number: "actionItemNumber",
+    action_text: "actionText",
+    rcfa_number: "rcfaNumber",
+  };
+  return map[col] ?? col;
+}
 
-const STATUS_TABS: StatusTabInfo[] = [
-  { key: "all", label: "All", getCount: (c) => c.all },
-  { key: "open", label: "Open", getCount: (c) => c.open },
-  { key: "mine", label: "My Items", getCount: (c) => c.mine },
-];
+/** Validate an ISO date string (yyyy-MM-dd) syntactically and semantically.
+ *  Round-trips through toISOString() to reject overflow dates (e.g. Feb 30 → Mar 2). */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isValidDate(value: string): boolean {
+  if (!ISO_DATE_RE.test(value)) return false;
+  const d = new Date(value);
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(value);
+}
+
+/** Default status filter: show only actionable items (matches old "Open" tab). */
+const DEFAULT_STATUSES: ActionItemStatus[] = ["open", "in_progress", "blocked"];
+
+/**
+ * Parse URL search params into initial ColumnFiltersState.
+ * Malformed date values are silently dropped to prevent 400 errors from the API.
+ */
+function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
+  const filters: ColumnFiltersState = [];
+
+  const id = sp.get("id");
+  if (id) filters.push({ id: "actionItemNumber", value: id });
+
+  const title = sp.get("title");
+  if (title) filters.push({ id: "actionText", value: title });
+
+  const status = sp.get("status");
+  if (status) {
+    filters.push({ id: "status", value: status.split(",") });
+  } else if (sp.get("filter") !== "mine") {
+    // Default to open/actionable statuses unless the legacy ?filter=mine is active
+    // (which lets the API control the full result set). Matches old "Open" tab default.
+    filters.push({ id: "status", value: [...DEFAULT_STATUSES] });
+  }
+
+  const priority = sp.get("priority");
+  if (priority) filters.push({ id: "priority", value: priority.split(",") });
+
+  const owner = sp.get("owner");
+  if (owner) filters.push({ id: "ownerDisplayName", value: owner.split(",") });
+
+  // Due date: combine dueDateFrom/dueDateTo into serialized value (skip malformed dates)
+  const dueDateFrom = sp.get("dueDateFrom");
+  const dueDateTo = sp.get("dueDateTo");
+  const validDueDateFrom = dueDateFrom && isValidDate(dueDateFrom) ? dueDateFrom : null;
+  const validDueDateTo = dueDateTo && isValidDate(dueDateTo) ? dueDateTo : null;
+  if (validDueDateFrom && validDueDateTo) {
+    filters.push({ id: "dueDate", value: `range:${validDueDateFrom},${validDueDateTo}` });
+  } else if (validDueDateFrom) {
+    filters.push({ id: "dueDate", value: `after:${validDueDateFrom}` });
+  } else if (validDueDateTo) {
+    filters.push({ id: "dueDate", value: `before:${validDueDateTo}` });
+  }
+
+  const rcfa = sp.get("rcfa");
+  if (rcfa) filters.push({ id: "rcfaNumber", value: rcfa });
+
+  // Created date: combine createdFrom/createdTo (skip malformed dates)
+  const createdFrom = sp.get("createdFrom");
+  const createdTo = sp.get("createdTo");
+  const validCreatedFrom = createdFrom && isValidDate(createdFrom) ? createdFrom : null;
+  const validCreatedTo = createdTo && isValidDate(createdTo) ? createdTo : null;
+  if (validCreatedFrom && validCreatedTo) {
+    filters.push({ id: "createdAt", value: `range:${validCreatedFrom},${validCreatedTo}` });
+  } else if (validCreatedFrom) {
+    filters.push({ id: "createdAt", value: `after:${validCreatedFrom}` });
+  } else if (validCreatedTo) {
+    filters.push({ id: "createdAt", value: `before:${validCreatedTo}` });
+  }
+
+  return filters;
+}
+
+/**
+ * Map columnFilters to API query params on the URL.
+ */
+function applyFiltersToApiParams(
+  params: URLSearchParams,
+  columnFilters: ColumnFiltersState
+) {
+  for (const filter of columnFilters) {
+    const val = filter.value;
+    switch (filter.id) {
+      case "actionItemNumber":
+        params.set("actionItemNumber", val as string);
+        break;
+      case "actionText":
+        params.set("actionText", val as string);
+        break;
+      case "status":
+        params.set("status", (val as string[]).join(","));
+        break;
+      case "priority":
+        params.set("priority", (val as string[]).join(","));
+        break;
+      case "ownerDisplayName":
+        params.set("owner", (val as string[]).join(","));
+        break;
+      case "dueDate": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if (mode === "after" && from) params.set("dueDateFrom", from);
+        if (mode === "before" && to) params.set("dueDateTo", to);
+        if (mode === "range") {
+          if (from) params.set("dueDateFrom", from);
+          if (to) params.set("dueDateTo", to);
+        }
+        break;
+      }
+      case "rcfaNumber":
+        params.set("rcfaNumber", val as string);
+        break;
+      case "createdAt": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if (mode === "after" && from) params.set("createdFrom", from);
+        if (mode === "before" && to) params.set("createdTo", to);
+        if (mode === "range") {
+          if (from) params.set("createdFrom", from);
+          if (to) params.set("createdTo", to);
+        }
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * Serialize columnFilters to URL search params for the browser URL bar.
+ */
+function filtersToUrlParams(
+  params: URLSearchParams,
+  columnFilters: ColumnFiltersState
+) {
+  for (const filter of columnFilters) {
+    const val = filter.value;
+    switch (filter.id) {
+      case "actionItemNumber":
+        params.set("id", val as string);
+        break;
+      case "actionText":
+        params.set("title", val as string);
+        break;
+      case "status":
+        params.set("status", (val as string[]).join(","));
+        break;
+      case "priority":
+        params.set("priority", (val as string[]).join(","));
+        break;
+      case "ownerDisplayName":
+        params.set("owner", (val as string[]).join(","));
+        break;
+      case "dueDate": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if ((mode === "after" || mode === "range") && from) params.set("dueDateFrom", from);
+        if ((mode === "before" || mode === "range") && to) params.set("dueDateTo", to);
+        break;
+      }
+      case "rcfaNumber":
+        params.set("rcfa", val as string);
+        break;
+      case "createdAt": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if ((mode === "after" || mode === "range") && from) params.set("createdFrom", from);
+        if ((mode === "before" || mode === "range") && to) params.set("createdTo", to);
+        break;
+      }
+    }
+  }
+}
 
 export default function ActionItemsTable() {
   const router = useRouter();
@@ -77,40 +255,26 @@ export default function ActionItemsTable() {
 
   // Parse initial state from URL
   const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
-  const urlStatus = searchParams.get("status") ?? "";
-  const urlPriority = searchParams.get("priority") ?? "";
-  const urlOwner = searchParams.get("owner") ?? "";
   const urlSortBy = searchParams.get("sortBy") ?? "due_date";
   const urlSortOrder = searchParams.get("sortOrder") ?? "asc";
-  const urlFilter = searchParams.get("filter") ?? "";
-  const urlTab = searchParams.get("tab") ?? "open";
+
+  // Backward compat: dashboard links to ?filter=mine — pass through to API
+  const legacyFilterRef = useRef(searchParams.get("filter"));
 
   // State
   const [data, setData] = useState<ActionItemTableRow[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<ActionItemStatus>>(
-    urlStatus ? new Set(urlStatus.split(",") as ActionItemStatus[]) : new Set()
-  );
-  const [selectedPriorities, setSelectedPriorities] = useState<Set<Priority>>(
-    urlPriority ? new Set(urlPriority.split(",") as Priority[]) : new Set()
-  );
-  const [selectedOwner, setSelectedOwner] = useState(urlFilter === "mine" ? "" : urlOwner);
-  const [isMineFilter, setIsMineFilter] = useState(urlFilter === "mine" || urlTab === "mine");
-  const [activeTab, setActiveTab] = useState<"all" | "open" | "mine">(
-    urlTab === "mine" ? "mine" : urlTab === "all" ? "all" : "open"
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
+    () => parseFiltersFromUrl(searchParams)
   );
   const [sorting, setSorting] = useState<SortingState>([
-    { id: urlSortBy === "due_date" ? "dueDate" : urlSortBy, desc: urlSortOrder === "desc" },
+    { id: fromApiSortColumn(urlSortBy), desc: urlSortOrder === "desc" },
   ]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: urlPage - 1,
     pageSize: 25,
-  });
-  const [statusCounts, setStatusCounts] = useState<StatusCounts>({
-    all: 0,
-    open: 0,
-    mine: 0,
   });
 
   // Ref for URL update debounce timer
@@ -123,79 +287,21 @@ export default function ActionItemsTable() {
     params.set("pageSize", String(pagination.pageSize));
 
     if (sorting.length > 0) {
-      const sortCol = sorting[0].id === "dueDate" ? "due_date" :
-        sorting[0].id === "createdAt" ? "created_at" :
-        sorting[0].id === "ownerDisplayName" ? "owner_display_name" :
-        sorting[0].id === "actionItemNumber" ? "action_item_number" :
-        sorting[0].id === "actionText" ? "action_text" :
-        sorting[0].id === "rcfaNumber" ? "rcfa_number" :
-        sorting[0].id;
-      params.set("sortBy", sortCol);
+      params.set("sortBy", toApiSortColumn(sorting[0].id));
       params.set("sortOrder", sorting[0].desc ? "desc" : "asc");
     }
 
-    if (isMineFilter) {
+    applyFiltersToApiParams(params, columnFilters);
+
+    // Read from ref (not a dependency) so the legacy ?filter=mine param is included
+    // on the first fetch but automatically drops out once cleared in .then() or
+    // handleFiltersChange, without triggering a re-fetch cycle.
+    if (legacyFilterRef.current === "mine") {
       params.set("filter", "mine");
     }
 
-    // Apply tab-based status filter for "open" tab
-    if (activeTab === "open" && selectedStatuses.size === 0) {
-      params.set("status", "open,in_progress,blocked");
-    } else if (selectedStatuses.size > 0) {
-      params.set("status", Array.from(selectedStatuses).join(","));
-    }
-
-    if (selectedPriorities.size > 0) {
-      params.set("priority", Array.from(selectedPriorities).join(","));
-    }
-
-    if (selectedOwner && !isMineFilter) {
-      params.set("owner", selectedOwner);
-    }
-
     return `/api/action-items?${params.toString()}`;
-  }, [pagination, sorting, selectedStatuses, selectedPriorities, selectedOwner, isMineFilter, activeTab]);
-
-  // Fetch counts for tabs (refreshes when data changes)
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchCounts = async () => {
-      try {
-        const [allRes, openRes, mineRes] = await Promise.all([
-          fetch("/api/action-items?pageSize=1", { signal: controller.signal }),
-          fetch("/api/action-items?pageSize=1&status=open,in_progress,blocked", { signal: controller.signal }),
-          fetch("/api/action-items?pageSize=1&filter=mine", { signal: controller.signal }),
-        ]);
-
-        // Check if aborted before parsing JSON
-        if (controller.signal.aborted) return;
-
-        const [allData, openData, mineData] = await Promise.all([
-          allRes.json(),
-          openRes.json(),
-          mineRes.json(),
-        ]);
-
-        // Check again before setting state
-        if (controller.signal.aborted) return;
-
-        setStatusCounts({
-          all: allData.total ?? 0,
-          open: openData.total ?? 0,
-          mine: mineData.total ?? 0,
-        });
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          console.error("Failed to fetch counts:", err);
-        }
-      }
-    };
-
-    fetchCounts();
-
-    return () => controller.abort();
-  }, [data]); // Refresh counts when main data changes
+  }, [pagination, sorting, columnFilters]);
 
   // Fetch data when filters/pagination change
   useEffect(() => {
@@ -204,15 +310,32 @@ export default function ActionItemsTable() {
     // Setting loading before async operation is intentional to show loading state immediately
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
+    setFetchError(null);
     fetch(buildApiUrl(), { signal: controller.signal })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          let message = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body.error) message = body.error;
+          } catch {
+            // Response body is not JSON (e.g., gateway HTML error page)
+          }
+          throw new Error(message);
+        }
+        return res.json();
+      })
       .then((response: ApiResponse) => {
         setData(response.rows);
         setTotalRows(response.total);
+        // Clear legacy filter after initial load so subsequent interactions
+        // aren't permanently scoped to "mine" (see backward-compat note above).
+        legacyFilterRef.current = null;
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
           console.error("Failed to fetch action items:", err);
+          setFetchError(err instanceof Error ? err.message : "Failed to load action items.");
         }
       })
       .finally(() => setIsLoading(false));
@@ -222,24 +345,19 @@ export default function ActionItemsTable() {
 
   // Update URL when filters change (debounced to prevent history spam)
   useEffect(() => {
-    // Clear any pending URL update
     if (urlUpdateTimerRef.current) {
       clearTimeout(urlUpdateTimerRef.current);
     }
 
-    // Debounce URL updates by 150ms
     urlUpdateTimerRef.current = setTimeout(() => {
       const params = new URLSearchParams();
       if (pagination.pageIndex > 0) params.set("page", String(pagination.pageIndex + 1));
-      if (selectedStatuses.size > 0) params.set("status", Array.from(selectedStatuses).join(","));
-      if (selectedPriorities.size > 0) params.set("priority", Array.from(selectedPriorities).join(","));
-      if (selectedOwner && !isMineFilter) params.set("owner", selectedOwner);
-      if (activeTab !== "open") params.set("tab", activeTab);
       if (sorting.length > 0) {
-        const sortCol = sorting[0].id === "dueDate" ? "due_date" : sorting[0].id;
+        const sortCol = toApiSortColumn(sorting[0].id);
         if (sortCol !== "due_date") params.set("sortBy", sortCol);
         if (sorting[0].desc) params.set("sortOrder", "desc");
       }
+      filtersToUrlParams(params, columnFilters);
 
       const newUrl = `/dashboard/action-items${params.toString() ? `?${params.toString()}` : ""}`;
       router.replace(newUrl, { scroll: false });
@@ -250,44 +368,19 @@ export default function ActionItemsTable() {
         clearTimeout(urlUpdateTimerRef.current);
       }
     };
-  }, [pagination.pageIndex, selectedStatuses, selectedPriorities, selectedOwner, isMineFilter, activeTab, sorting, router]);
+  }, [pagination.pageIndex, sorting, columnFilters, router]);
 
-  // Toggle status filter
-  const toggleStatus = (status: ActionItemStatus) => {
-    setSelectedStatuses((prev) => {
-      const next = new Set(prev);
-      if (next.has(status)) {
-        next.delete(status);
-      } else {
-        next.add(status);
-      }
-      return next;
-    });
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
-
-  // Toggle priority filter
-  const togglePriority = (priority: Priority) => {
-    setSelectedPriorities((prev) => {
-      const next = new Set(prev);
-      if (next.has(priority)) {
-        next.delete(priority);
-      } else {
-        next.add(priority);
-      }
-      return next;
-    });
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
-
-  // Handle tab change
-  const handleTabChange = (tab: "all" | "open" | "mine") => {
-    setActiveTab(tab);
-    setIsMineFilter(tab === "mine");
-    // Clear status filter when switching tabs to avoid confusion
-    setSelectedStatuses(new Set());
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  };
+  // Reset pagination to page 1 when filters change.
+  // Also clears legacy filter=mine so explicit user interaction takes precedence.
+  const handleFiltersChange = useCallback(
+    (updater: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => {
+      legacyFilterRef.current = null;
+      setColumnFilters(updater);
+      setPagination((p) => ({ ...p, pageIndex: 0 }));
+    },
+    // setColumnFilters is a stable state setter; listed here for React Compiler lint compliance.
+    [setColumnFilters]
+  );
 
   // Column definitions
   const columns = useMemo(
@@ -295,6 +388,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("actionItemNumber", {
         header: "ID",
         size: 90,
+        meta: { filterType: "text", filterPlaceholder: "Search ID..." },
         cell: (info) => (
           <Link
             href={`/dashboard/rcfa/${info.row.original.rcfaId}?expandItem=${info.row.original.id}`}
@@ -307,6 +401,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("actionText", {
         header: "Title",
         size: 250,
+        meta: { filterType: "text", filterPlaceholder: "Search title..." },
         cell: (info) => (
           <div className="max-w-[250px] truncate" title={info.getValue()}>
             {info.getValue()}
@@ -316,7 +411,14 @@ export default function ActionItemsTable() {
       columnHelper.accessor("status", {
         header: "Status",
         size: 110,
-        enableColumnFilter: false,
+        meta: {
+          filterType: "multi-select",
+          filterOptions: ALL_STATUSES.map((s) => ({
+            label: ACTION_STATUS_LABELS[s],
+            value: s,
+          })),
+          filterColorMap: ACTION_STATUS_COLORS,
+        },
         cell: (info) => {
           const status = info.getValue();
           return (
@@ -331,7 +433,14 @@ export default function ActionItemsTable() {
       columnHelper.accessor("priority", {
         header: "Priority",
         size: 100,
-        enableColumnFilter: false,
+        meta: {
+          filterType: "multi-select",
+          filterOptions: ALL_PRIORITIES.map((p) => ({
+            label: PRIORITY_LABELS[p],
+            value: p,
+          })),
+          filterColorMap: PRIORITY_COLORS,
+        },
         cell: (info) => {
           const priority = info.getValue();
           return (
@@ -346,16 +455,25 @@ export default function ActionItemsTable() {
       columnHelper.accessor("ownerDisplayName", {
         header: "Owner",
         size: 120,
-        enableColumnFilter: false,
+        meta: {
+          filterType: "multi-select",
+          // Options populate once useUsers() resolves; until then the filter button
+          // briefly shows "N selected" instead of names. Self-corrects when users load
+          // because this memo depends on [users].
+          filterOptions: users.map((u) => ({
+            label: u.displayName,
+            value: u.id,
+          })),
+        },
         cell: (info) => info.getValue() ?? "Unassigned",
       }),
       columnHelper.accessor("dueDate", {
         header: "Due Date",
         size: 130,
+        meta: { filterType: "date-range" },
         cell: (info) => {
           const dueDate = info.getValue();
           const status = info.row.original.status;
-          // Don't show urgency styling for completed/canceled items
           if (status === "done" || status === "canceled") {
             return dueDate ?? "No due date";
           }
@@ -366,6 +484,7 @@ export default function ActionItemsTable() {
       columnHelper.accessor("rcfaNumber", {
         header: "RCFA",
         size: 100,
+        meta: { filterType: "text", filterPlaceholder: "Search RCFA..." },
         cell: (info) => (
           <Link
             href={`/dashboard/rcfa/${info.row.original.rcfaId}`}
@@ -378,9 +497,10 @@ export default function ActionItemsTable() {
       columnHelper.accessor("createdAt", {
         header: "Created",
         size: 100,
+        meta: { filterType: "date-range" },
       }),
     ],
-    []
+    [users]
   );
 
   // Export column definitions
@@ -414,91 +534,23 @@ export default function ActionItemsTable() {
 
   return (
     <div className="space-y-4">
-      {/* Tab navigation */}
-      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabChange(tab.key)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? "border-b-2 border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
-            }`}
-          >
-            {tab.label} ({tab.getCount(statusCounts)})
-          </button>
-        ))}
-      </div>
-
-      {/* Filters row */}
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Status filter buttons */}
-        <div className="flex flex-wrap gap-1.5">
-          <span className="mr-1 text-xs text-zinc-500 dark:text-zinc-400">Status:</span>
-          {ALL_STATUSES.map((status) => (
-            <button
-              key={status}
-              onClick={() => toggleStatus(status)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                selectedStatuses.has(status)
-                  ? ACTION_STATUS_COLORS[status]
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-              }`}
-            >
-              {ACTION_STATUS_LABELS[status]}
-            </button>
-          ))}
+      {/* Error banner */}
+      {fetchError && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+          {fetchError}
         </div>
+      )}
 
-        {/* Priority filter buttons */}
-        <div className="flex flex-wrap gap-1.5">
-          <span className="mr-1 text-xs text-zinc-500 dark:text-zinc-400">Priority:</span>
-          {ALL_PRIORITIES.map((priority) => (
-            <button
-              key={priority}
-              onClick={() => togglePriority(priority)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                selectedPriorities.has(priority)
-                  ? PRIORITY_COLORS[priority]
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-              }`}
-            >
-              {PRIORITY_LABELS[priority]}
-            </button>
-          ))}
-        </div>
-
-        {/* Owner filter dropdown */}
-        {!isMineFilter && (
-          <select
-            value={selectedOwner}
-            onChange={(e) => {
-              setSelectedOwner(e.target.value);
-              setPagination((p) => ({ ...p, pageIndex: 0 }));
-            }}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-          >
-            <option value="">All Owners</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.displayName}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Result count and export */}
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {totalRows} action item{totalRows !== 1 ? "s" : ""} found
-          </span>
-          <ExportButtons
-            onExport={handleExport}
-            disabled={data.length === 0 || isLoading}
-            rowCount={data.length}
-          />
-        </div>
+      {/* Result count and export */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          {totalRows} action item{totalRows !== 1 ? "s" : ""} found
+        </span>
+        <ExportButtons
+          onExport={handleExport}
+          disabled={data.length === 0 || isLoading}
+          rowCount={data.length}
+        />
       </div>
 
       {/* Data table */}
@@ -507,12 +559,13 @@ export default function ActionItemsTable() {
         data={data}
         isLoading={isLoading}
         emptyMessage={
-          selectedStatuses.size > 0 || selectedPriorities.size > 0 || selectedOwner || isMineFilter
+          columnFilters.length > 0
             ? "No action items match the selected filters."
             : "No action items yet. Create an RCFA to get started."
         }
         showPagination={true}
-        enableFilters={false}
+        enableFilters={true}
+        columnFilters={columnFilters}
         pageSize={pagination.pageSize}
         pageSizeOptions={[10, 25, 50]}
         totalRows={totalRows}
@@ -522,6 +575,7 @@ export default function ActionItemsTable() {
         manualFiltering={true}
         onPaginationChange={setPagination}
         onSortingChange={setSorting}
+        onFiltersChange={handleFiltersChange}
       />
     </div>
   );
