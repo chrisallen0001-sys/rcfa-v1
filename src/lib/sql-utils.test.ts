@@ -65,6 +65,14 @@ describe("sql-utils", () => {
       it("passes through non-matching input unchanged", () => {
         expect(stripNumericPrefix("something", "RCFA-")).toBe("something");
       });
+
+      it("returns empty string for empty input", () => {
+        expect(stripNumericPrefix("", "RCFA-")).toBe("");
+      });
+
+      it("returns empty string for prefix-only input", () => {
+        expect(stripNumericPrefix("RCFA-", "RCFA-")).toBe("");
+      });
     });
 
     describe("with AI- prefix", () => {
@@ -83,6 +91,10 @@ describe("sql-utils", () => {
 
       it("passes through plain numbers unchanged", () => {
         expect(stripNumericPrefix("42", "AI-")).toBe("42");
+      });
+
+      it("returns empty string for prefix-only input", () => {
+        expect(stripNumericPrefix("AI-", "AI-")).toBe("");
       });
     });
   });

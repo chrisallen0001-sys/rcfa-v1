@@ -29,8 +29,9 @@ export function stripNumericPrefix(
   value: string,
   prefix: string,
 ): string {
-  const re = new RegExp(`^${prefix}`, "i");
-  const stripped = value.replace(re, "");
+  const stripped = value.toLowerCase().startsWith(prefix.toLowerCase())
+    ? value.slice(prefix.length)
+    : value;
   // Remove leading zeros but keep at least one digit ("000" → "0")
   const noLeadingZeros = stripped.replace(/^0+(?=\d)/, "");
   return noLeadingZeros;
