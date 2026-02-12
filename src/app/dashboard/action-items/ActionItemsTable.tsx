@@ -80,10 +80,13 @@ function fromApiSortColumn(col: string): string {
   return map[col] ?? col;
 }
 
-/** Validate an ISO date string (yyyy-MM-dd) both syntactically and semantically. */
+/** Validate an ISO date string (yyyy-MM-dd) syntactically and semantically.
+ *  Round-trips through toISOString() to reject overflow dates (e.g. Feb 30 → Mar 2). */
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isValidDate(value: string): boolean {
-  return ISO_DATE_RE.test(value) && !isNaN(new Date(value).getTime());
+  if (!ISO_DATE_RE.test(value)) return false;
+  const d = new Date(value);
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(value);
 }
 
 /** Default status filter: show only actionable items (matches old "Open" tab). */
@@ -105,9 +108,9 @@ function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
   const status = sp.get("status");
   if (status) {
     filters.push({ id: "status", value: status.split(",") });
-  } else if (!sp.get("filter")) {
-    // Default to open/actionable statuses when no explicit status or legacy filter is set.
-    // Matches the previous "Open" tab default behavior.
+  } else if (sp.get("filter") !== "mine") {
+    // Default to open/actionable statuses unless the legacy ?filter=mine is active
+    // (which lets the API control the full result set). Matches old "Open" tab default.
     filters.push({ id: "status", value: [...DEFAULT_STATUSES] });
   }
 
@@ -290,7 +293,9 @@ export default function ActionItemsTable() {
 
     applyFiltersToApiParams(params, columnFilters);
 
-    // Backward compat: pass legacy filter=mine to API (dashboard "View all" link)
+    // Read from ref (not a dependency) so the legacy ?filter=mine param is included
+    // on the first fetch but automatically drops out once cleared in .then() or
+    // handleFiltersChange, without triggering a re-fetch cycle.
     if (legacyFilterRef.current === "mine") {
       params.set("filter", "mine");
     }
@@ -305,19 +310,24 @@ export default function ActionItemsTable() {
     // Setting loading before async operation is intentional to show loading state immediately
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
+    setFetchError(null);
     fetch(buildApiUrl(), { signal: controller.signal })
-      .then((res) => {
+      .then(async (res) => {
         if (!res.ok) {
-          return res.json().then((body: { error?: string }) => {
-            throw new Error(body.error ?? `HTTP ${res.status}`);
-          });
+          let message = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body.error) message = body.error;
+          } catch {
+            // Response body is not JSON (e.g., gateway HTML error page)
+          }
+          throw new Error(message);
         }
         return res.json();
       })
       .then((response: ApiResponse) => {
         setData(response.rows);
         setTotalRows(response.total);
-        setFetchError(null);
         // Clear legacy filter after initial load so subsequent interactions
         // aren't permanently scoped to "mine" (see backward-compat note above).
         legacyFilterRef.current = null;
@@ -368,6 +378,7 @@ export default function ActionItemsTable() {
       setColumnFilters(updater);
       setPagination((p) => ({ ...p, pageIndex: 0 }));
     },
+    // setColumnFilters is a stable state setter; listed here for React Compiler lint compliance.
     [setColumnFilters]
   );
 
