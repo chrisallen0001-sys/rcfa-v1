@@ -155,34 +155,52 @@ export default function DataTable<TData>({
   const headerGroups = table.getHeaderGroups();
   const rows = table.getRowModel().rows;
 
-  // Preserve scroll position and table height across re-renders (e.g. when filters change)
+  // Preserve scroll position and table dimensions across re-renders (e.g. when filters change)
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollLeftRef = useRef(0);
   const contentHeightRef = useRef(0);
+  const contentWidthRef = useRef(0);
+  const isRestoringScroll = useRef(false);
+  const prevIsLoading = useRef(isLoading);
 
-  // Capture horizontal scroll position on every scroll event
+  // Capture horizontal scroll position — skip browser-initiated clamp events during loading
   const handleScroll = useCallback(() => {
+    if (isRestoringScroll.current) return;
     if (scrollContainerRef.current) {
       scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
     }
   }, []);
 
-  // Restore horizontal scroll and capture content height after table content changes
+  // Derive a stable key for client-side filtering (rows change without data/isLoading changing)
+  const rowCount = rows.length;
+
+  // Restore horizontal scroll and capture content dimensions after table content changes
   useLayoutEffect(() => {
+    // When transitioning into loading, freeze scroll capture so the skeleton's
+    // narrower content doesn't overwrite the saved user position via onScroll.
+    if (isLoading && !prevIsLoading.current) {
+      isRestoringScroll.current = true;
+    }
+    prevIsLoading.current = isLoading;
+
     const el = scrollContainerRef.current;
     if (!el) return;
 
-    // When not loading, capture the real content height so we can hold it during next load
+    // When not loading, capture real content dimensions for use as min-height/min-width during loading
     if (!isLoading) {
       contentHeightRef.current = el.offsetHeight;
+      contentWidthRef.current = el.scrollWidth;
     }
 
-    // Restore horizontal scroll position, clamped to new content width
-    if (scrollLeftRef.current > 0) {
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      el.scrollLeft = Math.min(scrollLeftRef.current, maxScroll);
-    }
-  }, [isLoading, data]);
+    // Restore horizontal scroll position, clamped to content width
+    isRestoringScroll.current = true;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    el.scrollLeft = Math.min(scrollLeftRef.current, maxScroll);
+    // Re-enable user scroll capture after the browser processes the programmatic assignment
+    requestAnimationFrame(() => {
+      isRestoringScroll.current = false;
+    });
+  }, [isLoading, data, rowCount]);
 
   return (
     <div className="w-full">
@@ -193,7 +211,10 @@ export default function DataTable<TData>({
         style={isLoading && contentHeightRef.current > 0 ? { minHeight: contentHeightRef.current } : undefined}
         className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800"
       >
-        <table className="w-full min-w-[600px] text-sm">
+        <table
+          style={isLoading && contentWidthRef.current > 0 ? { minWidth: contentWidthRef.current } : undefined}
+          className="w-full min-w-[600px] text-sm"
+        >
           <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
             {headerGroups.map((headerGroup) => (
               <tr key={headerGroup.id}>
