@@ -7,6 +7,7 @@ import { exportToCSV, exportToExcel, type ExportColumn } from "@/lib/export-util
 import Link from "next/link";
 import {
   DataTable,
+  ActiveFilterChips,
   createColumnHelper,
   parseDateRangeValue,
   type SortingState,
@@ -568,6 +569,17 @@ export default function ActionItemsTable() {
           rowCount={data.length}
         />
       </div>
+
+      {/* Active filter chips */}
+      <ActiveFilterChips
+        columnFilters={columnFilters}
+        columns={columns}
+        onRemoveFilter={(id) =>
+          handleFiltersChange((prev) => prev.filter((f) => f.id !== id))
+        }
+        onClearAll={() => handleFiltersChange([])}
+        defaultStatuses={DEFAULT_STATUSES}
+      />
 
       {/* Data table */}
       <DataTable
