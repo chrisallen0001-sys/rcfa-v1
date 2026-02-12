@@ -56,7 +56,23 @@ docs/                     Product documentation (see README.md for links)
 | Senior Dev | `@.claude/agents/senior-dev.md` | Implementation (runs `tsc`, `lint`, `build` before committing) |
 | Code Reviewer | `@.claude/agents/code-reviewer.md` | Reviews (correctness, security, performance, maintainability, accessibility) |
 | Tech Lead | `@.claude/agents/tech-lead.md` | Planning, issue creation, architecture (does not write code) |
+| Test Engineer | `@.claude/agents/test-enginer.md` | Test strategy, test suites, quality assurance |
 | Doc Writer | `@.claude/agents/documentation-writer.md` | Documentation updates (DRY principles) |
+
+### Delegation Rules
+
+The main conversation MUST delegate to agents. It MUST NOT perform work that belongs to an agent.
+
+| Task type | Delegate to | Never do in main conversation |
+|-----------|-------------|-------------------------------|
+| Writing, modifying, or deleting code | Senior Dev | Do not create/edit source files, components, API routes, or configs |
+| Writing or modifying tests | Senior Dev or Test Engineer | Do not create/edit test files |
+| Code review or PR review | Code Reviewer | Do not review code inline |
+| Planning, architecture, or task breakdown | Tech Lead | -- |
+| Writing or updating documentation | Doc Writer | Do not edit docs, README, or CLAUDE.md directly |
+| Git commits | Senior Dev | Do not run `git commit` outside an agent |
+
+**If you are unsure which agent to use, delegate to the Tech Lead for a plan first.**
 
 ## Documentation Policy
 
