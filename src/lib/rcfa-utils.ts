@@ -1,4 +1,46 @@
-import type { RcfaStatus, OperatingContext, Priority, ActionItemStatus } from "@/generated/prisma/client";
+import type { RcfaStatus, OperatingContext, Priority, ActionItemStatus, QuestionCategory } from "@/generated/prisma/client";
+
+// ---------------------------------------------------------------------------
+// Currency formatting
+// ---------------------------------------------------------------------------
+
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+/**
+ * Formats a value as USD currency. Returns null if the value is null,
+ * undefined, or not a valid number.
+ */
+export function formatUsd(value: unknown): string | null {
+  if (value == null) return null;
+  const num = Number(value);
+  return Number.isNaN(num) ? null : usdFormatter.format(num);
+}
+
+/**
+ * UI labels for operating context values.
+ */
+export const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
+  running: "Running",
+  startup: "Startup",
+  shutdown: "Shutdown",
+  maintenance: "Maintenance",
+  unknown: "Unknown",
+};
+
+/**
+ * UI labels for follow-up question category values.
+ */
+export const QUESTION_CATEGORY_LABELS: Record<QuestionCategory, string> = {
+  failure_mode: "Failure Mode",
+  evidence: "Evidence",
+  operating_context: "Operating Context",
+  maintenance_history: "Maintenance History",
+  safety: "Safety",
+  other: "Other",
+};
 
 /**
  * Valid operating context values for RCFA equipment.

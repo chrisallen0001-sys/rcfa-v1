@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, truncateTitle } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, formatUsd, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle } from "@/lib/rcfa-utils";
+import { fetchRcfaById } from "@/lib/rcfa-queries";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import InvestigationWrapper from "./InvestigationWrapper";
 import FollowupQuestions from "./FollowupQuestions";
@@ -21,10 +21,10 @@ import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import RcfaActionBar from "./RcfaActionBar";
 import DraftModeWrapper from "./DraftModeWrapper";
 import DraftPageContent from "./DraftPageContent";
+import ExportPdfButton from "./ExportPdfButton";
 import type {
   ConfidenceLabel,
   Priority,
-  OperatingContext,
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,30 +38,12 @@ const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
 
 const CONFIDENCE_ORDER: Record<ConfidenceLabel, number> = { high: 0, medium: 1, low: 2, deprioritized: 3 };
 
-const OPERATING_CONTEXT_LABELS: Record<OperatingContext, string> = {
-  running: "Running",
-  startup: "Startup",
-  shutdown: "Shutdown",
-  maintenance: "Maintenance",
-  unknown: "Unknown",
-};
-
-
 const PRIORITY_COLORS: Record<Priority, string> = {
   deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
   low: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
-
-const usdFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-function formatUsd(value: unknown): string | null {
-  return value != null ? usdFormatter.format(Number(value)) : null;
-}
 
 interface SectionStatusData {
   status: string;
@@ -255,36 +237,9 @@ export default async function RcfaDetailPage({
     notFound();
   }
 
-  const rcfa = await prisma.rcfa.findUnique({
-    where: { id },
-    include: {
-      owner: { select: { id: true, displayName: true } },
-      closedBy: { select: { email: true } },
-      followupQuestions: {
-        orderBy: [{ generatedAt: "asc" }, { id: "asc" }],
-        include: { answeredBy: { select: { email: true } } },
-      },
-      rootCauseCandidates: { orderBy: { generatedAt: "asc" } },
-      rootCauseFinals: {
-        orderBy: { selectedAt: "asc" },
-        include: { selectedBy: { select: { email: true } } },
-      },
-      actionItemCandidates: { orderBy: { generatedAt: "asc" } },
-      actionItems: {
-        orderBy: { createdAt: "asc" },
-        include: {
-          createdBy: { select: { email: true } },
-          owner: { select: { id: true, displayName: true } },
-        },
-      },
-      auditEvents: {
-        orderBy: { createdAt: "desc" },
-        include: { actor: { select: { email: true } } },
-      },
-    },
-  });
+  const rcfa = await fetchRcfaById(id);
 
-  if (!rcfa || rcfa.deletedAt) {
+  if (!rcfa) {
     notFound();
   }
 
@@ -419,8 +374,13 @@ export default async function RcfaDetailPage({
           colorClass={RCFA_STATUS_COLORS[rcfa.status]}
         />
       </div>
-      <div className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="text-sm text-zinc-600 dark:text-zinc-400">
+          <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
+        </div>
+        {rcfa.status !== "draft" && (
+          <ExportPdfButton rcfaId={rcfa.id} />
+        )}
       </div>
     </>
   );
