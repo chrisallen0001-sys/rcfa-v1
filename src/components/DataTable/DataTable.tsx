@@ -204,75 +204,63 @@ export default function DataTable<TData>({
 
   return (
     <div className="w-full">
-      {/* Outer scroll wrapper — overflow-x:auto provides horizontal scrolling
-          on narrow viewports.  It has no constrained height so it does NOT
-          become the vertical scroll ancestor; the viewport remains the
-          vertical scroll context and position:sticky on the thead still
-          works relative to the viewport. */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="overflow-x-auto"
+        style={isLoading && contentHeightRef.current > 0 ? { minHeight: contentHeightRef.current } : undefined}
+        className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800"
       >
-        {/* Inner border wrapper — overflow-x:clip keeps the rounded corners
-            intact without creating a scroll container (clip does not
-            establish a scroll context). */}
-        <div
-          style={isLoading && contentHeightRef.current > 0 ? { minHeight: contentHeightRef.current } : undefined}
-          className="rounded-lg border border-zinc-200 [overflow-x:clip] dark:border-zinc-800"
+        <table
+          style={isLoading && contentWidthRef.current > 0 ? { minWidth: contentWidthRef.current } : undefined}
+          className="w-full min-w-[600px] text-sm"
         >
-          <table
-            style={isLoading && contentWidthRef.current > 0 ? { minWidth: contentWidthRef.current } : undefined}
-            className="w-full min-w-[600px] text-sm"
+          <thead
+            className="sticky z-20 border-b border-zinc-200 bg-zinc-50 shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
+            style={{ top: "var(--app-header-h, 0px)" }}
           >
-            <thead
-              className="sticky z-20 border-b border-zinc-200 bg-zinc-50 shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
-              style={{ top: "var(--app-header-h, 0px)" }}
-            >
-              {headerGroups.map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHeader
-                      key={header.id}
-                      header={header}
-                      enableFilters={enableFilters}
-                    />
+            {headerGroups.map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHeader
+                    key={header.id}
+                    header={header}
+                    enableFilters={enableFilters}
+                  />
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
+            {isLoading ? (
+              <LoadingSkeleton columnCount={columns.length} />
+            ) : rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-12 text-center text-zinc-500 dark:text-zinc-400"
+                >
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td
+                      key={cell.id}
+                      className="whitespace-nowrap px-4 py-3 text-zinc-900 dark:text-zinc-100"
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
                   ))}
                 </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
-              {isLoading ? (
-                <LoadingSkeleton columnCount={columns.length} />
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    className="px-4 py-12 text-center text-zinc-500 dark:text-zinc-400"
-                  >
-                    {emptyMessage}
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className="whitespace-nowrap px-4 py-3 text-zinc-900 dark:text-zinc-100"
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Pagination */}
