@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
 import { formatRcfaNumber, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, truncateTitle } from "@/lib/rcfa-utils";
+import { fetchRcfaById } from "@/lib/rcfa-queries";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import InvestigationWrapper from "./InvestigationWrapper";
 import FollowupQuestions from "./FollowupQuestions";
@@ -21,6 +21,7 @@ import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import RcfaActionBar from "./RcfaActionBar";
 import DraftModeWrapper from "./DraftModeWrapper";
 import DraftPageContent from "./DraftPageContent";
+import ExportPdfButton from "./ExportPdfButton";
 import type {
   ConfidenceLabel,
   Priority,
@@ -255,36 +256,9 @@ export default async function RcfaDetailPage({
     notFound();
   }
 
-  const rcfa = await prisma.rcfa.findUnique({
-    where: { id },
-    include: {
-      owner: { select: { id: true, displayName: true } },
-      closedBy: { select: { email: true } },
-      followupQuestions: {
-        orderBy: [{ generatedAt: "asc" }, { id: "asc" }],
-        include: { answeredBy: { select: { email: true } } },
-      },
-      rootCauseCandidates: { orderBy: { generatedAt: "asc" } },
-      rootCauseFinals: {
-        orderBy: { selectedAt: "asc" },
-        include: { selectedBy: { select: { email: true } } },
-      },
-      actionItemCandidates: { orderBy: { generatedAt: "asc" } },
-      actionItems: {
-        orderBy: { createdAt: "asc" },
-        include: {
-          createdBy: { select: { email: true } },
-          owner: { select: { id: true, displayName: true } },
-        },
-      },
-      auditEvents: {
-        orderBy: { createdAt: "desc" },
-        include: { actor: { select: { email: true } } },
-      },
-    },
-  });
+  const rcfa = await fetchRcfaById(id);
 
-  if (!rcfa || rcfa.deletedAt) {
+  if (!rcfa) {
     notFound();
   }
 
@@ -419,8 +393,13 @@ export default async function RcfaDetailPage({
           colorClass={RCFA_STATUS_COLORS[rcfa.status]}
         />
       </div>
-      <div className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="text-sm text-zinc-600 dark:text-zinc-400">
+          <span className="font-medium">Owner:</span> {rcfa.owner.displayName}
+        </div>
+        {rcfa.status !== "draft" && (
+          <ExportPdfButton rcfaId={rcfa.id} />
+        )}
       </div>
     </>
   );
