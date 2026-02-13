@@ -36,6 +36,7 @@ const VALID_SORT_COLUMNS = [
 ];
 
 const VALID_STATUSES: ActionItemStatus[] = [
+  "draft",
   "open",
   "in_progress",
   "blocked",

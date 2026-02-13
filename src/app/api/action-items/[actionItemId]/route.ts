@@ -9,6 +9,7 @@ const UUID_RE =
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const VALID_STATUSES: ActionItemStatus[] = [
+  "draft",
   "open",
   "in_progress",
   "blocked",

@@ -66,6 +66,7 @@ enum Priority {
 }
 
 enum ActionItemStatus {
+  draft
   open
   in_progress
   blocked
@@ -303,6 +304,8 @@ model RcfaActionItem {
   completedAt       DateTime? @map("completed_at") @db.Timestamptz
   completedByUserId String?   @map("completed_by_user_id") @db.Uuid
   completionNotes   String?   @map("completion_notes")
+
+  workCompletedDate DateTime? @map("work_completed_date") @db.Date
 
   // Relations
   rcfa                  Rcfa                     @relation(fields: [rcfaId], references: [id], onDelete: Cascade)

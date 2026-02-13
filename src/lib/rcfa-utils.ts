@@ -118,6 +118,7 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
  * UI labels for action item status values.
  */
 export const ACTION_STATUS_LABELS: Record<ActionItemStatus, string> = {
+  draft: "Draft",
   open: "Open",
   in_progress: "In Progress",
   blocked: "Blocked",
@@ -129,12 +130,25 @@ export const ACTION_STATUS_LABELS: Record<ActionItemStatus, string> = {
  * Tailwind CSS classes for action item status badges.
  */
 export const ACTION_STATUS_COLORS: Record<ActionItemStatus, string> = {
+  draft: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
   open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   in_progress: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   done: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   canceled: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
 };
+
+/**
+ * Statuses that users can manually select in the UI.
+ * Excludes `draft` because it is system-controlled (set automatically based on RCFA phase).
+ */
+export const USER_SELECTABLE_STATUSES: ActionItemStatus[] = [
+  "open",
+  "in_progress",
+  "blocked",
+  "done",
+  "canceled",
+];
 
 /**
  * Valid status transitions for RCFA workflow.
@@ -319,6 +333,7 @@ export function formatDueDateWithColor(date: Date | null): DueDateInfo {
 
 /**
  * Returns true if the given action item status represents a terminal/complete state.
+ * Note: `draft` is NOT considered complete — only `done` and `canceled` are terminal.
  */
 export function isActionItemComplete(status: ActionItemStatus): boolean {
   return status === "done" || status === "canceled";
