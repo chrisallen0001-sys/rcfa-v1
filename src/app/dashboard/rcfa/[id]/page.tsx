@@ -28,7 +28,7 @@ import type {
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const AI_NUMBER_RE = /^AI-(\d{1,4})$/i;
+const AI_NUMBER_RE = /^AI-(\d+)$/i;
 
 /**
  * Resolves an `expandItem` query-param value to a concrete action item UUID.
@@ -48,7 +48,7 @@ function getExpandedActionItemId(
     return match?.id;
   }
 
-  // AI-XXXX format — resolve via actionItemNumber
+  // Support manually constructed URLs (e.g., shared in chat/docs) using the human-readable AI-XXXX format
   const aiMatch = AI_NUMBER_RE.exec(expandItem);
   if (aiMatch) {
     const num = parseInt(aiMatch[1], 10);

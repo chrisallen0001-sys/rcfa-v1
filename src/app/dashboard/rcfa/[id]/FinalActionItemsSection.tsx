@@ -37,17 +37,15 @@ export default function FinalActionItemsSection({
   status,
   initialOpenItemId,
 }: FinalActionItemsSectionProps) {
-  // Determine if a valid deep-link target exists (used to initialize drawer state)
-  const deepLinkTarget = initialOpenItemId
-    ? actionItems.find((a) => a.actionItemId === initialOpenItemId) ?? null
+  // Use a primitive string (or null) as the deep-link dependency for referential stability
+  const deepLinkTargetId = initialOpenItemId
+    ? actionItems.find((a) => a.actionItemId === initialOpenItemId)?.actionItemId ?? null
     : null;
 
   // Drawer state — pre-open when deep-linked
-  const [drawerOpen, setDrawerOpen] = useState(!!deepLinkTarget);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(
-    deepLinkTarget?.actionItemId ?? null,
-  );
-  const [drawerMode, setDrawerMode] = useState<DrawerMode>("view");
+  const [drawerOpen, setDrawerOpen] = useState(!!deepLinkTargetId);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(deepLinkTargetId);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(deepLinkTargetId ? "view" : "view");
 
   // Progress tracking
   const totalActionItems = actionItems.length;
@@ -71,13 +69,13 @@ export default function FinalActionItemsSection({
   // Scroll the section into view when deep-linking opens the drawer on mount
   const hasScrolled = useRef(false);
   useEffect(() => {
-    if (!deepLinkTarget || hasScrolled.current) return;
+    if (!deepLinkTargetId || hasScrolled.current) return;
     hasScrolled.current = true;
 
     document
       .getElementById("final-action-items")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [deepLinkTarget]);
+  }, [deepLinkTargetId]);
 
   // Handlers
   function handleCardClick(actionItemId: string) {
@@ -101,8 +99,8 @@ export default function FinalActionItemsSection({
     }, 200);
 
     // Remove expandItem query param from the URL without triggering navigation
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("expandItem")) {
+    if (typeof window !== "undefined" && window.location.search.includes("expandItem")) {
+      const url = new URL(window.location.href);
       url.searchParams.delete("expandItem");
       window.history.replaceState(window.history.state, "", url.toString());
     }
