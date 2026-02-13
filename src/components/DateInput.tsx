@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { DayPicker, getDefaultClassNames } from "react-day-picker";
 import { format, parse, isValid } from "date-fns";
 import "react-day-picker/style.css";
+import XIcon from "@/components/XIcon";
 
 type DateInputProps = {
   value: string;
@@ -21,21 +22,6 @@ type DateInputProps = {
   /** Custom className for the container */
   className?: string;
 };
-
-/** Clear (X) icon for the clear button */
-function ClearIcon({ size = "md" }: { size?: "sm" | "md" }) {
-  const sizeClass = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className={sizeClass}
-    >
-      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-    </svg>
-  );
-}
 
 /** Calendar icon */
 function CalendarIcon() {
@@ -167,7 +153,7 @@ export default function DateInput({
   const calendarPortal =
     isOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
             <div
               ref={calendarRef}
               className="rounded-lg border border-zinc-200 bg-white p-3 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
@@ -236,7 +222,7 @@ export default function DateInput({
                   title="Clear date"
                   aria-label="Clear date"
                 >
-                  <ClearIcon size="sm" />
+                  <XIcon className="h-3.5 w-3.5" />
                 </button>
               )}
               <span className="flex h-5 w-5 items-center justify-center text-zinc-400">
@@ -283,7 +269,7 @@ export default function DateInput({
               title="Clear date"
               aria-label="Clear date"
             >
-              <ClearIcon size="md" />
+              <XIcon className="h-4 w-4" />
             </button>
           )}
           <span className="flex h-5 w-5 items-center justify-center text-zinc-400">

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber, formatUsd, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, formatUsd, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle, isActionItemComplete } from "@/lib/rcfa-utils";
 import { fetchRcfaById } from "@/lib/rcfa-queries";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import InvestigationWrapper from "./InvestigationWrapper";
@@ -10,8 +10,8 @@ import PromoteRootCauseButton from "./PromoteRootCauseButton";
 import PromoteActionItemButton from "./PromoteActionItemButton";
 import AddRootCauseForm from "./AddRootCauseForm";
 import EditableRootCause from "./EditableRootCause";
-import AddActionItemForm from "./AddActionItemForm";
-import EditableActionItem from "./EditableActionItem";
+import FinalActionItemsSection from "./FinalActionItemsSection";
+import type { ActionItemData } from "./ActionItemDrawerContent";
 import DeleteRcfaButton from "./DeleteRcfaButton";
 import ReassignOwnerButton from "./ReassignOwnerButton";
 import AuditLogSection from "./AuditLogSection";
@@ -28,6 +28,36 @@ import type {
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const AI_NUMBER_RE = /^AI-(\d+)$/i;
+
+/**
+ * Resolves an `expandItem` query-param value to a concrete action item UUID.
+ * Accepts either a raw UUID (matched directly against `actionItemId`) or the
+ * human-readable `AI-XXXX` format (resolved via `actionItemNumber`).
+ * Returns `undefined` when the value cannot be matched.
+ */
+function getExpandedActionItemId(
+  expandItem: string | undefined,
+  actionItems: { id: string; actionItemNumber: number }[],
+): string | undefined {
+  if (!expandItem) return undefined;
+
+  // UUID format — match against action item primary key
+  if (UUID_RE.test(expandItem)) {
+    const match = actionItems.find((a) => a.id === expandItem);
+    return match?.id;
+  }
+
+  // Support manually constructed URLs (e.g., shared in chat/docs) using the human-readable AI-XXXX format
+  const aiMatch = AI_NUMBER_RE.exec(expandItem);
+  if (aiMatch) {
+    const num = parseInt(aiMatch[1], 10);
+    const match = actionItems.find((a) => a.actionItemNumber === num);
+    return match?.id;
+  }
+
+  return undefined;
+}
 
 const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
   deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
@@ -327,7 +357,7 @@ export default async function RcfaDetailPage({
 
   // Action items progress tracking
   const completedActionItems = rcfa.actionItems.filter(
-    (a) => a.status === "done" || a.status === "canceled"
+    (a) => isActionItemComplete(a.status)
   ).length;
   const totalActionItems = rcfa.actionItems.length;
   const allActionItemsComplete = totalActionItems > 0 && completedActionItems === totalActionItems;
@@ -335,27 +365,24 @@ export default async function RcfaDetailPage({
   // Helper for statuses that allow action item editing
   const canEditActionItems = (rcfa.status === "investigation" || rcfa.status === "actions_open") && canEdit;
 
-  // Deep-link: determine which action item to expand
-  // Supports both "AI-XXXX" format and raw UUID
-  const getExpandedActionItemId = (): string | null => {
-    if (!expandItem) return null;
+  // Serialize action items for client component (ActionItemData shape)
+  const serializedActionItems: ActionItemData[] = rcfa.actionItems.map((a) => ({
+    actionItemId: a.id,
+    actionItemNumber: a.actionItemNumber,
+    actionText: a.actionText,
+    actionDescription: a.actionDescription,
+    completionNotes: a.completionNotes,
+    priority: a.priority,
+    status: a.status,
+    dueDate: a.dueDate?.toISOString().slice(0, 10) ?? null,
+    ownerUserId: a.owner?.id ?? null,
+    ownerName: a.owner?.displayName ?? null,
+    createdByEmail: a.createdBy.email,
+    createdAt: a.createdAt.toISOString().slice(0, 10),
+  }));
 
-    // Check if it's a UUID directly
-    if (UUID_RE.test(expandItem)) {
-      return rcfa.actionItems.some((a) => a.id === expandItem) ? expandItem : null;
-    }
-
-    // Check if it's an AI-XXXX format (e.g., "AI-0001" or "AI-1")
-    const aiMatch = expandItem.match(/^AI-?(\d+)$/i);
-    if (aiMatch) {
-      const actionItemNumber = parseInt(aiMatch[1], 10);
-      const matchingItem = rcfa.actionItems.find((a) => a.actionItemNumber === actionItemNumber);
-      return matchingItem?.id ?? null;
-    }
-
-    return null;
-  };
-  const expandedActionItemId = getExpandedActionItemId();
+  // Resolve expandItem deep-link to a concrete action item UUID
+  const resolvedExpandItemId = getExpandedActionItemId(expandItem, rcfa.actionItems);
 
   // Shared header content (RCFA number, title, badge, owner)
   const headerContent = (
@@ -697,52 +724,13 @@ export default async function RcfaDetailPage({
 
               {/* Final Action Items */}
               {(rcfa.actionItems.length > 0 || rcfa.status === "investigation" || rcfa.status === "actions_open") && (
-                <Section
-                  title="Final Action Items"
+                <FinalActionItemsSection
+                  rcfaId={rcfa.id}
+                  actionItems={serializedActionItems}
+                  canEdit={canEditActionItems}
                   status={sectionStatuses?.trackedActions}
-                  defaultExpanded={!!expandedActionItemId}
-                  headerContent={
-                    totalActionItems > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700">
-                          <div
-                            className="h-2 rounded-full bg-green-500 transition-all"
-                            style={{ width: `${(completedActionItems / totalActionItems) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {completedActionItems} of {totalActionItems} complete
-                        </span>
-                      </div>
-                    ) : undefined
-                  }
-                >
-                  <div className="space-y-4">
-                    {rcfa.actionItems.map((a) => (
-                      <EditableActionItem
-                        key={a.id}
-                        rcfaId={rcfa.id}
-                        actionItemId={a.id}
-                        actionItemNumber={a.actionItemNumber}
-                        actionText={a.actionText}
-                        actionDescription={a.actionDescription}
-                        completionNotes={a.completionNotes}
-                        priority={a.priority}
-                        status={a.status}
-                        dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
-                        ownerUserId={a.owner?.id ?? null}
-                        ownerName={a.owner?.displayName ?? null}
-                        createdByEmail={a.createdBy.email}
-                        createdAt={a.createdAt.toISOString().slice(0, 10)}
-                        canEdit={canEditActionItems}
-                        defaultExpanded={a.id === expandedActionItemId}
-                      />
-                    ))}
-                    {canEditActionItems && (
-                      <AddActionItemForm rcfaId={rcfa.id} />
-                    )}
-                  </div>
-                </Section>
+                  initialOpenItemId={resolvedExpandItemId}
+                />
               )}
 
               {/* Audit Log */}
@@ -943,48 +931,12 @@ export default async function RcfaDetailPage({
 
         {/* Final Action Items - read-only for closed state */}
         {rcfa.status === "closed" && rcfa.actionItems.length > 0 && (
-          <Section
-            title="Final Action Items"
-            defaultExpanded={!!expandedActionItemId}
-            headerContent={
-              totalActionItems > 0 ? (
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700">
-                    <div
-                      className="h-2 rounded-full bg-green-500 transition-all"
-                      style={{ width: `${(completedActionItems / totalActionItems) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {completedActionItems} of {totalActionItems} complete
-                  </span>
-                </div>
-              ) : undefined
-            }
-          >
-            <div className="space-y-4">
-              {rcfa.actionItems.map((a) => (
-                <EditableActionItem
-                  key={a.id}
-                  rcfaId={rcfa.id}
-                  actionItemId={a.id}
-                  actionItemNumber={a.actionItemNumber}
-                  actionText={a.actionText}
-                  actionDescription={a.actionDescription}
-                  completionNotes={a.completionNotes}
-                  priority={a.priority}
-                  status={a.status}
-                  dueDate={a.dueDate?.toISOString().slice(0, 10) ?? null}
-                  ownerUserId={a.owner?.id ?? null}
-                  ownerName={a.owner?.displayName ?? null}
-                  createdByEmail={a.createdBy.email}
-                  createdAt={a.createdAt.toISOString().slice(0, 10)}
-                  canEdit={false}
-                  defaultExpanded={a.id === expandedActionItemId}
-                />
-              ))}
-            </div>
-          </Section>
+          <FinalActionItemsSection
+            rcfaId={rcfa.id}
+            actionItems={serializedActionItems}
+            canEdit={false}
+            initialOpenItemId={resolvedExpandItemId}
+          />
         )}
 
         {/* Closed RCFA Info */}
