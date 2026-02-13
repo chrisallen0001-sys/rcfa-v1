@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import DateInput from "@/components/DateInput";
@@ -79,9 +79,10 @@ export default function ActionItemDrawerContent({
   onModeChange,
 }: ActionItemDrawerContentProps) {
   if (mode === "view") {
+    if (!actionItem) return null;
     return (
       <ViewMode
-        actionItem={actionItem!}
+        actionItem={actionItem}
         canEdit={canEdit}
         rcfaId={rcfaId}
         onClose={onClose}
@@ -91,11 +92,11 @@ export default function ActionItemDrawerContent({
   }
 
   if (mode === "edit") {
+    if (!actionItem) return null;
     return (
       <EditMode
-        actionItem={actionItem!}
+        actionItem={actionItem}
         rcfaId={rcfaId}
-        onClose={onClose}
         onModeChange={onModeChange}
       />
     );
@@ -131,6 +132,11 @@ function ViewMode({
   const [completionNotes, setCompletionNotes] = useState(
     actionItem.completionNotes ?? ""
   );
+
+  useEffect(() => {
+    setCompletionNotes(actionItem.completionNotes ?? "");
+  }, [actionItem.actionItemId, actionItem.completionNotes]);
+
   const hasCompletionNotesChanges =
     (completionNotes || null) !== (actionItem.completionNotes || null);
 
@@ -258,12 +264,15 @@ function ViewMode({
 
       {/* Completion Notes / Action Taken */}
       <div>
-        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-          Action Taken
-        </p>
+        <label htmlFor="view-completionNotes">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Action Taken
+          </span>
+        </label>
         {canEdit ? (
           <div className="mt-1">
             <textarea
+              id="view-completionNotes"
               value={completionNotes}
               onChange={(e) => setCompletionNotes(e.target.value)}
               placeholder="Action taken (optional)"
@@ -312,6 +321,11 @@ function ViewMode({
         </p>
       </div>
 
+      {/* Error message */}
+      {error && (
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+
       {/* Edit / Delete buttons */}
       {canEdit && (
         <div className="flex items-center gap-2">
@@ -354,11 +368,6 @@ function ViewMode({
           )}
         </div>
       )}
-
-      {/* Error message */}
-      {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-      )}
     </div>
   );
 }
@@ -370,12 +379,10 @@ function ViewMode({
 function EditMode({
   actionItem,
   rcfaId,
-  onClose,
   onModeChange,
 }: {
   actionItem: ActionItemData;
   rcfaId: string;
-  onClose: () => void;
   onModeChange: (mode: DrawerMode) => void;
 }) {
   const router = useRouter();
@@ -426,7 +433,7 @@ function EditMode({
       }
 
       router.refresh();
-      onClose();
+      onModeChange("view");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to update action item"
@@ -445,10 +452,11 @@ function EditMode({
     <form onSubmit={handleSave} className="space-y-4">
       {/* Action Title */}
       <div>
-        <label className={labelClass}>
+        <label htmlFor="edit-actionText" className={labelClass}>
           Action Title <span className="text-red-500">*</span>
         </label>
         <textarea
+          id="edit-actionText"
           value={actionText}
           onChange={(e) => setActionText(e.target.value)}
           required
@@ -460,8 +468,9 @@ function EditMode({
 
       {/* Action Description */}
       <div>
-        <label className={labelClass}>Action Description</label>
+        <label htmlFor="edit-actionDescription" className={labelClass}>Action Description</label>
         <textarea
+          id="edit-actionDescription"
           value={actionDescription}
           onChange={(e) => setActionDescription(e.target.value)}
           maxLength={4000}
@@ -473,38 +482,39 @@ function EditMode({
 
       {/* Priority */}
       <div>
-        <label className={labelClass}>Priority</label>
+        <label htmlFor="edit-priority" className={labelClass}>Priority</label>
         <select
+          id="edit-priority"
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
           className={inputClass}
         >
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
+          {(Object.entries(PRIORITY_LABELS) as [Priority, string][]).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
       </div>
 
       {/* Status */}
       <div>
-        <label className={labelClass}>Status</label>
+        <label htmlFor="edit-status" className={labelClass}>Status</label>
         <select
+          id="edit-status"
           value={editStatus}
           onChange={(e) => setEditStatus(e.target.value)}
           className={inputClass}
         >
-          <option value="open">Open</option>
-          <option value="in_progress">In Progress</option>
-          <option value="blocked">Blocked</option>
-          <option value="done">Complete</option>
-          <option value="canceled">Canceled</option>
+          {(Object.entries(ACTION_STATUS_LABELS) as [ActionItemStatus, string][]).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
       </div>
 
       {/* Assigned Owner */}
       <div>
-        <label className={labelClass}>Assigned Owner</label>
+        <label htmlFor="edit-ownerUserId" className={labelClass}>Assigned Owner</label>
         <select
+          id="edit-ownerUserId"
           value={ownerUserId}
           onChange={(e) => setOwnerUserId(e.target.value)}
           disabled={loadingUsers}
@@ -526,7 +536,7 @@ function EditMode({
 
       {/* Error */}
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>
       )}
 
       {/* Actions */}
@@ -607,10 +617,11 @@ function AddMode({
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Action Title */}
       <div>
-        <label className={labelClass}>
+        <label htmlFor="add-actionText" className={labelClass}>
           Action Title <span className="text-red-500">*</span>
         </label>
         <textarea
+          id="add-actionText"
           value={actionText}
           onChange={(e) => setActionText(e.target.value)}
           required
@@ -623,11 +634,12 @@ function AddMode({
 
       {/* Action Description */}
       <div>
-        <label className={labelClass}>Action Description</label>
+        <label htmlFor="add-actionDescription" className={labelClass}>Action Description</label>
         <textarea
+          id="add-actionDescription"
           value={actionDescription}
           onChange={(e) => setActionDescription(e.target.value)}
-          maxLength={2000}
+          maxLength={4000}
           rows={3}
           placeholder="Detailed explanation of the action (optional)"
           className={inputClass}
@@ -636,22 +648,24 @@ function AddMode({
 
       {/* Priority */}
       <div>
-        <label className={labelClass}>Priority</label>
+        <label htmlFor="add-priority" className={labelClass}>Priority</label>
         <select
+          id="add-priority"
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
           className={inputClass}
         >
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
+          {(Object.entries(PRIORITY_LABELS) as [Priority, string][]).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
       </div>
 
       {/* Assigned Owner */}
       <div>
-        <label className={labelClass}>Assigned Owner</label>
+        <label htmlFor="add-ownerUserId" className={labelClass}>Assigned Owner</label>
         <select
+          id="add-ownerUserId"
           value={ownerUserId}
           onChange={(e) => setOwnerUserId(e.target.value)}
           disabled={loadingUsers}
@@ -673,7 +687,7 @@ function AddMode({
 
       {/* Error */}
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>
       )}
 
       {/* Actions */}
