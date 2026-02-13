@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import SectionStatusIndicator from "@/components/SectionStatusIndicator";
+import { isActionItemComplete } from "@/lib/rcfa-utils";
+import type { ActionItemStatus } from "@/generated/prisma/client";
 import ActionItemCard from "./ActionItemCard";
 import ActionItemDrawer from "./ActionItemDrawer";
 import ActionItemDrawerContent, {
@@ -20,6 +22,8 @@ interface FinalActionItemsSectionProps {
   canEdit: boolean;
   /** Section status indicator for workflow guidance */
   status?: SectionStatus;
+  /** TODO(#356): When provided, auto-open the drawer for this action item (UUID or AI-XXXX format) */
+  initialOpenItemId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,6 +35,9 @@ export default function FinalActionItemsSection({
   actionItems,
   canEdit,
   status,
+  // TODO(#356): Wire up initialOpenItemId to auto-open the drawer for deep-linked action items
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  initialOpenItemId,
 }: FinalActionItemsSectionProps) {
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -40,7 +47,7 @@ export default function FinalActionItemsSection({
   // Progress tracking
   const totalActionItems = actionItems.length;
   const completedActionItems = actionItems.filter(
-    (a) => a.status === "done" || a.status === "canceled"
+    (a) => isActionItemComplete(a.status as ActionItemStatus)
   ).length;
 
   // Derive the selected action item data from the current list
@@ -71,7 +78,7 @@ export default function FinalActionItemsSection({
 
   function handleDrawerClose() {
     setDrawerOpen(false);
-    // Reset selection after close animation completes
+    // Wait for drawer close animation (200ms defined in ActionItemDrawer.tsx @keyframes) before resetting state
     setTimeout(() => {
       setSelectedItemId(null);
       setDrawerMode("view");
@@ -83,7 +90,10 @@ export default function FinalActionItemsSection({
   }
 
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <section
+      id="final-action-items"
+      className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+    >
       {/* Section header -- matches CollapsibleSection visual style but without collapse */}
       <div className="flex w-full items-center justify-between px-6 py-4">
         <div className="flex flex-1 items-center justify-between gap-4">
@@ -93,7 +103,13 @@ export default function FinalActionItemsSection({
           <div className="flex items-center gap-3">
             {totalActionItems > 0 && (
               <div className="flex items-center gap-2">
-                <div className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700">
+                <div
+                  className="h-2 w-24 rounded-full bg-zinc-200 dark:bg-zinc-700"
+                  role="progressbar"
+                  aria-valuenow={completedActionItems}
+                  aria-valuemax={totalActionItems}
+                  aria-label={`${completedActionItems} of ${totalActionItems} action items complete`}
+                >
                   <div
                     className="h-2 rounded-full bg-green-500 transition-all"
                     style={{
@@ -139,6 +155,7 @@ export default function FinalActionItemsSection({
           <button
             type="button"
             onClick={handleAddClick}
+            aria-label="Add Action Item"
             className="mt-4 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             + Add Action Item

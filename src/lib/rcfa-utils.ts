@@ -312,3 +312,14 @@ export function formatDueDateWithColor(date: Date | null): DueDateInfo {
 
   return { text, colorClass };
 }
+
+// ---------------------------------------------------------------------------
+// Action item completion
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the given action item status represents a terminal/complete state.
+ */
+export function isActionItemComplete(status: ActionItemStatus): boolean {
+  return status === "done" || status === "canceled";
+}

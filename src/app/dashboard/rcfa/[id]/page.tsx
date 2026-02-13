@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAuthContext } from "@/lib/auth-context";
-import { formatRcfaNumber, formatUsd, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle } from "@/lib/rcfa-utils";
+import { formatRcfaNumber, formatUsd, RCFA_STATUS_LABELS, RCFA_STATUS_COLORS, OPERATING_CONTEXT_LABELS, truncateTitle, isActionItemComplete } from "@/lib/rcfa-utils";
 import { fetchRcfaById } from "@/lib/rcfa-queries";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
 import InvestigationWrapper from "./InvestigationWrapper";
@@ -226,11 +226,12 @@ export default async function RcfaDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ new?: string }>;
+  // TODO(#356): expandItem deep-link will auto-open the action item drawer
+  searchParams: Promise<{ new?: string; expandItem?: string }>;
 }) {
   const { userId, role } = await getAuthContext();
   const { id } = await params;
-  const { new: isNew } = await searchParams;
+  const { new: isNew, expandItem } = await searchParams;
   const isNewRcfa = isNew === "true";
 
   if (!UUID_RE.test(id)) {
@@ -327,7 +328,7 @@ export default async function RcfaDetailPage({
 
   // Action items progress tracking
   const completedActionItems = rcfa.actionItems.filter(
-    (a) => a.status === "done" || a.status === "canceled"
+    (a) => isActionItemComplete(a.status)
   ).length;
   const totalActionItems = rcfa.actionItems.length;
   const allActionItemsComplete = totalActionItems > 0 && completedActionItems === totalActionItems;
@@ -696,6 +697,7 @@ export default async function RcfaDetailPage({
                   actionItems={serializedActionItems}
                   canEdit={canEditActionItems}
                   status={sectionStatuses?.trackedActions}
+                  initialOpenItemId={expandItem}
                 />
               )}
 
@@ -901,6 +903,7 @@ export default async function RcfaDetailPage({
             rcfaId={rcfa.id}
             actionItems={serializedActionItems}
             canEdit={false}
+            initialOpenItemId={expandItem}
           />
         )}
 
