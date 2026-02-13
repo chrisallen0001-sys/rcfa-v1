@@ -91,6 +91,7 @@ export async function POST(
         if (!item.dueDate) {
           missingFields.push("dueDate");
         }
+        // priority has a DB default of 'medium' — defensive check only
         if (!item.priority) {
           missingFields.push("priority");
         }
@@ -98,7 +99,7 @@ export async function POST(
         if (missingFields.length > 0) {
           incompleteItems.push({
             actionItemNumber: item.actionItemNumber,
-            actionText: item.actionText,
+            actionText: item.actionText || `(Action Item #${item.actionItemNumber})`,
             missingFields,
           });
         }
