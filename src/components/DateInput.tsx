@@ -153,7 +153,7 @@ export default function DateInput({
   const calendarPortal =
     isOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
             <div
               ref={calendarRef}
               className="rounded-lg border border-zinc-200 bg-white p-3 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
