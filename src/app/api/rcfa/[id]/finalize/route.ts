@@ -53,6 +53,71 @@ export async function POST(
         throw new Error("RCFA_NO_ACTION_ITEMS");
       }
 
+      // Validate draft action items have all required fields before finalizing
+      const draftItems = await tx.rcfaActionItem.findMany({
+        where: { rcfaId: id, status: "draft" },
+        select: {
+          id: true,
+          actionItemNumber: true,
+          actionText: true,
+          actionDescription: true,
+          ownerUserId: true,
+          dueDate: true,
+          priority: true,
+        },
+      });
+
+      const incompleteItems: {
+        actionItemNumber: number;
+        actionText: string;
+        missingFields: string[];
+      }[] = [];
+
+      for (const item of draftItems) {
+        const missingFields: string[] = [];
+
+        if (!item.actionText || item.actionText.trim().length === 0) {
+          missingFields.push("actionText");
+        }
+        if (
+          !item.actionDescription ||
+          item.actionDescription.trim().length === 0
+        ) {
+          missingFields.push("actionDescription");
+        }
+        if (!item.ownerUserId) {
+          missingFields.push("ownerUserId");
+        }
+        if (!item.dueDate) {
+          missingFields.push("dueDate");
+        }
+        if (!item.priority) {
+          missingFields.push("priority");
+        }
+
+        if (missingFields.length > 0) {
+          incompleteItems.push({
+            actionItemNumber: item.actionItemNumber,
+            actionText: item.actionText,
+            missingFields,
+          });
+        }
+      }
+
+      if (incompleteItems.length > 0) {
+        const err = new Error("RCFA_DRAFT_ITEMS_INCOMPLETE");
+        (err as Error & { payload: unknown }).payload = incompleteItems;
+        throw err;
+      }
+
+      // Activate all draft items by setting status to open
+      if (draftItems.length > 0) {
+        await tx.rcfaActionItem.updateMany({
+          where: { rcfaId: id, status: "draft" },
+          data: { status: "open" },
+        });
+      }
+
       await tx.rcfa.update({
         where: { id },
         data: { status: "actions_open" },
@@ -66,6 +131,22 @@ export async function POST(
           eventPayload: { from: "investigation", to: "actions_open" },
         },
       });
+
+      // Record audit event for draft item activation
+      if (draftItems.length > 0) {
+        const activatedItemIds = draftItems.map((item) => item.id);
+        await tx.rcfaAuditEvent.create({
+          data: {
+            rcfaId: id,
+            actorUserId: userId,
+            eventType: "draft_items_activated",
+            eventPayload: {
+              activatedItemIds,
+              count: activatedItemIds.length,
+            },
+          },
+        });
+      }
     });
 
     return NextResponse.json({ status: "actions_open" }, { status: 200 });
@@ -94,6 +175,18 @@ export async function POST(
     ) {
       return NextResponse.json(
         { error: "At least one action item is required before finalizing investigation" },
+        { status: 422 }
+      );
+    }
+    if (
+      error instanceof Error &&
+      error.message === "RCFA_DRAFT_ITEMS_INCOMPLETE"
+    ) {
+      return NextResponse.json(
+        {
+          error: "Some action items are incomplete",
+          incompleteItems: (error as Error & { payload: unknown }).payload,
+        },
         { status: 422 }
       );
     }
