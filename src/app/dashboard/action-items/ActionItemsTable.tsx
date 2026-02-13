@@ -109,9 +109,8 @@ function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
   const status = sp.get("status");
   if (status) {
     filters.push({ id: "status", value: status.split(",") });
-  } else if (sp.get("filter") !== "mine") {
-    // Default to open/actionable statuses unless the legacy ?filter=mine is active
-    // (which lets the API control the full result set). Matches old "Open" tab default.
+  } else {
+    // Default to open/actionable statuses. Matches old "Open" tab default.
     filters.push({ id: "status", value: [...DEFAULT_STATUSES] });
   }
 
@@ -265,9 +264,6 @@ export default function ActionItemsTable() {
   const urlSortBy = searchParams.get("sortBy") ?? "due_date";
   const urlSortOrder = searchParams.get("sortOrder") ?? "asc";
 
-  // Backward compat: dashboard links to ?filter=mine — pass through to API
-  const legacyFilterRef = useRef(searchParams.get("filter"));
-
   // State
   const [data, setData] = useState<ActionItemTableRow[]>([]);
   const [totalRows, setTotalRows] = useState(0);
@@ -289,7 +285,7 @@ export default function ActionItemsTable() {
   const urlUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Build the common URLSearchParams shared by data fetch and export.
-  // Includes sorting, column filters, and the legacy ?filter=mine param.
+  // Includes sorting and column filters.
   const buildBaseApiParams = useCallback(() => {
     const params = new URLSearchParams();
 
@@ -299,13 +295,6 @@ export default function ActionItemsTable() {
     }
 
     applyFiltersToApiParams(params, columnFilters);
-
-    // Read from ref (not a dependency) so the legacy ?filter=mine param is included
-    // on the first fetch but automatically drops out once cleared in .then() or
-    // handleFiltersChange, without triggering a re-fetch cycle.
-    if (legacyFilterRef.current === "mine") {
-      params.set("filter", "mine");
-    }
 
     return params;
   }, [sorting, columnFilters]);
@@ -343,19 +332,6 @@ export default function ActionItemsTable() {
       .then((response: ApiResponse) => {
         setData(response.rows);
         setTotalRows(response.total);
-        // Clear legacy filter after initial load so subsequent interactions
-        // aren't permanently scoped to "mine" (see backward-compat note above).
-        if (legacyFilterRef.current === "mine") {
-          legacyFilterRef.current = null;
-          // Inject default status filter so closed items don't appear on subsequent interactions
-          setColumnFilters((prev) => {
-            const hasStatus = prev.some((f) => f.id === "status");
-            if (!hasStatus) {
-              return [...prev, { id: "status", value: [...DEFAULT_STATUSES] }];
-            }
-            return prev;
-          });
-        }
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
@@ -396,10 +372,8 @@ export default function ActionItemsTable() {
   }, [pagination.pageIndex, sorting, columnFilters, router]);
 
   // Reset pagination to page 1 when filters change.
-  // Also clears legacy filter=mine so explicit user interaction takes precedence.
   const handleFiltersChange = useCallback(
     (updater: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => {
-      legacyFilterRef.current = null;
       setColumnFilters(updater);
       setPagination((p) => ({ ...p, pageIndex: 0 }));
     },

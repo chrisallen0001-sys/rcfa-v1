@@ -140,7 +140,7 @@ export default async function HomePage() {
               </span>
               {hasMoreRcfas && (
                 <Link
-                  href="/dashboard/rcfas?filter=mine"
+                  href={`/dashboard/rcfas?owner=${encodeURIComponent(userId)}&status=draft,investigation,actions_open`}
                   className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   View all
@@ -205,7 +205,7 @@ export default async function HomePage() {
               </span>
               {hasMoreActionItems && (
                 <Link
-                  href="/dashboard/action-items?filter=mine"
+                  href={`/dashboard/action-items?owner=${encodeURIComponent(userId)}&status=open,in_progress,blocked`}
                   className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   View all
