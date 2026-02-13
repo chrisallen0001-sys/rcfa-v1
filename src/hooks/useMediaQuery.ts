@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+
+const SSR_SNAPSHOT = () => false;
 
 /**
  * Concurrent-mode-safe media query hook using `useSyncExternalStore`.
@@ -14,29 +16,30 @@ import { useCallback, useSyncExternalStore } from "react";
  * @returns Whether the media query currently matches
  */
 export function useMediaQuery(query: string): boolean {
-  const subscribe = useCallback(
-    (callback: () => void) => {
-      const mql = window.matchMedia(query);
-      mql.addEventListener("change", callback);
-      return () => mql.removeEventListener("change", callback);
-    },
+  const mql = useMemo(
+    () => (typeof window !== "undefined" ? window.matchMedia(query) : null),
     [query],
   );
 
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (!mql) return () => {};
+      mql.addEventListener("change", callback);
+      return () => mql.removeEventListener("change", callback);
+    },
+    [mql],
+  );
+
   const getSnapshot = useCallback(() => {
-    return window.matchMedia(query).matches;
-  }, [query]);
+    return mql?.matches ?? false;
+  }, [mql]);
 
-  const getServerSnapshot = useCallback(() => {
-    return false;
-  }, []);
-
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(subscribe, getSnapshot, SSR_SNAPSHOT);
 }
 
 /**
- * Convenience hook that returns `true` when the viewport width is at or
- * below the Tailwind `sm` breakpoint (< 640px).
+ * Convenience hook that returns `true` when the viewport width is below
+ * the Tailwind `sm` breakpoint (< 640px).
  */
 export function useIsMobile(): boolean {
   return useMediaQuery("(max-width: 639px)");
