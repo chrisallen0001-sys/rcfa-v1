@@ -94,7 +94,20 @@ export async function PATCH(
       );
     }
 
-    const hasChanges = ["status", "ownerUserId", "dueDate", "completionNotes", "actionDescription"].some(
+    if (
+      body.workCompletedDate !== undefined &&
+      body.workCompletedDate !== null &&
+      (typeof body.workCompletedDate !== "string" ||
+        !ISO_DATE_RE.test(body.workCompletedDate) ||
+        isNaN(new Date(body.workCompletedDate + "T00:00:00Z").getTime()))
+    ) {
+      return NextResponse.json(
+        { error: "workCompletedDate must be YYYY-MM-DD or null" },
+        { status: 400 }
+      );
+    }
+
+    const hasChanges = ["status", "ownerUserId", "dueDate", "completionNotes", "actionDescription", "workCompletedDate"].some(
       (k) => body[k] !== undefined
     );
     if (!hasChanges) {
@@ -210,6 +223,12 @@ export async function PATCH(
             : existing.actionDescription;
     }
 
+    if (body.workCompletedDate !== undefined) {
+      data.workCompletedDate = body.workCompletedDate
+        ? new Date(body.workCompletedDate + "T00:00:00Z")
+        : null;
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const record = await tx.rcfaActionItem.update({
         where: { id: actionItemId },
@@ -252,6 +271,12 @@ export async function PATCH(
                     to: data.actionDescription ?? null,
                   },
                 }),
+                ...(body.workCompletedDate !== undefined && {
+                  workCompletedDate: {
+                    from: existing.workCompletedDate?.toISOString().slice(0, 10) ?? null,
+                    to: body.workCompletedDate ?? null,
+                  },
+                }),
               },
             },
           },
@@ -268,6 +293,7 @@ export async function PATCH(
               actionItemId,
               status: body.status,
               completionNotes: data.completionNotes ?? null,
+              workCompletedDate: body.workCompletedDate ?? null,
               previousStatus: existing.status,
             },
           },
