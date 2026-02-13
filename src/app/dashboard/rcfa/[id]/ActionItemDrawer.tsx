@@ -27,6 +27,12 @@ export default function ActionItemDrawer({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const handleDismiss = useCallback(() => {
+    // Reset any inline opacity the swipe handler may have set on the overlay.
+    // Radix unmounts the overlay so this is belt-and-suspenders, but avoids a
+    // stale inline style if the component is ever reused without unmounting.
+    if (overlayRef.current) {
+      overlayRef.current.style.opacity = "";
+    }
     onOpenChange(false);
   }, [onOpenChange]);
 
@@ -90,8 +96,10 @@ export default function ActionItemDrawer({
             </Dialog.Close>
           </header>
 
-          {/* Scrollable content area — data-scroll-region used by useSwipeToDismiss */}
-          <div data-scroll-region className="flex-1 overflow-y-auto p-4">
+          {/* Scrollable content area — data-scroll-region used by useSwipeToDismiss.
+              overscroll-behavior-y:none prevents iOS Safari's rubber-band bounce from
+              interfering with swipe-to-dismiss detection. */}
+          <div data-scroll-region className="flex-1 overflow-y-auto overscroll-y-none p-4">
             {children}
           </div>
         </Dialog.Content>
