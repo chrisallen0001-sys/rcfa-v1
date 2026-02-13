@@ -35,8 +35,9 @@ const VALID_SORT_COLUMNS = [
   "rcfa_number",
 ];
 
+// draft is intentionally excluded — draft items are never shown in the
+// dashboard and users should not be able to filter by draft status.
 const VALID_STATUSES: ActionItemStatus[] = [
-  "draft",
   "open",
   "in_progress",
   "blocked",
@@ -134,6 +135,10 @@ export async function GET(request: NextRequest) {
 
     // Always exclude deleted RCFAs
     conditions.push(`r.deleted_at IS NULL`);
+
+    // Always exclude draft action items — drafts are internal to the RCFA
+    // workflow and should never appear in the cross-RCFA dashboard.
+    conditions.push(`ai.status != 'draft'`);
 
     // Backward-compatible "mine" filter (used by dashboard until #324 migrates to column filters)
     if (specialFilter === "mine") {
