@@ -15,6 +15,7 @@ type ActionItemRow = {
   priority: Priority;
   status: ActionItemStatus;
   due_date: Date | null;
+  work_completed_date: Date | null;
   created_at: Date;
   owner_user_id: string | null;
   owner_display_name: string | null;
@@ -30,6 +31,7 @@ const VALID_SORT_COLUMNS = [
   "priority",
   "status",
   "due_date",
+  "work_completed_date",
   "created_at",
   "owner_display_name",
   "rcfa_number",
@@ -67,6 +69,7 @@ function mapRowToResponse(r: ActionItemRow) {
     priority: r.priority,
     status: r.status,
     dueDate: r.due_date?.toISOString().slice(0, 10) ?? null,
+    workCompletedDate: r.work_completed_date?.toISOString().slice(0, 10) ?? null,
     createdAt: new Date(r.created_at).toISOString().slice(0, 10),
     ownerUserId: r.owner_user_id,
     ownerDisplayName: r.owner_display_name,
@@ -95,6 +98,8 @@ function mapRowToResponse(r: ActionItemRow) {
  * - dueDateTo: ISO date string for due_date <= filter
  * - createdFrom: ISO date string for created_at >= filter
  * - createdTo: ISO date string for created_at <= filter
+ * - workCompletedDateFrom: ISO date string for work_completed_date >= filter
+ * - workCompletedDateTo: ISO date string for work_completed_date <= filter
  */
 export async function GET(request: NextRequest) {
   try {
@@ -127,6 +132,8 @@ export async function GET(request: NextRequest) {
     const dueDateTo = searchParams.get("dueDateTo");
     const createdFrom = searchParams.get("createdFrom");
     const createdTo = searchParams.get("createdTo");
+    const workCompletedDateFrom = searchParams.get("workCompletedDateFrom");
+    const workCompletedDateTo = searchParams.get("workCompletedDateTo");
 
     // Build WHERE conditions
     const conditions: string[] = [];
@@ -206,6 +213,8 @@ export async function GET(request: NextRequest) {
       ["dueDateTo", dueDateTo],
       ["createdFrom", createdFrom],
       ["createdTo", createdTo],
+      ["workCompletedDateFrom", workCompletedDateFrom],
+      ["workCompletedDateTo", workCompletedDateTo],
     ] as const) {
       if (val && !isValidISODate(val)) {
         return NextResponse.json(
@@ -230,12 +239,21 @@ export async function GET(request: NextRequest) {
       conditions.push(`ai.created_at <= $${paramIndex++}`);
       params.push(new Date(createdTo + "T23:59:59.999Z"));
     }
+    if (workCompletedDateFrom) {
+      conditions.push(`ai.work_completed_date >= $${paramIndex++}`);
+      params.push(new Date(workCompletedDateFrom));
+    }
+    if (workCompletedDateTo) {
+      conditions.push(`ai.work_completed_date <= $${paramIndex++}`);
+      params.push(new Date(workCompletedDateTo + "T23:59:59.999Z"));
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // Handle NULL sorting for due_date (NULLs last for ASC, first for DESC)
-    const orderByClause = validatedSortBy === "due_date"
-      ? `ORDER BY ai.due_date ${sortOrder} NULLS ${sortOrder === "ASC" ? "LAST" : "FIRST"}`
+    // Handle NULL sorting for nullable date columns (NULLs last for ASC, first for DESC)
+    const nullSortedColumns = ["due_date", "work_completed_date"];
+    const orderByClause = nullSortedColumns.includes(validatedSortBy)
+      ? `ORDER BY ai.${validatedSortBy} ${sortOrder} NULLS ${sortOrder === "ASC" ? "LAST" : "FIRST"}`
       : `ORDER BY ${validatedSortBy === "owner_display_name" ? "u.display_name" : validatedSortBy === "rcfa_number" ? "r.rcfa_number" : `ai.${validatedSortBy}`} ${sortOrder}`;
 
     const paginationClause = unlimitedExport
@@ -251,6 +269,7 @@ export async function GET(request: NextRequest) {
         ai.priority,
         ai.status,
         ai.due_date,
+        ai.work_completed_date,
         ai.created_at,
         ai.owner_user_id,
         u.display_name AS owner_display_name,
