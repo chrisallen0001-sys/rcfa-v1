@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SectionStatus } from "@/components/SectionStatusIndicator";
 import SectionStatusIndicator from "@/components/SectionStatusIndicator";
 import { isActionItemComplete } from "@/lib/rcfa-utils";
@@ -22,7 +22,7 @@ interface FinalActionItemsSectionProps {
   canEdit: boolean;
   /** Section status indicator for workflow guidance */
   status?: SectionStatus;
-  /** TODO(#356): When provided, auto-open the drawer for this action item (UUID or AI-XXXX format) */
+  /** When provided, auto-open the drawer in "view" mode for this action item on mount */
   initialOpenItemId?: string;
 }
 
@@ -35,13 +35,18 @@ export default function FinalActionItemsSection({
   actionItems,
   canEdit,
   status,
-  // TODO(#356): Wire up initialOpenItemId to auto-open the drawer for deep-linked action items
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   initialOpenItemId,
 }: FinalActionItemsSectionProps) {
-  // Drawer state
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  // Determine if a valid deep-link target exists (used to initialize drawer state)
+  const deepLinkTarget = initialOpenItemId
+    ? actionItems.find((a) => a.actionItemId === initialOpenItemId) ?? null
+    : null;
+
+  // Drawer state — pre-open when deep-linked
+  const [drawerOpen, setDrawerOpen] = useState(!!deepLinkTarget);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(
+    deepLinkTarget?.actionItemId ?? null,
+  );
   const [drawerMode, setDrawerMode] = useState<DrawerMode>("view");
 
   // Progress tracking
@@ -63,6 +68,17 @@ export default function FinalActionItemsSection({
         ? "Edit Action Item"
         : "Action Item Details";
 
+  // Scroll the section into view when deep-linking opens the drawer on mount
+  const hasScrolled = useRef(false);
+  useEffect(() => {
+    if (!deepLinkTarget || hasScrolled.current) return;
+    hasScrolled.current = true;
+
+    document
+      .getElementById("final-action-items")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [deepLinkTarget]);
+
   // Handlers
   function handleCardClick(actionItemId: string) {
     setSelectedItemId(actionItemId);
@@ -83,6 +99,13 @@ export default function FinalActionItemsSection({
       setSelectedItemId(null);
       setDrawerMode("view");
     }, 200);
+
+    // Remove expandItem query param from the URL without triggering navigation
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("expandItem")) {
+      url.searchParams.delete("expandItem");
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
   }
 
   function handleModeChange(mode: DrawerMode) {

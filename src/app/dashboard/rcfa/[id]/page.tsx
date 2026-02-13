@@ -28,6 +28,36 @@ import type {
 } from "@/generated/prisma/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const AI_NUMBER_RE = /^AI-(\d{1,4})$/i;
+
+/**
+ * Resolves an `expandItem` query-param value to a concrete action item UUID.
+ * Accepts either a raw UUID (matched directly against `actionItemId`) or the
+ * human-readable `AI-XXXX` format (resolved via `actionItemNumber`).
+ * Returns `undefined` when the value cannot be matched.
+ */
+function getExpandedActionItemId(
+  expandItem: string | undefined,
+  actionItems: { id: string; actionItemNumber: number }[],
+): string | undefined {
+  if (!expandItem) return undefined;
+
+  // UUID format — match against action item primary key
+  if (UUID_RE.test(expandItem)) {
+    const match = actionItems.find((a) => a.id === expandItem);
+    return match?.id;
+  }
+
+  // AI-XXXX format — resolve via actionItemNumber
+  const aiMatch = AI_NUMBER_RE.exec(expandItem);
+  if (aiMatch) {
+    const num = parseInt(aiMatch[1], 10);
+    const match = actionItems.find((a) => a.actionItemNumber === num);
+    return match?.id;
+  }
+
+  return undefined;
+}
 
 const CONFIDENCE_COLORS: Record<ConfidenceLabel, string> = {
   deprioritized: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
@@ -226,7 +256,6 @@ export default async function RcfaDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  // TODO(#356): expandItem deep-link will auto-open the action item drawer
   searchParams: Promise<{ new?: string; expandItem?: string }>;
 }) {
   const { userId, role } = await getAuthContext();
@@ -351,6 +380,9 @@ export default async function RcfaDetailPage({
     createdByEmail: a.createdBy.email,
     createdAt: a.createdAt.toISOString().slice(0, 10),
   }));
+
+  // Resolve expandItem deep-link to a concrete action item UUID
+  const resolvedExpandItemId = getExpandedActionItemId(expandItem, rcfa.actionItems);
 
   // Shared header content (RCFA number, title, badge, owner)
   const headerContent = (
@@ -697,7 +729,7 @@ export default async function RcfaDetailPage({
                   actionItems={serializedActionItems}
                   canEdit={canEditActionItems}
                   status={sectionStatuses?.trackedActions}
-                  initialOpenItemId={expandItem}
+                  initialOpenItemId={resolvedExpandItemId}
                 />
               )}
 
@@ -903,7 +935,7 @@ export default async function RcfaDetailPage({
             rcfaId={rcfa.id}
             actionItems={serializedActionItems}
             canEdit={false}
-            initialOpenItemId={expandItem}
+            initialOpenItemId={resolvedExpandItemId}
           />
         )}
 
