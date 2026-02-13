@@ -3,6 +3,7 @@
 import type { Priority, ActionItemStatus } from "@/generated/prisma/client";
 import {
   formatActionItemNumber,
+  formatDateShort,
   PRIORITY_LABELS,
   PRIORITY_COLORS,
   ACTION_STATUS_LABELS,
@@ -12,26 +13,11 @@ import {
 interface ActionItemCardProps {
   actionItemNumber: number;
   actionText: string;
-  priority: string;
-  status: string;
+  priority: Priority;
+  status: ActionItemStatus;
   dueDate: string | null;
   ownerName: string | null;
   onClick: () => void;
-}
-
-/**
- * Formats a date string (ISO or YYYY-MM-DD) into a compact display form
- * such as "Feb 11, 2026". Returns null if the input is null or invalid.
- */
-function formatDateShort(dateStr: string | null): string | null {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 export default function ActionItemCard({
@@ -43,14 +29,12 @@ export default function ActionItemCard({
   ownerName,
   onClick,
 }: ActionItemCardProps) {
-  const priorityKey = priority as Priority;
-  const statusKey = status as ActionItemStatus;
-
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full cursor-pointer rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+      aria-label={`${formatActionItemNumber(actionItemNumber)}: ${actionText}`}
+      className="w-full cursor-pointer rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:focus-visible:ring-blue-400"
     >
       {/* Row 1: AI number, owner, due date, badges */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -75,18 +59,18 @@ export default function ActionItemCard({
 
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            PRIORITY_COLORS[priorityKey] ?? ""
+            PRIORITY_COLORS[priority] ?? ""
           }`}
         >
-          {PRIORITY_LABELS[priorityKey] ?? priority}
+          {PRIORITY_LABELS[priority] ?? priority}
         </span>
 
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            ACTION_STATUS_COLORS[statusKey] ?? ""
+            ACTION_STATUS_COLORS[status] ?? ""
           }`}
         >
-          {ACTION_STATUS_LABELS[statusKey] ?? status}
+          {ACTION_STATUS_LABELS[status] ?? status}
         </span>
       </div>
 
