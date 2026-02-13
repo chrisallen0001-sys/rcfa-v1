@@ -167,6 +167,42 @@ export const PATCH_ALLOWED_TRANSITIONS: Record<RcfaStatus, RcfaStatus[]> = {
  */
 export const ALL_RCFA_STATUSES = Object.keys(VALID_STATUS_TRANSITIONS) as RcfaStatus[];
 
+// ---------------------------------------------------------------------------
+// Date formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Formats a date (string or Date) into a compact display form such as
+ * "Feb 11, 2026". Returns null if the input is null, undefined, or invalid.
+ *
+ * Date-only strings like "2026-02-11" are normalised by appending T00:00:00
+ * so they are parsed as local time rather than UTC (which would shift the
+ * displayed date by one day in western timezones).
+ */
+export function formatDateShort(
+  date: string | Date | null | undefined,
+): string | null {
+  if (date == null) return null;
+
+  let d: Date;
+  if (date instanceof Date) {
+    d = date;
+  } else {
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? `${date}T00:00:00`
+      : date;
+    d = new Date(normalized);
+  }
+
+  if (Number.isNaN(d.getTime())) return null;
+
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export type StatusTransitionResult =
   | { valid: true }
   | { valid: false; error: string; allowedTransitions: RcfaStatus[] };

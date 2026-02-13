@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AUDIT_EVENT_TYPES, AUDIT_SOURCES } from "@/lib/audit-constants";
+import { formatDateShort } from "@/lib/rcfa-utils";
 
 interface AuditEvent {
   id: string;
@@ -212,16 +213,10 @@ function formatValue(value: unknown): string {
   if (typeof value === "string") {
     // Check if it's an ISO date string
     if (/^\d{4}-\d{2}-\d{2}(T|$)/.test(value)) {
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        });
-      }
+      const formatted = formatDateShort(value);
+      if (formatted) return formatted;
     }
-    return value || "—";
+    return value || "\u2014";
   }
   if (typeof value === "number") {
     return String(value);

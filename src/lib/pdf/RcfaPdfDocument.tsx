@@ -13,6 +13,7 @@ import type { FullRcfa } from "@/lib/rcfa-queries";
 import {
   formatRcfaNumber,
   formatActionItemNumber,
+  formatDateShort,
   formatUsd,
   RCFA_STATUS_LABELS,
   PRIORITY_LABELS,
@@ -305,15 +306,6 @@ const styles = StyleSheet.create({
 // Utility helpers
 // ---------------------------------------------------------------------------
 
-function formatDate(date: Date | null | undefined): string {
-  if (!date) return "";
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Reusable sub-components
 // ---------------------------------------------------------------------------
@@ -491,10 +483,10 @@ export function RcfaPdfDocument({ rcfa }: RcfaPdfDocumentProps) {
           <View style={styles.fieldGrid}>
             <HalfField label="Status" value={RCFA_STATUS_LABELS[rcfa.status]} />
             <HalfField label="Owner" value={rcfa.owner.displayName} />
-            <HalfField label="Created" value={formatDate(rcfa.createdAt)} />
+            <HalfField label="Created" value={formatDateShort(rcfa.createdAt)} />
             <HalfField
               label="Closed"
-              value={rcfa.closedAt ? formatDate(rcfa.closedAt) : null}
+              value={rcfa.closedAt ? formatDateShort(rcfa.closedAt) : null}
             />
           </View>
           {rcfa.closingNotes && (
@@ -578,7 +570,7 @@ export function RcfaPdfDocument({ rcfa }: RcfaPdfDocumentProps) {
                     <Text style={styles.aText}>{q.answerText}</Text>
                     <Text style={styles.aMeta}>
                       Answered by {q.answeredBy?.email ?? "Unknown"}
-                      {q.answeredAt ? ` on ${formatDate(q.answeredAt)}` : ""}
+                      {q.answeredAt ? ` on ${formatDateShort(q.answeredAt)}` : ""}
                     </Text>
                   </>
                 ) : (
@@ -600,7 +592,7 @@ export function RcfaPdfDocument({ rcfa }: RcfaPdfDocumentProps) {
                   <Text style={styles.cardBody}>{rc.evidenceSummary}</Text>
                 )}
                 <Text style={styles.cardMeta}>
-                  Selected by {rc.selectedBy.email} on {formatDate(rc.selectedAt)}
+                  Selected by {rc.selectedBy.email} on {formatDateShort(rc.selectedAt)}
                 </Text>
               </View>
             ))}
@@ -643,7 +635,7 @@ export function RcfaPdfDocument({ rcfa }: RcfaPdfDocumentProps) {
                     {ai.owner?.displayName ?? "\u2014"}
                   </Text>
                   <Text style={[styles.tableCell, { width: "18%" }]}>
-                    {ai.dueDate ? formatDate(ai.dueDate) : "\u2014"}
+                    {ai.dueDate ? formatDateShort(ai.dueDate) : "\u2014"}
                   </Text>
                 </View>
 
