@@ -1,7 +1,9 @@
 "use client";
 
+import { useCallback, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useIsMobile } from "@/hooks/useMediaQuery";
+import { useSwipeToDismiss } from "@/hooks/useSwipeToDismiss";
 import XIcon from "@/components/XIcon";
 
 interface ActionItemDrawerProps {
@@ -21,19 +23,46 @@ export default function ActionItemDrawer({
   // rendered inside Dialog.Portal which does not SSR, so no hydration mismatch occurs.
   const isMobile = useIsMobile();
 
+  // Ref to the overlay element so we can sync its opacity during swipe.
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const handleDismiss = useCallback(() => {
+    // Reset any inline opacity the swipe handler may have set on the overlay.
+    // Radix unmounts the overlay so this is belt-and-suspenders, but avoids a
+    // stale inline style if the component is ever reused without unmounting.
+    if (overlayRef.current) {
+      overlayRef.current.style.opacity = "";
+    }
+    onOpenChange(false);
+  }, [onOpenChange]);
+
+  const handleOpacityChange = useCallback((opacity: number) => {
+    if (overlayRef.current) {
+      overlayRef.current.style.opacity = String(opacity);
+    }
+  }, []);
+
+  const swipeRef = useSwipeToDismiss({
+    enabled: isMobile && open,
+    onDismiss: handleDismiss,
+    onOpacityChange: handleOpacityChange,
+  });
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange} modal>
       <Dialog.Portal>
         {/* Backdrop overlay */}
         <Dialog.Overlay
-          className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-[drawer-overlay-fade-in_300ms_ease-out] data-[state=closed]:animate-[drawer-overlay-fade-out_200ms_ease-in]"
+          ref={overlayRef}
+          className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-[drawer-overlay-fade-in_300ms_ease-out] data-[state=closed]:animate-[drawer-overlay-fade-out_200ms_ease-in] motion-reduce:animate-none motion-reduce:transition-none"
         />
 
         {/* Drawer content */}
         <Dialog.Content
+          ref={isMobile ? swipeRef : undefined}
           aria-describedby={undefined}
           className={[
-            "fixed z-[51] flex flex-col bg-white shadow-xl outline-none dark:bg-zinc-900",
+            "fixed z-[51] flex flex-col bg-white shadow-xl outline-none dark:bg-zinc-900 motion-reduce:animate-none motion-reduce:transition-none",
             isMobile
               ? [
                   "inset-x-0 bottom-0 max-h-[85vh] rounded-t-2xl",
@@ -67,8 +96,10 @@ export default function ActionItemDrawer({
             </Dialog.Close>
           </header>
 
-          {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* Scrollable content area — data-scroll-region used by useSwipeToDismiss.
+              overscroll-behavior-y:none prevents iOS Safari's rubber-band bounce from
+              interfering with swipe-to-dismiss detection. */}
+          <div data-scroll-region className="flex-1 overflow-y-auto overscroll-y-none p-4">
             {children}
           </div>
         </Dialog.Content>
