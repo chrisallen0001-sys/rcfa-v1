@@ -8,7 +8,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const VALID_STATUSES: ActionItemStatus[] = [
-  "draft",
   "open",
   "in_progress",
   "blocked",
@@ -64,7 +63,7 @@ export async function PATCH(
       !VALID_STATUSES.includes(body.status as ActionItemStatus)
     ) {
       return NextResponse.json(
-        { error: "status must be open, in_progress, blocked, done, or canceled" },
+        { error: `status must be one of: ${VALID_STATUSES.join(", ")}` },
         { status: 400 }
       );
     }
