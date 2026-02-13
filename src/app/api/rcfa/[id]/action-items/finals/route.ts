@@ -108,6 +108,7 @@ export async function POST(
             priority,
             dueDate,
             ownerUserId,
+            status: record.status,
           },
         },
       });
