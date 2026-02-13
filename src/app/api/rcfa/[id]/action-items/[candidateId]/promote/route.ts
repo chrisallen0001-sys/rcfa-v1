@@ -99,7 +99,7 @@ export async function POST(
           dueDate: candidate.suggestedDueDate,
           selectedFromCandidateId: candidateId,
           createdByUserId: userId,
-          status: "open",
+          status: locked.status === "investigation" ? "draft" : "open",
         },
       });
 
