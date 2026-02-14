@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, useEffect, useRef } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -161,35 +162,21 @@ export default function ChangePasswordModal({
               </div>
             )}
 
-            <div>
-              <label
-                htmlFor="currentPassword"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Current Password
-              </label>
-              <input
-                ref={currentPasswordRef}
-                id="currentPassword"
-                type="password"
-                required
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
-              />
-            </div>
+            <PasswordInput
+              ref={currentPasswordRef}
+              id="currentPassword"
+              label="Current Password"
+              required
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            />
 
             <div>
-              <label
-                htmlFor="newPassword"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                New Password
-              </label>
-              <input
+              <PasswordInput
                 id="newPassword"
-                type="password"
+                label="New Password"
                 required
                 autoComplete="new-password"
                 value={newPassword}
@@ -201,23 +188,15 @@ export default function ChangePasswordModal({
               </p>
             </div>
 
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Confirm New Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                required
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
-              />
-            </div>
+            <PasswordInput
+              id="confirmPassword"
+              label="Confirm New Password"
+              required
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            />
 
             <div className="flex justify-end gap-3 pt-2">
               {!mandatory && (
