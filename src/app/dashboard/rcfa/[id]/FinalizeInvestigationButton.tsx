@@ -86,7 +86,18 @@ export default function FinalizeInvestigationButton({
         const data = await res.json().catch(() => ({}));
 
         // Structured validation error — incomplete draft action items
-        if (Array.isArray(data.incompleteItems) && data.incompleteItems.length > 0) {
+        if (
+          Array.isArray(data.incompleteItems) &&
+          data.incompleteItems.length > 0 &&
+          data.incompleteItems.every(
+            (it: unknown) =>
+              typeof it === "object" &&
+              it !== null &&
+              "actionItemNumber" in it &&
+              "missingFields" in it &&
+              Array.isArray((it as IncompleteItem).missingFields)
+          )
+        ) {
           setError({ kind: "incomplete", items: data.incompleteItems });
           return;
         }
@@ -163,7 +174,7 @@ export default function FinalizeInvestigationButton({
         )}
         {/* Generic (non-validation) error — inline message */}
         {error?.kind === "generic" && (
-          <span className="text-sm text-red-600 dark:text-red-400">
+          <span role="alert" className="text-sm text-red-600 dark:text-red-400">
             {error.message}
           </span>
         )}
@@ -171,7 +182,7 @@ export default function FinalizeInvestigationButton({
 
       {/* Structured validation error — incomplete action items list */}
       {error?.kind === "incomplete" && (
-        <IncompleteItemsBanner items={error.items} />
+        <IncompleteItemsBanner items={error.items} onDismiss={() => setError(null)} />
       )}
     </div>
   );
@@ -181,7 +192,7 @@ export default function FinalizeInvestigationButton({
 // Incomplete items banner
 // ---------------------------------------------------------------------------
 
-function IncompleteItemsBanner({ items }: { items: IncompleteItem[] }) {
+function IncompleteItemsBanner({ items, onDismiss }: { items: IncompleteItem[]; onDismiss: () => void }) {
   const displayed = items.slice(0, MAX_DISPLAYED_ITEMS);
   const remaining = items.length - displayed.length;
 
@@ -190,10 +201,20 @@ function IncompleteItemsBanner({ items }: { items: IncompleteItem[] }) {
       role="alert"
       className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700 dark:bg-amber-950/40"
     >
-      <p className="mb-2 font-medium text-amber-800 dark:text-amber-300">
-        Cannot finalize investigation — the following action items are missing
-        required fields:
-      </p>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <p className="font-medium text-amber-800 dark:text-amber-300">
+          Cannot finalize investigation — the following action items are missing
+          required fields:
+        </p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="shrink-0 text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200"
+        >
+          &times;
+        </button>
+      </div>
       <ul className="list-inside space-y-1 text-amber-700 dark:text-amber-400">
         {displayed.map((item) => (
           <li key={item.actionItemNumber}>
