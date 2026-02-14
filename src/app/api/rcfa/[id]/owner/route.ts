@@ -50,7 +50,7 @@ export async function PATCH(
     });
 
     if (!newOwner) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Owner user not found" }, { status: 400 });
     }
 
     if (newOwner.status !== "active") {

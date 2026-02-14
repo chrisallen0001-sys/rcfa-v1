@@ -17,6 +17,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get("status");
 
+    // Validate the status parameter: only "active", "all", or absent are allowed.
+    const VALID_STATUS_VALUES = new Set(["active", "all"]);
+    if (statusParam !== null && !VALID_STATUS_VALUES.has(statusParam)) {
+      return NextResponse.json(
+        { error: `Invalid status parameter: "${statusParam}". Must be "active" or "all".` },
+        { status: 400 }
+      );
+    }
+
     // Default to active-only so assignment dropdowns exclude disabled/pending users.
     // Pass ?status=all to include all users (e.g., for table filter dropdowns).
     const activeOnly = statusParam !== "all";
