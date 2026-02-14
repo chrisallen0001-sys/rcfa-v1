@@ -38,6 +38,8 @@ interface RcfaActionBarProps {
   // For actions_open state
   allActionItemsComplete?: boolean;
   totalActionItems?: number;
+  /** Total action items including drafts (used for finalize gate in investigation). */
+  totalAllActionItems?: number;
 }
 
 function AnalyzeWithAIButton({
@@ -247,6 +249,7 @@ export default function RcfaActionBar({
   onFlushAnswers,
   allActionItemsComplete = false,
   totalActionItems = 0,
+  totalAllActionItems = 0,
 }: RcfaActionBarProps) {
   const [isAIAnalyzing, setIsAIAnalyzing] = useState(false);
 
@@ -300,7 +303,7 @@ export default function RcfaActionBar({
             />
             <FinalizeInvestigationButton
               rcfaId={rcfaId}
-              totalActionItems={totalActionItems}
+              totalActionItems={totalAllActionItems}
             />
           </div>
         );

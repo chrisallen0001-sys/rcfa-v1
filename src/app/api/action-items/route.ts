@@ -245,7 +245,7 @@ export async function GET(request: NextRequest) {
     }
     if (workCompletedDateTo) {
       conditions.push(`ai.work_completed_date <= $${paramIndex++}`);
-      params.push(new Date(workCompletedDateTo));
+      params.push(new Date(workCompletedDateTo + "T23:59:59.999Z"));
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

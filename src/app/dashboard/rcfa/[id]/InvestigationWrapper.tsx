@@ -30,6 +30,8 @@ interface InvestigationWrapperProps {
   hasNewDataForReanalysis: boolean;
   allActionItemsComplete: boolean;
   totalActionItems: number;
+  /** Total action items including drafts (used for finalize gate). */
+  totalAllActionItems: number;
   questions: FollowupQuestion[];
   isInvestigation: boolean;
   /** Content rendered before follow-up questions section (e.g., Intake Summary) */
@@ -53,6 +55,7 @@ export default function InvestigationWrapper({
   hasNewDataForReanalysis,
   allActionItemsComplete,
   totalActionItems,
+  totalAllActionItems,
   questions,
   isInvestigation,
   beforeQuestions,
@@ -113,6 +116,7 @@ export default function InvestigationWrapper({
         onFlushAnswers={handleFlushAnswers}
         allActionItemsComplete={allActionItemsComplete}
         totalActionItems={totalActionItems}
+        totalAllActionItems={totalAllActionItems}
       />
     </>
   );

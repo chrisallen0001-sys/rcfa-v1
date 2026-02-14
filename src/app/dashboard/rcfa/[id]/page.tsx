@@ -361,6 +361,7 @@ export default async function RcfaDetailPage({
     (a) => isActionItemComplete(a.status)
   ).length;
   const totalActionItems = nonDraftActionItems.length;
+  const totalAllActionItems = rcfa.actionItems.length;
   const allActionItemsComplete = totalActionItems > 0 && completedActionItems === totalActionItems;
 
   // Helper for statuses that allow action item editing
@@ -521,6 +522,7 @@ export default async function RcfaDetailPage({
           hasNewDataForReanalysis={hasNewDataForReanalysis}
           allActionItemsComplete={allActionItemsComplete}
           totalActionItems={totalActionItems}
+          totalAllActionItems={totalAllActionItems}
           questions={rcfa.followupQuestions.map((q) => ({
             id: q.id,
             questionText: q.questionText,
