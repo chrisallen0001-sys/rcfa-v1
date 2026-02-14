@@ -24,6 +24,10 @@ interface FinalActionItemsSectionProps {
   status?: SectionStatus;
   /** When provided, auto-open the drawer in "view" mode for this action item on mount */
   initialOpenItemId?: string;
+  /** Current authenticated user ID for item-owner permission checks */
+  currentUserId?: string;
+  /** RCFA workflow status for phase-based permission enforcement */
+  rcfaStatus?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,6 +40,8 @@ export default function FinalActionItemsSection({
   canEdit,
   status,
   initialOpenItemId,
+  currentUserId,
+  rcfaStatus,
 }: FinalActionItemsSectionProps) {
   // Use a primitive string (or null) as the deep-link dependency for referential stability
   const deepLinkTargetId = initialOpenItemId
@@ -199,6 +205,8 @@ export default function FinalActionItemsSection({
           actionItem={selectedItem ?? undefined}
           onClose={handleDrawerClose}
           onModeChange={handleModeChange}
+          currentUserId={currentUserId}
+          rcfaStatus={rcfaStatus}
         />
       </ActionItemDrawer>
     </section>

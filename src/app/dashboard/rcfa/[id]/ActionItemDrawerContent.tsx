@@ -33,6 +33,7 @@ export interface ActionItemData {
   ownerName: string | null;
   createdByEmail: string;
   createdAt: string;
+  workCompletedDate: string | null;
 }
 
 export interface ActionItemDrawerContentProps {
@@ -43,6 +44,10 @@ export interface ActionItemDrawerContentProps {
   actionItem?: ActionItemData;
   onClose: () => void;
   onModeChange: (mode: DrawerMode) => void;
+  /** Current authenticated user ID for item-owner permission checks */
+  currentUserId?: string;
+  /** RCFA workflow status for phase-based permission enforcement */
+  rcfaStatus?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +83,8 @@ export default function ActionItemDrawerContent({
   actionItem,
   onClose,
   onModeChange,
+  currentUserId,
+  rcfaStatus,
 }: ActionItemDrawerContentProps) {
   if (mode === "view") {
     if (!actionItem) return null;
@@ -88,6 +95,8 @@ export default function ActionItemDrawerContent({
         rcfaId={rcfaId}
         onClose={onClose}
         onModeChange={onModeChange}
+        currentUserId={currentUserId}
+        rcfaStatus={rcfaStatus}
       />
     );
   }
@@ -99,6 +108,7 @@ export default function ActionItemDrawerContent({
         actionItem={actionItem}
         rcfaId={rcfaId}
         onModeChange={onModeChange}
+        rcfaStatus={rcfaStatus}
       />
     );
   }
@@ -116,12 +126,16 @@ function ViewMode({
   rcfaId,
   onClose,
   onModeChange,
+  currentUserId,
+  rcfaStatus,
 }: {
   actionItem: ActionItemData;
   canEdit: boolean;
   rcfaId: string;
   onClose: () => void;
   onModeChange: (mode: DrawerMode) => void;
+  currentUserId?: string;
+  rcfaStatus?: string;
 }) {
   const router = useRouter();
   const pendingRef = useRef(false);
@@ -129,45 +143,128 @@ function ViewMode({
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Item-owner detection: user owns this action item but is NOT the RCFA owner/admin
+  const isItemOwner =
+    !!currentUserId && actionItem.ownerUserId === currentUserId;
+  const isActionsOpen = rcfaStatus === "actions_open";
+  // Can inline-edit fields that item owners are permitted to change (only during actions_open)
+  const canInlineEdit = (canEdit || isItemOwner) && isActionsOpen;
+
   // Completion notes inline editing
   const [completionNotes, setCompletionNotes] = useState(
     actionItem.completionNotes ?? ""
   );
 
+  // Status inline editing (for item-owner-only)
+  const [inlineStatus, setInlineStatus] = useState<string>(actionItem.status);
+
+  // Work completed date inline editing (for item-owner-only)
+  const [workCompletedDate, setWorkCompletedDate] = useState(
+    actionItem.workCompletedDate ?? ""
+  );
+
   useEffect(() => {
     setCompletionNotes(actionItem.completionNotes ?? "");
-  }, [actionItem.actionItemId, actionItem.completionNotes]);
+    setInlineStatus(actionItem.status);
+    setWorkCompletedDate(actionItem.workCompletedDate ?? "");
+  }, [
+    actionItem.actionItemId,
+    actionItem.completionNotes,
+    actionItem.status,
+    actionItem.workCompletedDate,
+  ]);
 
   const hasCompletionNotesChanges =
     (completionNotes || null) !== (actionItem.completionNotes || null);
 
-  async function handleSaveCompletionNotes() {
+  const hasStatusChange = inlineStatus !== actionItem.status;
+
+  const hasWorkCompletedDateChange =
+    (workCompletedDate || null) !== (actionItem.workCompletedDate || null);
+
+  const hasItemOwnerChanges =
+    hasCompletionNotesChanges || hasStatusChange || hasWorkCompletedDateChange;
+
+  /** Save all RCFA-owner/admin inline changes (completion notes + work completed date) in a single PATCH */
+  async function handleSaveRcfaOwnerChanges() {
     if (pendingRef.current) return;
     pendingRef.current = true;
     setLoading(true);
     setError(null);
 
     try {
+      const payload: Record<string, unknown> = {};
+      if (hasCompletionNotesChanges) payload.completionNotes = completionNotes || null;
+      if (hasWorkCompletedDateChange) payload.workCompletedDate = workCompletedDate || null;
+
       const res = await fetch(`/api/action-items/${actionItem.actionItemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completionNotes: completionNotes || null }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to update action taken");
+        throw new Error(data.error ?? "Failed to save changes");
       }
 
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update action taken"
+        err instanceof Error ? err.message : "Failed to save changes"
       );
     } finally {
       pendingRef.current = false;
       setLoading(false);
     }
+  }
+
+  function handleCancelRcfaOwnerChanges() {
+    setCompletionNotes(actionItem.completionNotes ?? "");
+    setWorkCompletedDate(actionItem.workCompletedDate ?? "");
+  }
+
+  const hasRcfaOwnerChanges = hasCompletionNotesChanges || hasWorkCompletedDateChange;
+
+  /** Save all item-owner-only inline changes in a single PATCH */
+  async function handleSaveItemOwnerChanges() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const payload: Record<string, unknown> = {};
+      if (hasStatusChange) payload.status = inlineStatus;
+      if (hasCompletionNotesChanges)
+        payload.completionNotes = completionNotes || null;
+      if (hasWorkCompletedDateChange)
+        payload.workCompletedDate = workCompletedDate || null;
+
+      const res = await fetch(`/api/action-items/${actionItem.actionItemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to save changes");
+      }
+
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      pendingRef.current = false;
+      setLoading(false);
+    }
+  }
+
+  function handleCancelItemOwnerChanges() {
+    setInlineStatus(actionItem.status);
+    setCompletionNotes(actionItem.completionNotes ?? "");
+    setWorkCompletedDate(actionItem.workCompletedDate ?? "");
   }
 
   async function handleDelete() {
@@ -231,13 +328,29 @@ function ViewMode({
       {/* Detail fields - single column for narrow drawer */}
       <div className="space-y-3">
         <DetailField label="Status">
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              ACTION_STATUS_COLORS[actionItem.status] ?? ""
-            }`}
-          >
-            {ACTION_STATUS_LABELS[actionItem.status] ?? actionItem.status}
-          </span>
+          {/* Item owners (non-admin, non-RCFA-owner) can change status inline during actions_open */}
+          {!canEdit && isItemOwner && isActionsOpen ? (
+            <select
+              value={inlineStatus}
+              onChange={(e) => setInlineStatus(e.target.value)}
+              className={inputClass}
+              aria-label="Status"
+            >
+              {USER_SELECTABLE_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {ACTION_STATUS_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                ACTION_STATUS_COLORS[actionItem.status] ?? ""
+              }`}
+            >
+              {ACTION_STATUS_LABELS[actionItem.status] ?? actionItem.status}
+            </span>
+          )}
         </DetailField>
 
         <DetailField label="Priority">
@@ -270,7 +383,7 @@ function ViewMode({
             Action Taken
           </span>
         </label>
-        {canEdit ? (
+        {canEdit && isActionsOpen ? (
           <div className="mt-1">
             <textarea
               id="view-completionNotes"
@@ -281,31 +394,27 @@ function ViewMode({
               rows={2}
               className={inputClass}
             />
-            <div className="mt-1 flex items-center justify-between">
+            <div className="mt-1">
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
                 {completionNotes.length}/2000
               </span>
-              {hasCompletionNotesChanges && (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveCompletionNotes}
-                    disabled={loading}
-                    className={btnPrimary}
-                  >
-                    {loading ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCompletionNotes(actionItem.completionNotes ?? "")
-                    }
-                    className={btnSecondary}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
+            </div>
+          </div>
+        ) : !canEdit && isItemOwner && isActionsOpen ? (
+          <div className="mt-1">
+            <textarea
+              id="view-completionNotes"
+              value={completionNotes}
+              onChange={(e) => setCompletionNotes(e.target.value)}
+              placeholder="Action taken (optional)"
+              maxLength={2000}
+              rows={2}
+              className={inputClass}
+            />
+            <div className="mt-1">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                {completionNotes.length}/2000
+              </span>
             </div>
           </div>
         ) : (
@@ -314,6 +423,65 @@ function ViewMode({
           </p>
         )}
       </div>
+
+      {/* Work Completed Date - editable for item owners and RCFA owners/admins */}
+      {canInlineEdit ? (
+        <div>
+          <DateInput
+            label="Work Completed Date"
+            value={canEdit ? workCompletedDate : (isItemOwner ? workCompletedDate : "")}
+            onChange={setWorkCompletedDate}
+          />
+        </div>
+      ) : (
+        <DetailField label="Work Completed Date">
+          <span className="text-sm text-zinc-700 dark:text-zinc-300">
+            {formatDateShort(actionItem.workCompletedDate) ?? "\u2014"}
+          </span>
+        </DetailField>
+      )}
+
+      {/* RCFA owner/admin: unified save/cancel bar for completion notes + work completed date */}
+      {canEdit && isActionsOpen && hasRcfaOwnerChanges && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSaveRcfaOwnerChanges}
+            disabled={loading}
+            className={btnPrimary}
+          >
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelRcfaOwnerChanges}
+            className={btnSecondary}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Item-owner-only: combined save/cancel for status + notes + date changes */}
+      {!canEdit && isItemOwner && isActionsOpen && hasItemOwnerChanges && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSaveItemOwnerChanges}
+            disabled={loading}
+            className={btnPrimary}
+          >
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelItemOwnerChanges}
+            className={btnSecondary}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Created-by footer */}
       <div className="border-t border-zinc-200 pt-3 dark:border-zinc-700">
@@ -327,7 +495,7 @@ function ViewMode({
         <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>
       )}
 
-      {/* Edit / Delete buttons */}
+      {/* Edit / Delete buttons -- only for RCFA owner / admin (canEdit) */}
       {canEdit && (
         <div className="flex items-center gap-2">
           <button
@@ -381,13 +549,16 @@ function EditMode({
   actionItem,
   rcfaId,
   onModeChange,
+  rcfaStatus,
 }: {
   actionItem: ActionItemData;
   rcfaId: string;
   onModeChange: (mode: DrawerMode) => void;
+  rcfaStatus?: string;
 }) {
   const router = useRouter();
   const pendingRef = useRef(false);
+  const isActionsOpen = rcfaStatus === "actions_open";
 
   const [actionText, setActionText] = useState(actionItem.actionText);
   const [actionDescription, setActionDescription] = useState(
@@ -421,7 +592,7 @@ function EditMode({
             actionText,
             actionDescription: actionDescription || null,
             priority,
-            status: editStatus,
+            ...(isActionsOpen && { status: editStatus }),
             dueDate: dueDate || null,
             ownerUserId: ownerUserId || null,
           }),
@@ -499,16 +670,28 @@ function EditMode({
       {/* Status */}
       <div>
         <label htmlFor="edit-status" className={labelClass}>Status</label>
-        <select
-          id="edit-status"
-          value={editStatus}
-          onChange={(e) => setEditStatus(e.target.value)}
-          className={inputClass}
-        >
-          {USER_SELECTABLE_STATUSES.map((value) => (
-            <option key={value} value={value}>{ACTION_STATUS_LABELS[value]}</option>
-          ))}
-        </select>
+        {isActionsOpen ? (
+          <select
+            id="edit-status"
+            value={editStatus}
+            onChange={(e) => setEditStatus(e.target.value)}
+            className={inputClass}
+          >
+            {USER_SELECTABLE_STATUSES.map((value) => (
+              <option key={value} value={value}>{ACTION_STATUS_LABELS[value]}</option>
+            ))}
+          </select>
+        ) : (
+          <div className="mt-1">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                ACTION_STATUS_COLORS[actionItem.status] ?? ""
+              }`}
+            >
+              {ACTION_STATUS_LABELS[actionItem.status] ?? actionItem.status}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Assigned Owner */}

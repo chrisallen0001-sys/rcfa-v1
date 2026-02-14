@@ -50,7 +50,7 @@ type ApiResponse = {
   totalPages: number;
 };
 
-const ALL_STATUSES: ActionItemStatus[] = ["draft", "open", "in_progress", "blocked", "done", "canceled"];
+const ALL_STATUSES: ActionItemStatus[] = ["open", "in_progress", "blocked", "done", "canceled"];
 const ALL_PRIORITIES: Priority[] = ["high", "medium", "low", "deprioritized"];
 
 const columnHelper = createColumnHelper<ActionItemTableRow>();

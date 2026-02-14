@@ -119,7 +119,7 @@ export async function PATCH(
 
     const existing = await prisma.rcfaActionItem.findUnique({
       where: { id: actionItemId },
-      include: { rcfa: { select: { ownerUserId: true } } },
+      include: { rcfa: { select: { ownerUserId: true, status: true } } },
     });
 
     if (!existing) {
@@ -129,12 +129,79 @@ export async function PATCH(
       );
     }
 
+    // Block transitioning a non-draft item TO draft — draft is system-controlled
+    if (body.status === "draft" && existing.status !== "draft") {
+      return NextResponse.json(
+        { error: "Cannot manually set status to draft" },
+        { status: 403 }
+      );
+    }
+
+    if (existing.rcfa.status === "closed") {
+      return NextResponse.json(
+        { error: "Cannot modify action items on a closed RCFA" },
+        { status: 403 }
+      );
+    }
+
     if (
       existing.rcfa.ownerUserId !== userId &&
       existing.ownerUserId !== userId &&
       role !== "admin"
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Determine the user's role relative to this action item
+    const isAdmin = role === "admin";
+    const isRcfaOwner = existing.rcfa.ownerUserId === userId;
+    const isItemOwnerOnly =
+      existing.ownerUserId === userId && !isRcfaOwner && !isAdmin;
+
+    // Phase-based restrictions during investigation
+    if (existing.rcfa.status === "investigation") {
+      // Item-owner-only users cannot edit anything during investigation (items are draft)
+      if (isItemOwnerOnly) {
+        return NextResponse.json(
+          { error: "Action item owners cannot edit items during investigation phase" },
+          { status: 403 }
+        );
+      }
+
+      // Nobody can modify status, completionNotes, or workCompletedDate during investigation
+      const restrictedFields: string[] = [];
+      if (body.status !== undefined) restrictedFields.push("status");
+      if (body.completionNotes !== undefined) restrictedFields.push("completionNotes");
+      if (body.workCompletedDate !== undefined) restrictedFields.push("workCompletedDate");
+      if (restrictedFields.length > 0) {
+        return NextResponse.json(
+          { error: "Status, action taken, and work completed date cannot be modified during investigation" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Item-owner-only users can only update status, completionNotes, and workCompletedDate
+    if (isItemOwnerOnly) {
+      const restrictedFields = [
+        "actionText",
+        "actionDescription",
+        "ownerUserId",
+        "dueDate",
+        "priority",
+      ];
+      const attemptedRestrictedFields = restrictedFields.filter(
+        (f) => body[f] !== undefined
+      );
+      if (attemptedRestrictedFields.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Action item owners can only update status, action taken, and work completed date",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Fetch owner names for audit trail (if owner is changing)
