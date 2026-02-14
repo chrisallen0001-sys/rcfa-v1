@@ -89,6 +89,11 @@ export async function POST(
         });
       }
 
+      // No active-user validation is needed here: promoted items are created
+      // in "draft" status without an owner (ownerUserId is null). The owner is
+      // assigned later during draft editing, which validates active status at
+      // that point. The finalize endpoint also re-validates owners before
+      // transitioning drafts to open.
       const created = await tx.rcfaActionItem.create({
         data: {
           rcfaId: id,

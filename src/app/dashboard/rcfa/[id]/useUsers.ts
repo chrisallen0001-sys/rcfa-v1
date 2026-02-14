@@ -51,6 +51,8 @@ async function fetchUsers() {
 
 /**
  * Hook that fetches and caches the list of users for assignment dropdowns.
+ * Calls GET /api/users with no status param, which defaults to active-only,
+ * so only active users appear in owner-assignment selects.
  * Uses a module-level cache to prevent duplicate API calls when multiple
  * components need the users list.
  *

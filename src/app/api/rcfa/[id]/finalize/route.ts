@@ -110,6 +110,41 @@ export async function POST(
         throw err;
       }
 
+      // Verify all assigned owners are still active before transitioning to open.
+      // An owner could have been deactivated after being assigned to a draft item.
+      const ownerUserIds = [
+        ...new Set(
+          draftItems
+            .map((item) => item.ownerUserId)
+            .filter((uid): uid is string => uid !== null)
+        ),
+      ];
+
+      if (ownerUserIds.length > 0) {
+        const activeOwners = await tx.appUser.findMany({
+          where: { id: { in: ownerUserIds }, status: "active" },
+          select: { id: true },
+        });
+        const activeOwnerIdSet = new Set(activeOwners.map((o) => o.id));
+
+        const inactiveOwnerItems = draftItems
+          .filter(
+            (item) =>
+              item.ownerUserId !== null &&
+              !activeOwnerIdSet.has(item.ownerUserId)
+          )
+          .map((item) => ({
+            actionItemNumber: item.actionItemNumber,
+            ownerUserId: item.ownerUserId,
+          }));
+
+        if (inactiveOwnerItems.length > 0) {
+          const err = new Error("RCFA_DRAFT_ITEMS_INACTIVE_OWNERS");
+          (err as Error & { payload: unknown }).payload = inactiveOwnerItems;
+          throw err;
+        }
+      }
+
       // Activate all draft items by setting status to open
       if (draftItems.length > 0) {
         await tx.rcfaActionItem.updateMany({
@@ -186,6 +221,18 @@ export async function POST(
         {
           error: "Some action items are incomplete",
           incompleteItems: (error as Error & { payload: unknown }).payload,
+        },
+        { status: 422 }
+      );
+    }
+    if (
+      error instanceof Error &&
+      error.message === "RCFA_DRAFT_ITEMS_INACTIVE_OWNERS"
+    ) {
+      return NextResponse.json(
+        {
+          error: "Some action items are assigned to inactive users",
+          inactiveOwnerItems: (error as Error & { payload: unknown }).payload,
         },
         { status: 422 }
       );
