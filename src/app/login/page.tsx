@@ -12,11 +12,12 @@ function LoginForm() {
   const registered = searchParams.get("registered");
   const pending = searchParams.get("pending");
   const expired = searchParams.get("expired");
+  const reset = searchParams.get("reset");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [showForceReset, setShowForceReset] = useState(false);
+  const [showForceReset, setShowForceReset] = useState(reset === "1");
 
   const handleResetSuccess = useCallback(() => {
     router.push("/dashboard");
@@ -156,6 +157,7 @@ function LoginForm() {
 
       <ChangePasswordModal
         open={showForceReset}
+        // No-op: mandatory modal cannot be dismissed
         onClose={() => {}}
         mandatory
         onSuccess={handleResetSuccess}

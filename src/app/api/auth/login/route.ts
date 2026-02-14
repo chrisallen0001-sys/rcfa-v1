@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       role: user.role,
       displayName: user.displayName,
+      mustResetPassword: user.mustResetPassword,
     });
 
     const response = NextResponse.json({

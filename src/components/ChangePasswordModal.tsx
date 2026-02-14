@@ -24,6 +24,17 @@ export default function ChangePasswordModal({
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open && mandatory) {
+      // Delay slightly to ensure the DOM is ready after render
+      const timer = setTimeout(() => {
+        currentPasswordRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [open, mandatory]);
 
   useEffect(() => {
     if (!open) {
@@ -113,12 +124,17 @@ export default function ChangePasswordModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="change-password-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    >
       <div
         ref={modalRef}
         className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
       >
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h2 id="change-password-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           {mandatory ? "Password Reset Required" : "Change Password"}
         </h2>
         {mandatory && !success && (
@@ -147,6 +163,7 @@ export default function ChangePasswordModal({
                 Current Password
               </label>
               <input
+                ref={currentPasswordRef}
                 id="currentPassword"
                 type="password"
                 required

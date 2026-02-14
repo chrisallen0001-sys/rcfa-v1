@@ -6,6 +6,7 @@ export interface JwtPayload {
   email: string;
   role: AppUserRole;
   displayName: string;
+  mustResetPassword?: boolean;
 }
 
 const TOKEN_COOKIE_NAME = "auth_token";
@@ -20,7 +21,15 @@ function getSecret() {
 }
 
 export async function createToken(payload: JwtPayload): Promise<string> {
-  return new SignJWT({ email: payload.email, role: payload.role, displayName: payload.displayName })
+  const claims: Record<string, unknown> = {
+    email: payload.email,
+    role: payload.role,
+    displayName: payload.displayName,
+  };
+  if (payload.mustResetPassword) {
+    claims.mustResetPassword = true;
+  }
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -35,6 +44,7 @@ export async function verifyToken(token: string): Promise<JwtPayload> {
     email: payload.email as string,
     role: payload.role as AppUserRole,
     displayName: payload.displayName as string,
+    mustResetPassword: payload.mustResetPassword === true,
   };
 }
 

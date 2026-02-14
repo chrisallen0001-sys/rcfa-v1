@@ -28,6 +28,24 @@ export async function proxy(request: NextRequest) {
   try {
     const payload = await verifyToken(token);
 
+    // Enforce server-side password reset: block all routes except allowed ones
+    if (payload.mustResetPassword) {
+      const RESET_ALLOWED_PATHS = ["/api/auth/change-password", "/api/auth/logout", "/login"];
+      const isAllowed = RESET_ALLOWED_PATHS.some((p) => pathname.startsWith(p));
+
+      if (!isAllowed) {
+        if (pathname.startsWith("/api/")) {
+          return NextResponse.json(
+            { error: "Password reset required" },
+            { status: 403 }
+          );
+        }
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("reset", "1");
+        return NextResponse.redirect(loginUrl);
+      }
+    }
+
     const headers = new Headers(request.headers);
     headers.set("x-user-id", payload.sub);
     headers.set("x-user-email", payload.email);

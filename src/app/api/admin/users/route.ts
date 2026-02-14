@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
         displayName: user.displayName,
         role: user.role,
         status: user.status,
+        mustResetPassword: user.mustResetPassword,
       },
       { status: 201 }
     );

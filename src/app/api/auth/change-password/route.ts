@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-context";
+import { createToken, TOKEN_COOKIE_NAME } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,12 +57,30 @@ export async function POST(request: NextRequest) {
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
-    await prisma.appUser.update({
+    const updatedUser = await prisma.appUser.update({
       where: { id: userId },
       data: { passwordHash: newPasswordHash, mustResetPassword: false },
+      select: { id: true, email: true, role: true, displayName: true },
     });
 
-    return NextResponse.json({ success: true });
+    // Re-issue JWT without mustResetPassword so the middleware no longer blocks
+    const newToken = await createToken({
+      sub: updatedUser.id,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      displayName: updatedUser.displayName,
+    });
+
+    const response = NextResponse.json({ success: true });
+    response.cookies.set(TOKEN_COOKIE_NAME, newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return response;
   } catch (error) {
     console.error("POST /api/auth/change-password error:", error);
     return NextResponse.json(

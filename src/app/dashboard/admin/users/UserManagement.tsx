@@ -60,7 +60,6 @@ export default function UserManagement({
       ...prev,
       {
         ...created,
-        mustResetPassword: true,
         status: created.status || "active",
         createdAt: new Date().toISOString().slice(0, 10),
       },
@@ -303,7 +302,7 @@ export default function UserManagement({
                 Status
               </th>
               <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
-                Reset PW
+                Force Reset
               </th>
               <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Created
@@ -378,7 +377,7 @@ export default function UserManagement({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {!isCurrentUser && !isPending ? (
+                    {!isCurrentUser && !isPending && !isDisabled ? (
                       <button
                         type="button"
                         role="switch"

@@ -27,6 +27,14 @@ export async function PATCH(
 
     const { role: newRole, status: newStatus, mustResetPassword } = body;
 
+    // Validate mustResetPassword type if provided
+    if (mustResetPassword !== undefined && typeof mustResetPassword !== "boolean") {
+      return NextResponse.json(
+        { error: "mustResetPassword must be a boolean" },
+        { status: 400 }
+      );
+    }
+
     // Validate that at least one field is provided
     if (!newRole && !newStatus && mustResetPassword === undefined) {
       return NextResponse.json(
