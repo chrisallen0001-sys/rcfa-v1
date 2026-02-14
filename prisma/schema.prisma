@@ -84,7 +84,8 @@ model AppUser {
   displayName  String   @map("display_name")
   role         AppUserRole @default(user)
   status       UserStatus  @default(active)
-  passwordHash String   @map("password_hash")
+  passwordHash      String  @map("password_hash")
+  mustResetPassword Boolean @default(false) @map("must_reset_password")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

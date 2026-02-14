@@ -5,9 +5,18 @@ import { useState, FormEvent, useEffect, useRef } from "react";
 interface ChangePasswordModalProps {
   open: boolean;
   onClose: () => void;
+  /** When true, the modal cannot be dismissed -- no Cancel, no Escape, no click-outside */
+  mandatory?: boolean;
+  /** Called after a successful password change (used in mandatory mode for navigation) */
+  onSuccess?: () => void;
 }
 
-export default function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps) {
+export default function ChangePasswordModal({
+  open,
+  onClose,
+  mandatory = false,
+  onSuccess,
+}: ChangePasswordModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -28,17 +37,22 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && open && !loading) {
+      if (e.key === "Escape" && open && !loading && !mandatory) {
         onClose();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose, loading]);
+  }, [open, onClose, loading, mandatory]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (modalRef.current && !modalRef.current.contains(e.target as Node) && !loading) {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(e.target as Node) &&
+        !loading &&
+        !mandatory
+      ) {
         onClose();
       }
     }
@@ -46,7 +60,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [open, onClose, loading]);
+  }, [open, onClose, loading, mandatory]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -83,7 +97,11 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
 
       setSuccess(true);
       setTimeout(() => {
-        onClose();
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          onClose();
+        }
       }, 1500);
     } catch {
       setError("Something went wrong. Please try again.");
@@ -101,12 +119,17 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
         className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
       >
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Change Password
+          {mandatory ? "Password Reset Required" : "Change Password"}
         </h2>
+        {mandatory && !success && (
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            You must set a new password before you can continue.
+          </p>
+        )}
 
         {success ? (
           <div className="mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
-            Password changed successfully!
+            Password changed successfully!{mandatory ? " Redirecting..." : ""}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -174,20 +197,22 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={loading}
-                className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
+              {!mandatory && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={loading}
                 className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
-                {loading ? "Saving..." : "Change Password"}
+                {loading ? "Saving..." : mandatory ? "Set New Password" : "Change Password"}
               </button>
             </div>
           </form>

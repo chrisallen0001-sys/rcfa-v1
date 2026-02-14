@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState, FormEvent } from "react";
+import { Suspense, useState, useCallback, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AletheiaLogo from "@/components/AletheiaLogo";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 function LoginForm() {
   const router = useRouter();
@@ -15,6 +16,11 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showForceReset, setShowForceReset] = useState(false);
+
+  const handleResetSuccess = useCallback(() => {
+    router.push("/dashboard");
+  }, [router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,6 +42,13 @@ function LoginForm() {
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Login failed.");
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data.mustResetPassword) {
+        setShowForceReset(true);
         return;
       }
 
@@ -126,7 +139,7 @@ function LoginForm() {
             disabled={submitting}
             className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            {submitting ? "Signing in…" : "Sign in"}
+            {submitting ? "Signing in\u2026" : "Sign in"}
           </button>
         </form>
 
@@ -140,6 +153,13 @@ function LoginForm() {
           </Link>
         </p>
       </div>
+
+      <ChangePasswordModal
+        open={showForceReset}
+        onClose={() => {}}
+        mandatory
+        onSuccess={handleResetSuccess}
+      />
     </div>
   );
 }

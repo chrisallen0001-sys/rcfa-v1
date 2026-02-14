@@ -18,6 +18,7 @@ export async function GET() {
         displayName: true,
         role: true,
         status: true,
+        mustResetPassword: true,
         createdAt: true,
       },
       orderBy: { createdAt: "asc" },
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
         email: emailNormalized,
         displayName: displayName.trim(),
         passwordHash,
+        mustResetPassword: true,
         ...(newRole ? { role: newRole as "admin" | "user" } : {}),
       },
     });
