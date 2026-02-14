@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 type User = {
   id: string;
@@ -40,7 +41,14 @@ export default function UserManagement({
     const email = (data.get("email") as string).trim();
     const displayName = (data.get("displayName") as string).trim();
     const password = data.get("password") as string;
+    const confirmPassword = data.get("confirmPassword") as string;
     const role = data.get("role") as string;
+
+    if (password !== confirmPassword) {
+      setFormError("Passwords do not match.");
+      setSaving(false);
+      return;
+    }
 
     const res = await fetch("/api/admin/users", {
       method: "POST",
@@ -517,18 +525,20 @@ export default function UserManagement({
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Password
-                </label>
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                />
-              </div>
+              <PasswordInput
+                name="password"
+                label="Password"
+                required
+                minLength={8}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+              <PasswordInput
+                name="confirmPassword"
+                label="Confirm Password"
+                required
+                minLength={8}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              />
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   Role
