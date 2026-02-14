@@ -50,31 +50,35 @@ export default function UserManagement({
       return;
     }
 
-    const res = await fetch("/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, displayName, password, role }),
-    });
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, displayName, password, role }),
+      });
 
-    if (!res.ok) {
-      const body = await res.json();
-      setFormError(body.error || "Failed to create user");
+      if (!res.ok) {
+        const body = await res.json();
+        setFormError(body.error || "Failed to create user");
+        return;
+      }
+
+      const created = await res.json();
+      setUsers((prev) => [
+        ...prev,
+        {
+          ...created,
+          status: created.status || "active",
+          createdAt: new Date().toISOString().slice(0, 10),
+        },
+      ]);
+      setShowForm(false);
+      form.reset();
+    } catch {
+      setFormError("Something went wrong. Please try again.");
+    } finally {
       setSaving(false);
-      return;
     }
-
-    const created = await res.json();
-    setUsers((prev) => [
-      ...prev,
-      {
-        ...created,
-        status: created.status || "active",
-        createdAt: new Date().toISOString().slice(0, 10),
-      },
-    ]);
-    setShowForm(false);
-    setSaving(false);
-    form.reset();
   }
 
   async function handleToggleRole(user: User) {
@@ -526,17 +530,21 @@ export default function UserManagement({
                 />
               </div>
               <PasswordInput
+                id="createUserPassword"
                 name="password"
                 label="Password"
                 required
                 minLength={8}
+                wrapperClassName="sm:col-span-2"
                 className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
               />
               <PasswordInput
+                id="createUserConfirmPassword"
                 name="confirmPassword"
                 label="Confirm Password"
                 required
                 minLength={8}
+                wrapperClassName="sm:col-span-2"
                 className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
               />
               <div>

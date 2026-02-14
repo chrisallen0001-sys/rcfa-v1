@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, forwardRef, type InputHTMLAttributes } from "react";
+import { useState, forwardRef, useId, type InputHTMLAttributes } from "react";
 
 interface PasswordInputProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
@@ -23,12 +23,14 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
     ref,
   ) {
     const [visible, setVisible] = useState(false);
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
 
     return (
       <div className={wrapperClassName}>
         {label && (
           <label
-            htmlFor={id}
+            htmlFor={inputId}
             className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
           >
             {label}
@@ -37,7 +39,7 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
         <div className="relative">
           <input
             ref={ref}
-            id={id}
+            id={inputId}
             type={visible ? "text" : "password"}
             className={`${className ?? ""} pr-10`}
             {...inputProps}

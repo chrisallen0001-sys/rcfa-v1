@@ -19,7 +19,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
 
-    if (!email.trim() || !displayName.trim() || !password) {
+    if (!email.trim() || !displayName.trim() || !password || !confirmPassword) {
       setError("All fields are required.");
       return;
     }
