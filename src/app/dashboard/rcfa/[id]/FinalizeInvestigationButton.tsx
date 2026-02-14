@@ -192,8 +192,7 @@ export default function FinalizeInvestigationButton({
 // ---------------------------------------------------------------------------
 
 function IncompleteItemsBanner({ items, onDismiss }: { items: IncompleteItem[]; onDismiss: () => void }) {
-  const sorted = [...items].sort((a, b) => a.actionItemNumber - b.actionItemNumber);
-  const displayed = sorted.slice(0, MAX_DISPLAYED_ITEMS);
+  const displayed = items.slice(0, MAX_DISPLAYED_ITEMS);
   const remaining = items.length - displayed.length;
 
   return (
