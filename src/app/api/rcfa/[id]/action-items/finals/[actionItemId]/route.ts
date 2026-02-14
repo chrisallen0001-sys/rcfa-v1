@@ -32,14 +32,6 @@ export async function PATCH(
     const body = await request.json();
     const actionText =
       typeof body.actionText === "string" ? body.actionText.trim() : "";
-    // Block setting status to "draft" for all roles — draft is system-controlled
-    if (body.status === "draft") {
-      return NextResponse.json(
-        { error: "Cannot manually set status to draft" },
-        { status: 403 }
-      );
-    }
-
     if (
       typeof body.priority === "string" &&
       !VALID_PRIORITIES.includes(body.priority as Priority)
@@ -152,6 +144,11 @@ export async function PATCH(
         throw new Error("NOT_FOUND");
       }
 
+      // Block transitioning a non-draft item TO draft — draft is system-controlled
+      if (status === "draft" && existing.status !== "draft") {
+        throw new Error("CANNOT_SET_DRAFT");
+      }
+
       const record = await tx.rcfaActionItem.update({
         where: { id: actionItemId },
         data: {
@@ -207,6 +204,12 @@ export async function PATCH(
         return NextResponse.json(
           { error: "Action item not found" },
           { status: 404 }
+        );
+      }
+      if (error.message === "CANNOT_SET_DRAFT") {
+        return NextResponse.json(
+          { error: "Cannot manually set status to draft" },
+          { status: 403 }
         );
       }
     }

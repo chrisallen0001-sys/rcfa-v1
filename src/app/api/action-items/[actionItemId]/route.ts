@@ -30,14 +30,6 @@ export async function PATCH(
 
     const body = await request.json();
 
-    // Block setting status to "draft" for all roles — draft is system-controlled
-    if (body.status === "draft") {
-      return NextResponse.json(
-        { error: "Cannot manually set status to draft" },
-        { status: 403 }
-      );
-    }
-
     // Validate fields
     if (
       body.status !== undefined &&
@@ -134,6 +126,14 @@ export async function PATCH(
       return NextResponse.json(
         { error: "Action item not found" },
         { status: 404 }
+      );
+    }
+
+    // Block transitioning a non-draft item TO draft — draft is system-controlled
+    if (body.status === "draft" && existing.status !== "draft") {
+      return NextResponse.json(
+        { error: "Cannot manually set status to draft" },
+        { status: 403 }
       );
     }
 

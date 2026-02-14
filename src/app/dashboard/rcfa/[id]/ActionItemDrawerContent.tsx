@@ -555,7 +555,9 @@ function EditMode({
     actionItem.actionDescription ?? ""
   );
   const [priority, setPriority] = useState(actionItem.priority as string);
-  const [editStatus, setEditStatus] = useState(actionItem.status as string);
+  const [editStatus, setEditStatus] = useState(
+    actionItem.status === "draft" ? "open" : actionItem.status as string
+  );
   const [dueDate, setDueDate] = useState(actionItem.dueDate ?? "");
   const [ownerUserId, setOwnerUserId] = useState(
     actionItem.ownerUserId ?? ""
