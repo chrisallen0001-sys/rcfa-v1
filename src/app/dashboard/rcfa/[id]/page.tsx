@@ -732,6 +732,7 @@ export default async function RcfaDetailPage({
                   status={sectionStatuses?.trackedActions}
                   initialOpenItemId={resolvedExpandItemId}
                   currentUserId={userId}
+                  rcfaStatus={rcfa.status as "investigation" | "actions_open"}
                 />
               )}
 
@@ -939,6 +940,7 @@ export default async function RcfaDetailPage({
             canEdit={false}
             initialOpenItemId={resolvedExpandItemId}
             currentUserId={userId}
+            rcfaStatus="closed"
           />
         )}
 

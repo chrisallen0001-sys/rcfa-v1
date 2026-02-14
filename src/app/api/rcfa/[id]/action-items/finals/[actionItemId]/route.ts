@@ -149,6 +149,23 @@ export async function PATCH(
         throw new Error("CANNOT_SET_DRAFT");
       }
 
+      // Phase-based field restrictions: during investigation, status/completionNotes/workCompletedDate cannot be modified
+      if (locked.status === "investigation") {
+        const restrictedFields: string[] = [];
+        if (status !== undefined && status !== existing.status) {
+          restrictedFields.push("status");
+        }
+        if (body.completionNotes !== undefined) {
+          restrictedFields.push("completionNotes");
+        }
+        if (workCompletedDate !== undefined) {
+          restrictedFields.push("workCompletedDate");
+        }
+        if (restrictedFields.length > 0) {
+          throw new Error("INVESTIGATION_FIELD_RESTRICTED");
+        }
+      }
+
       const record = await tx.rcfaActionItem.update({
         where: { id: actionItemId },
         data: {
@@ -209,6 +226,12 @@ export async function PATCH(
       if (error.message === "CANNOT_SET_DRAFT") {
         return NextResponse.json(
           { error: "Cannot manually set status to draft" },
+          { status: 403 }
+        );
+      }
+      if (error.message === "INVESTIGATION_FIELD_RESTRICTED") {
+        return NextResponse.json(
+          { error: "Status, action taken, and work completed date cannot be modified during investigation" },
           { status: 403 }
         );
       }

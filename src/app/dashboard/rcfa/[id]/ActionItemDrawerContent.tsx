@@ -46,6 +46,8 @@ export interface ActionItemDrawerContentProps {
   onModeChange: (mode: DrawerMode) => void;
   /** Current authenticated user ID for item-owner permission checks */
   currentUserId?: string;
+  /** RCFA workflow status for phase-based permission enforcement */
+  rcfaStatus?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +84,7 @@ export default function ActionItemDrawerContent({
   onClose,
   onModeChange,
   currentUserId,
+  rcfaStatus,
 }: ActionItemDrawerContentProps) {
   if (mode === "view") {
     if (!actionItem) return null;
@@ -93,6 +96,7 @@ export default function ActionItemDrawerContent({
         onClose={onClose}
         onModeChange={onModeChange}
         currentUserId={currentUserId}
+        rcfaStatus={rcfaStatus}
       />
     );
   }
@@ -104,6 +108,7 @@ export default function ActionItemDrawerContent({
         actionItem={actionItem}
         rcfaId={rcfaId}
         onModeChange={onModeChange}
+        rcfaStatus={rcfaStatus}
       />
     );
   }
@@ -122,6 +127,7 @@ function ViewMode({
   onClose,
   onModeChange,
   currentUserId,
+  rcfaStatus,
 }: {
   actionItem: ActionItemData;
   canEdit: boolean;
@@ -129,6 +135,7 @@ function ViewMode({
   onClose: () => void;
   onModeChange: (mode: DrawerMode) => void;
   currentUserId?: string;
+  rcfaStatus?: string;
 }) {
   const router = useRouter();
   const pendingRef = useRef(false);
@@ -139,9 +146,9 @@ function ViewMode({
   // Item-owner detection: user owns this action item but is NOT the RCFA owner/admin
   const isItemOwner =
     !!currentUserId && actionItem.ownerUserId === currentUserId;
-  const isDraft = actionItem.status === "draft";
-  // Can inline-edit fields that item owners are permitted to change
-  const canInlineEdit = canEdit || (isItemOwner && !isDraft);
+  const isActionsOpen = rcfaStatus === "actions_open";
+  // Can inline-edit fields that item owners are permitted to change (only during actions_open)
+  const canInlineEdit = (canEdit || isItemOwner) && isActionsOpen;
 
   // Completion notes inline editing
   const [completionNotes, setCompletionNotes] = useState(
@@ -321,8 +328,8 @@ function ViewMode({
       {/* Detail fields - single column for narrow drawer */}
       <div className="space-y-3">
         <DetailField label="Status">
-          {/* Item owners (non-admin, non-RCFA-owner) can change status inline, unless draft */}
-          {!canEdit && isItemOwner && !isDraft ? (
+          {/* Item owners (non-admin, non-RCFA-owner) can change status inline during actions_open */}
+          {!canEdit && isItemOwner && isActionsOpen ? (
             <select
               value={inlineStatus}
               onChange={(e) => setInlineStatus(e.target.value)}
@@ -376,7 +383,7 @@ function ViewMode({
             Action Taken
           </span>
         </label>
-        {canEdit ? (
+        {canEdit && isActionsOpen ? (
           <div className="mt-1">
             <textarea
               id="view-completionNotes"
@@ -393,7 +400,7 @@ function ViewMode({
               </span>
             </div>
           </div>
-        ) : !canEdit && isItemOwner && !isDraft ? (
+        ) : !canEdit && isItemOwner && isActionsOpen ? (
           <div className="mt-1">
             <textarea
               id="view-completionNotes"
@@ -435,7 +442,7 @@ function ViewMode({
       )}
 
       {/* RCFA owner/admin: unified save/cancel bar for completion notes + work completed date */}
-      {canEdit && hasRcfaOwnerChanges && (
+      {canEdit && isActionsOpen && hasRcfaOwnerChanges && (
         <div className="flex gap-2">
           <button
             type="button"
@@ -456,7 +463,7 @@ function ViewMode({
       )}
 
       {/* Item-owner-only: combined save/cancel for status + notes + date changes */}
-      {!canEdit && isItemOwner && !isDraft && hasItemOwnerChanges && (
+      {!canEdit && isItemOwner && isActionsOpen && hasItemOwnerChanges && (
         <div className="flex gap-2">
           <button
             type="button"
@@ -542,22 +549,23 @@ function EditMode({
   actionItem,
   rcfaId,
   onModeChange,
+  rcfaStatus,
 }: {
   actionItem: ActionItemData;
   rcfaId: string;
   onModeChange: (mode: DrawerMode) => void;
+  rcfaStatus?: string;
 }) {
   const router = useRouter();
   const pendingRef = useRef(false);
+  const isActionsOpen = rcfaStatus === "actions_open";
 
   const [actionText, setActionText] = useState(actionItem.actionText);
   const [actionDescription, setActionDescription] = useState(
     actionItem.actionDescription ?? ""
   );
   const [priority, setPriority] = useState(actionItem.priority as string);
-  const [editStatus, setEditStatus] = useState(
-    actionItem.status === "draft" ? "open" : actionItem.status as string
-  );
+  const [editStatus, setEditStatus] = useState(actionItem.status as string);
   const [dueDate, setDueDate] = useState(actionItem.dueDate ?? "");
   const [ownerUserId, setOwnerUserId] = useState(
     actionItem.ownerUserId ?? ""
@@ -584,7 +592,7 @@ function EditMode({
             actionText,
             actionDescription: actionDescription || null,
             priority,
-            status: editStatus,
+            ...(isActionsOpen && { status: editStatus }),
             dueDate: dueDate || null,
             ownerUserId: ownerUserId || null,
           }),
@@ -662,16 +670,28 @@ function EditMode({
       {/* Status */}
       <div>
         <label htmlFor="edit-status" className={labelClass}>Status</label>
-        <select
-          id="edit-status"
-          value={editStatus}
-          onChange={(e) => setEditStatus(e.target.value)}
-          className={inputClass}
-        >
-          {USER_SELECTABLE_STATUSES.map((value) => (
-            <option key={value} value={value}>{ACTION_STATUS_LABELS[value]}</option>
-          ))}
-        </select>
+        {isActionsOpen ? (
+          <select
+            id="edit-status"
+            value={editStatus}
+            onChange={(e) => setEditStatus(e.target.value)}
+            className={inputClass}
+          >
+            {USER_SELECTABLE_STATUSES.map((value) => (
+              <option key={value} value={value}>{ACTION_STATUS_LABELS[value]}</option>
+            ))}
+          </select>
+        ) : (
+          <div className="mt-1">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                ACTION_STATUS_COLORS[actionItem.status] ?? ""
+              }`}
+            >
+              {ACTION_STATUS_LABELS[actionItem.status] ?? actionItem.status}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Assigned Owner */}

@@ -26,6 +26,8 @@ interface FinalActionItemsSectionProps {
   initialOpenItemId?: string;
   /** Current authenticated user ID for item-owner permission checks */
   currentUserId?: string;
+  /** RCFA workflow status for phase-based permission enforcement */
+  rcfaStatus?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +41,7 @@ export default function FinalActionItemsSection({
   status,
   initialOpenItemId,
   currentUserId,
+  rcfaStatus,
 }: FinalActionItemsSectionProps) {
   // Use a primitive string (or null) as the deep-link dependency for referential stability
   const deepLinkTargetId = initialOpenItemId
@@ -203,6 +206,7 @@ export default function FinalActionItemsSection({
           onClose={handleDrawerClose}
           onModeChange={handleModeChange}
           currentUserId={currentUserId}
+          rcfaStatus={rcfaStatus}
         />
       </ActionItemDrawer>
     </section>

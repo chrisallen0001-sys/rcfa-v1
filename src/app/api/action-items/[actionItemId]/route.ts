@@ -158,6 +158,29 @@ export async function PATCH(
     const isItemOwnerOnly =
       existing.ownerUserId === userId && !isRcfaOwner && !isAdmin;
 
+    // Phase-based restrictions during investigation
+    if (existing.rcfa.status === "investigation") {
+      // Item-owner-only users cannot edit anything during investigation (items are draft)
+      if (isItemOwnerOnly) {
+        return NextResponse.json(
+          { error: "Action item owners cannot edit items during investigation phase" },
+          { status: 403 }
+        );
+      }
+
+      // Nobody can modify status, completionNotes, or workCompletedDate during investigation
+      const restrictedFields: string[] = [];
+      if (body.status !== undefined) restrictedFields.push("status");
+      if (body.completionNotes !== undefined) restrictedFields.push("completionNotes");
+      if (body.workCompletedDate !== undefined) restrictedFields.push("workCompletedDate");
+      if (restrictedFields.length > 0) {
+        return NextResponse.json(
+          { error: "Status, action taken, and work completed date cannot be modified during investigation" },
+          { status: 403 }
+        );
+      }
+    }
+
     // Item-owner-only users can only update status, completionNotes, and workCompletedDate
     if (isItemOwnerOnly) {
       const restrictedFields = [
