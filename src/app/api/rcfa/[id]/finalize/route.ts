@@ -70,7 +70,6 @@ export async function POST(
 
       const incompleteItems: {
         actionItemNumber: number;
-        actionText: string;
         missingFields: string[];
       }[] = [];
 
@@ -100,7 +99,6 @@ export async function POST(
         if (missingFields.length > 0) {
           incompleteItems.push({
             actionItemNumber: item.actionItemNumber,
-            actionText: item.actionText || `(Action Item #${item.actionItemNumber})`,
             missingFields,
           });
         }
