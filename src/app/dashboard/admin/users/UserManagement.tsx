@@ -8,6 +8,7 @@ type User = {
   displayName: string;
   role: string;
   status: string;
+  mustResetPassword: boolean;
   createdAt: string;
 };
 
@@ -115,6 +116,33 @@ export default function UserManagement({
     } else {
       const body = await res.json();
       setActionError(body.error || "Failed to update status");
+    }
+    setTogglingId(null);
+  }
+
+  async function handleToggleMustResetPassword(user: User) {
+    setTogglingId(user.id);
+    setActionError("");
+    const newValue = !user.mustResetPassword;
+
+    const res = await fetch(`/api/admin/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mustResetPassword: newValue }),
+    });
+
+    if (res.ok) {
+      const updated = await res.json();
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? { ...u, mustResetPassword: updated.mustResetPassword }
+            : u
+        )
+      );
+    } else {
+      const body = await res.json();
+      setActionError(body.error || "Failed to update password reset flag");
     }
     setTogglingId(null);
   }
@@ -274,6 +302,9 @@ export default function UserManagement({
                 Status
               </th>
               <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+                Force Reset
+              </th>
+              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Created
               </th>
               <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
@@ -344,6 +375,33 @@ export default function UserManagement({
                     >
                       {isPending ? "Pending" : isDisabled ? "Disabled" : "Active"}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {!isCurrentUser && !isPending && !isDisabled ? (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={user.mustResetPassword}
+                        aria-label={`Force password reset for ${user.displayName}`}
+                        disabled={togglingId === user.id}
+                        onClick={() => handleToggleMustResetPassword(user)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                          user.mustResetPassword
+                            ? "bg-amber-500 dark:bg-amber-600"
+                            : "bg-zinc-200 dark:bg-zinc-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ease-in-out ${
+                            user.mustResetPassword ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    ) : (
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                        --
+                      </span>
+                    )}
                   </td>
                   <td
                     className={`px-4 py-3 ${

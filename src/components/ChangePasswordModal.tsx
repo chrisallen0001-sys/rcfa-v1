@@ -5,9 +5,24 @@ import { useState, FormEvent, useEffect, useRef } from "react";
 interface ChangePasswordModalProps {
   open: boolean;
   onClose: () => void;
+  /** When true, the modal cannot be dismissed -- no Cancel, no Escape, no click-outside */
+  mandatory?: boolean;
+  /** Called after a successful password change (used in mandatory mode for navigation) */
+  onSuccess?: () => void;
+  /** Called when the user clicks "Sign out" in mandatory mode */
+  onLogout?: () => void;
+  /** When true, the logout request is in flight (disables the Sign out button) */
+  loggingOut?: boolean;
 }
 
-export default function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps) {
+export default function ChangePasswordModal({
+  open,
+  onClose,
+  mandatory = false,
+  onSuccess,
+  onLogout,
+  loggingOut = false,
+}: ChangePasswordModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -15,6 +30,17 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open && mandatory) {
+      // Delay slightly to ensure the DOM is ready after render
+      const timer = setTimeout(() => {
+        currentPasswordRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [open, mandatory]);
 
   useEffect(() => {
     if (!open) {
@@ -28,17 +54,22 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && open && !loading) {
+      if (e.key === "Escape" && open && !loading && !mandatory) {
         onClose();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose, loading]);
+  }, [open, onClose, loading, mandatory]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (modalRef.current && !modalRef.current.contains(e.target as Node) && !loading) {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(e.target as Node) &&
+        !loading &&
+        !mandatory
+      ) {
         onClose();
       }
     }
@@ -46,7 +77,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [open, onClose, loading]);
+  }, [open, onClose, loading, mandatory]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -83,7 +114,11 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
 
       setSuccess(true);
       setTimeout(() => {
-        onClose();
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          onClose();
+        }
       }, 1500);
     } catch {
       setError("Something went wrong. Please try again.");
@@ -95,18 +130,28 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="change-password-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    >
       <div
         ref={modalRef}
         className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900"
       >
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Change Password
+        <h2 id="change-password-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          {mandatory ? "Password Reset Required" : "Change Password"}
         </h2>
+        {mandatory && !success && (
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            You must set a new password before you can continue.
+          </p>
+        )}
 
         {success ? (
           <div className="mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
-            Password changed successfully!
+            Password changed successfully!{mandatory ? " Redirecting..." : ""}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -124,6 +169,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
                 Current Password
               </label>
               <input
+                ref={currentPasswordRef}
                 id="currentPassword"
                 type="password"
                 required
@@ -174,22 +220,38 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={loading}
-                className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
+              {!mandatory && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={loading}
                 className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
-                {loading ? "Saving..." : "Change Password"}
+                {loading ? "Saving..." : mandatory ? "Set New Password" : "Change Password"}
               </button>
             </div>
+
+            {mandatory && onLogout && (
+              <p className="pt-2 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                Not you?{" "}
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  disabled={loading || loggingOut}
+                  className="font-medium text-zinc-700 hover:text-zinc-900 hover:underline disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  {loggingOut ? "Signing out\u2026" : "Sign out"}
+                </button>
+              </p>
+            )}
           </form>
         )}
       </div>

@@ -22,6 +22,7 @@ export default async function AdminUsersPage() {
       displayName: true,
       role: true,
       status: true,
+      mustResetPassword: true,
       createdAt: true,
     },
     orderBy: { createdAt: "asc" },
@@ -42,6 +43,7 @@ export default async function AdminUsersPage() {
     displayName: u.displayName,
     role: u.role as string,
     status: u.status as string,
+    mustResetPassword: u.mustResetPassword,
     createdAt: u.createdAt.toISOString().slice(0, 10),
   }));
 

@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       role: user.role,
       displayName: user.displayName,
+      mustResetPassword: user.mustResetPassword,
     });
 
     const response = NextResponse.json({
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       displayName: user.displayName,
       role: user.role,
+      mustResetPassword: user.mustResetPassword,
     });
 
     response.cookies.set(TOKEN_COOKIE_NAME, token, {

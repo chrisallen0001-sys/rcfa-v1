@@ -15,7 +15,7 @@ export async function PATCH(
 
     const { userId } = await params;
 
-    let body: { role?: string; status?: string };
+    let body: { role?: string; status?: string; mustResetPassword?: boolean };
     try {
       body = await request.json();
     } catch {
@@ -25,12 +25,20 @@ export async function PATCH(
       );
     }
 
-    const { role: newRole, status: newStatus } = body;
+    const { role: newRole, status: newStatus, mustResetPassword } = body;
+
+    // Validate mustResetPassword type if provided
+    if (mustResetPassword !== undefined && typeof mustResetPassword !== "boolean") {
+      return NextResponse.json(
+        { error: "mustResetPassword must be a boolean" },
+        { status: 400 }
+      );
+    }
 
     // Validate that at least one field is provided
-    if (!newRole && !newStatus) {
+    if (!newRole && !newStatus && mustResetPassword === undefined) {
       return NextResponse.json(
-        { error: "At least one of role or status is required" },
+        { error: "At least one of role, status, or mustResetPassword is required" },
         { status: 400 }
       );
     }
@@ -76,12 +84,15 @@ export async function PATCH(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const updateData: { role?: "admin" | "user"; status?: UserStatus } = {};
+    const updateData: { role?: "admin" | "user"; status?: UserStatus; mustResetPassword?: boolean } = {};
     if (newRole) {
       updateData.role = newRole as "admin" | "user";
     }
     if (newStatus) {
       updateData.status = newStatus as UserStatus;
+    }
+    if (mustResetPassword !== undefined) {
+      updateData.mustResetPassword = mustResetPassword;
     }
 
     const updated = await prisma.appUser.update({
@@ -93,6 +104,7 @@ export async function PATCH(
         displayName: true,
         role: true,
         status: true,
+        mustResetPassword: true,
       },
     });
 
