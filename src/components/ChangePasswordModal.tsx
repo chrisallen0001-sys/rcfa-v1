@@ -9,6 +9,8 @@ interface ChangePasswordModalProps {
   mandatory?: boolean;
   /** Called after a successful password change (used in mandatory mode for navigation) */
   onSuccess?: () => void;
+  /** Called when the user clicks "Sign out" in mandatory mode */
+  onLogout?: () => void;
 }
 
 export default function ChangePasswordModal({
@@ -16,6 +18,7 @@ export default function ChangePasswordModal({
   onClose,
   mandatory = false,
   onSuccess,
+  onLogout,
 }: ChangePasswordModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -232,6 +235,20 @@ export default function ChangePasswordModal({
                 {loading ? "Saving..." : mandatory ? "Set New Password" : "Change Password"}
               </button>
             </div>
+
+            {mandatory && onLogout && (
+              <p className="pt-2 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                Not you?{" "}
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  disabled={loading}
+                  className="font-medium text-zinc-700 hover:text-zinc-900 hover:underline disabled:opacity-50 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  Sign out
+                </button>
+              </p>
+            )}
           </form>
         )}
       </div>

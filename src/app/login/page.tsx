@@ -23,6 +23,17 @@ function LoginForm() {
     router.push("/dashboard");
   }, [router]);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Even if the logout request fails, clear local state so the user
+      // can attempt to sign in again.
+    }
+    setShowForceReset(false);
+    router.replace("/login");
+  }, [router]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -161,6 +172,7 @@ function LoginForm() {
         onClose={() => {}}
         mandatory
         onSuccess={handleResetSuccess}
+        onLogout={handleLogout}
       />
     </div>
   );
