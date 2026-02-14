@@ -606,12 +606,13 @@ export function RcfaPdfDocument({ rcfa }: RcfaPdfDocumentProps) {
             <SectionHeader title="Action Items" />
             {/* Table header */}
             <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderText, { width: "10%" }]}>#</Text>
-              <Text style={[styles.tableHeaderText, { width: "28%" }]}>Title</Text>
-              <Text style={[styles.tableHeaderText, { width: "12%" }]}>Priority</Text>
-              <Text style={[styles.tableHeaderText, { width: "14%" }]}>Status</Text>
-              <Text style={[styles.tableHeaderText, { width: "18%" }]}>Owner</Text>
-              <Text style={[styles.tableHeaderText, { width: "18%" }]}>Due Date</Text>
+              <Text style={[styles.tableHeaderText, { width: "8%" }]}>#</Text>
+              <Text style={[styles.tableHeaderText, { width: "24%" }]}>Title</Text>
+              <Text style={[styles.tableHeaderText, { width: "10%" }]}>Priority</Text>
+              <Text style={[styles.tableHeaderText, { width: "12%" }]}>Status</Text>
+              <Text style={[styles.tableHeaderText, { width: "16%" }]}>Owner</Text>
+              <Text style={[styles.tableHeaderText, { width: "15%" }]}>Due Date</Text>
+              <Text style={[styles.tableHeaderText, { width: "15%" }]}>Work Completed</Text>
             </View>
             {/* Table rows */}
             {rcfa.actionItems.map((ai, idx) => (
@@ -622,21 +623,24 @@ export function RcfaPdfDocument({ rcfa }: RcfaPdfDocumentProps) {
                     idx % 2 === 1 ? styles.tableRowStriped : {},
                   ]}
                 >
-                  <Text style={[styles.tableCell, { width: "10%", fontFamily: "Helvetica-Bold" }]}>
+                  <Text style={[styles.tableCell, { width: "8%", fontFamily: "Helvetica-Bold" }]}>
                     {formatActionItemNumber(ai.actionItemNumber)}
                   </Text>
-                  <Text style={[styles.tableCell, { width: "28%" }]}>{ai.actionText}</Text>
-                  <View style={{ width: "12%" }}>
+                  <Text style={[styles.tableCell, { width: "24%" }]}>{ai.actionText}</Text>
+                  <View style={{ width: "10%" }}>
                     <PriorityBadge priority={ai.priority} />
                   </View>
-                  <View style={{ width: "14%" }}>
+                  <View style={{ width: "12%" }}>
                     <ActionStatusBadge status={ai.status} />
                   </View>
-                  <Text style={[styles.tableCell, { width: "18%" }]}>
+                  <Text style={[styles.tableCell, { width: "16%" }]}>
                     {ai.owner?.displayName ?? "\u2014"}
                   </Text>
-                  <Text style={[styles.tableCell, { width: "18%" }]}>
+                  <Text style={[styles.tableCell, { width: "15%" }]}>
                     {ai.dueDate ? formatDateShort(ai.dueDate) : "\u2014"}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: "15%" }]}>
+                    {ai.workCompletedDate ? formatDateShort(ai.workCompletedDate) : "\u2014"}
                   </Text>
                 </View>
 

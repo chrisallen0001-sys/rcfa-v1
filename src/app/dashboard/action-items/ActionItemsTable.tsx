@@ -34,6 +34,7 @@ export type ActionItemTableRow = {
   priority: Priority;
   status: ActionItemStatus;
   dueDate: string | null;
+  workCompletedDate: string | null;
   createdAt: string;
   ownerUserId: string | null;
   ownerDisplayName: string | null;
@@ -59,6 +60,7 @@ const columnHelper = createColumnHelper<ActionItemTableRow>();
 function toApiSortColumn(id: string): string {
   const map: Record<string, string> = {
     dueDate: "due_date",
+    workCompletedDate: "work_completed_date",
     createdAt: "created_at",
     ownerDisplayName: "owner_display_name",
     actionItemNumber: "action_item_number",
@@ -72,6 +74,7 @@ function toApiSortColumn(id: string): string {
 function fromApiSortColumn(col: string): string {
   const map: Record<string, string> = {
     due_date: "dueDate",
+    work_completed_date: "workCompletedDate",
     created_at: "createdAt",
     owner_display_name: "ownerDisplayName",
     action_item_number: "actionItemNumber",
@@ -149,6 +152,19 @@ function parseFiltersFromUrl(sp: URLSearchParams): ColumnFiltersState {
     filters.push({ id: "createdAt", value: `before:${validCreatedTo}` });
   }
 
+  // Work completed date: combine workCompletedFrom/workCompletedTo (skip malformed dates)
+  const workCompletedFrom = sp.get("workCompletedFrom");
+  const workCompletedTo = sp.get("workCompletedTo");
+  const validWorkCompletedFrom = workCompletedFrom && isValidDate(workCompletedFrom) ? workCompletedFrom : null;
+  const validWorkCompletedTo = workCompletedTo && isValidDate(workCompletedTo) ? workCompletedTo : null;
+  if (validWorkCompletedFrom && validWorkCompletedTo) {
+    filters.push({ id: "workCompletedDate", value: `range:${validWorkCompletedFrom},${validWorkCompletedTo}` });
+  } else if (validWorkCompletedFrom) {
+    filters.push({ id: "workCompletedDate", value: `after:${validWorkCompletedFrom}` });
+  } else if (validWorkCompletedTo) {
+    filters.push({ id: "workCompletedDate", value: `before:${validWorkCompletedTo}` });
+  }
+
   return filters;
 }
 
@@ -200,6 +216,16 @@ function applyFiltersToApiParams(
         }
         break;
       }
+      case "workCompletedDate": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if (mode === "after" && from) params.set("workCompletedDateFrom", from);
+        if (mode === "before" && to) params.set("workCompletedDateTo", to);
+        if (mode === "range") {
+          if (from) params.set("workCompletedDateFrom", from);
+          if (to) params.set("workCompletedDateTo", to);
+        }
+        break;
+      }
     }
   }
 }
@@ -248,6 +274,12 @@ function filtersToUrlParams(
         const { mode, from, to } = parseDateRangeValue(val as string);
         if ((mode === "after" || mode === "range") && from) params.set("createdFrom", from);
         if ((mode === "before" || mode === "range") && to) params.set("createdTo", to);
+        break;
+      }
+      case "workCompletedDate": {
+        const { mode, from, to } = parseDateRangeValue(val as string);
+        if ((mode === "after" || mode === "range") && from) params.set("workCompletedFrom", from);
+        if ((mode === "before" || mode === "range") && to) params.set("workCompletedTo", to);
         break;
       }
     }
@@ -480,6 +512,12 @@ export default function ActionItemsTable() {
           return <span className={dateInfo.colorClass}>{dateInfo.text}</span>;
         },
       }),
+      columnHelper.accessor("workCompletedDate", {
+        header: "Work Completed",
+        size: 130,
+        meta: { filterType: "date-range" },
+        cell: (info) => info.getValue() ?? "\u2014",
+      }),
       columnHelper.accessor("rcfaNumber", {
         header: "RCFA",
         size: 100,
@@ -512,6 +550,7 @@ export default function ActionItemsTable() {
       { header: "Priority", accessor: (row) => PRIORITY_LABELS[row.priority] },
       { header: "Owner", accessor: (row) => row.ownerDisplayName ?? "Unassigned" },
       { header: "Due Date", accessor: "dueDate" },
+      { header: "Work Completed", accessor: "workCompletedDate" },
       { header: "Created", accessor: "createdAt" },
       { header: "RCFA #", accessor: (row) => formatRcfaNumber(row.rcfaNumber) },
       { header: "RCFA Title", accessor: "rcfaTitle" },
