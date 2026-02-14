@@ -139,9 +139,9 @@ function ViewMode({
   // Item-owner detection: user owns this action item but is NOT the RCFA owner/admin
   const isItemOwner =
     !!currentUserId && actionItem.ownerUserId === currentUserId;
-  // Can inline-edit fields that item owners are permitted to change
-  const canInlineEdit = canEdit || isItemOwner;
   const isDraft = actionItem.status === "draft";
+  // Can inline-edit fields that item owners are permitted to change
+  const canInlineEdit = canEdit || (isItemOwner && !isDraft);
 
   // Completion notes inline editing
   const [completionNotes, setCompletionNotes] = useState(
@@ -393,7 +393,7 @@ function ViewMode({
               </span>
             </div>
           </div>
-        ) : !canEdit && isItemOwner ? (
+        ) : !canEdit && isItemOwner && !isDraft ? (
           <div className="mt-1">
             <textarea
               id="view-completionNotes"
@@ -456,7 +456,7 @@ function ViewMode({
       )}
 
       {/* Item-owner-only: combined save/cancel for status + notes + date changes */}
-      {!canEdit && isItemOwner && hasItemOwnerChanges && (
+      {!canEdit && isItemOwner && !isDraft && hasItemOwnerChanges && (
         <div className="flex gap-2">
           <button
             type="button"

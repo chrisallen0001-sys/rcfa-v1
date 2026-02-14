@@ -61,6 +61,12 @@ export default function ActionItemDrawer({
         <Dialog.Content
           ref={isMobile ? swipeRef : undefined}
           aria-describedby={undefined}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest("[data-date-picker-portal]")) {
+              e.preventDefault();
+            }
+          }}
           className={[
             "fixed z-[51] flex flex-col bg-white shadow-xl outline-none dark:bg-zinc-900 motion-reduce:animate-none motion-reduce:transition-none",
             isMobile
