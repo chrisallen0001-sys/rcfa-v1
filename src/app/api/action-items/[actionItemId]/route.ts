@@ -30,6 +30,14 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Block setting status to "draft" for all roles — draft is system-controlled
+    if (body.status === "draft") {
+      return NextResponse.json(
+        { error: "Cannot manually set status to draft" },
+        { status: 403 }
+      );
+    }
+
     // Validate fields
     if (
       body.status !== undefined &&
@@ -119,7 +127,7 @@ export async function PATCH(
 
     const existing = await prisma.rcfaActionItem.findUnique({
       where: { id: actionItemId },
-      include: { rcfa: { select: { ownerUserId: true } } },
+      include: { rcfa: { select: { ownerUserId: true, status: true } } },
     });
 
     if (!existing) {
@@ -129,20 +137,19 @@ export async function PATCH(
       );
     }
 
+    if (existing.rcfa.status === "closed") {
+      return NextResponse.json(
+        { error: "Cannot modify action items on a closed RCFA" },
+        { status: 403 }
+      );
+    }
+
     if (
       existing.rcfa.ownerUserId !== userId &&
       existing.ownerUserId !== userId &&
       role !== "admin"
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Block setting status to "draft" for all roles — draft is system-controlled
-    if (body.status === "draft") {
-      return NextResponse.json(
-        { error: "Cannot manually set status to draft" },
-        { status: 403 }
-      );
     }
 
     // Determine the user's role relative to this action item

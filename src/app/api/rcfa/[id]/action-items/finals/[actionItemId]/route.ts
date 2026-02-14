@@ -32,6 +32,14 @@ export async function PATCH(
     const body = await request.json();
     const actionText =
       typeof body.actionText === "string" ? body.actionText.trim() : "";
+    // Block setting status to "draft" for all roles — draft is system-controlled
+    if (body.status === "draft") {
+      return NextResponse.json(
+        { error: "Cannot manually set status to draft" },
+        { status: 403 }
+      );
+    }
+
     if (
       typeof body.priority === "string" &&
       !VALID_PRIORITIES.includes(body.priority as Priority)
@@ -65,14 +73,6 @@ export async function PATCH(
       return NextResponse.json(
         { error: `status must be one of: ${VALID_STATUSES.join(", ")}` },
         { status: 400 }
-      );
-    }
-
-    // Block setting status to "draft" for all roles — draft is system-controlled
-    if (body.status === "draft") {
-      return NextResponse.json(
-        { error: "Cannot manually set status to draft" },
-        { status: 403 }
       );
     }
 

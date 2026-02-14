@@ -178,34 +178,46 @@ function ViewMode({
   const hasItemOwnerChanges =
     hasCompletionNotesChanges || hasStatusChange || hasWorkCompletedDateChange;
 
-  async function handleSaveCompletionNotes() {
+  /** Save all RCFA-owner/admin inline changes (completion notes + work completed date) in a single PATCH */
+  async function handleSaveRcfaOwnerChanges() {
     if (pendingRef.current) return;
     pendingRef.current = true;
     setLoading(true);
     setError(null);
 
     try {
+      const payload: Record<string, unknown> = {};
+      if (hasCompletionNotesChanges) payload.completionNotes = completionNotes || null;
+      if (hasWorkCompletedDateChange) payload.workCompletedDate = workCompletedDate || null;
+
       const res = await fetch(`/api/action-items/${actionItem.actionItemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completionNotes: completionNotes || null }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to update action taken");
+        throw new Error(data.error ?? "Failed to save changes");
       }
 
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update action taken"
+        err instanceof Error ? err.message : "Failed to save changes"
       );
     } finally {
       pendingRef.current = false;
       setLoading(false);
     }
   }
+
+  function handleCancelRcfaOwnerChanges() {
+    setCompletionNotes(actionItem.completionNotes ?? "");
+    setWorkCompletedDate(actionItem.workCompletedDate ?? "");
+  }
+
+  const hasRcfaOwnerChanges = hasCompletionNotesChanges || hasWorkCompletedDateChange;
 
   /** Save all item-owner-only inline changes in a single PATCH */
   async function handleSaveItemOwnerChanges() {
@@ -375,31 +387,10 @@ function ViewMode({
               rows={2}
               className={inputClass}
             />
-            <div className="mt-1 flex items-center justify-between">
+            <div className="mt-1">
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
                 {completionNotes.length}/2000
               </span>
-              {hasCompletionNotesChanges && (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveCompletionNotes}
-                    disabled={loading}
-                    className={btnPrimary}
-                  >
-                    {loading ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCompletionNotes(actionItem.completionNotes ?? "")
-                    }
-                    className={btnSecondary}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         ) : !canEdit && isItemOwner ? (
@@ -434,61 +425,6 @@ function ViewMode({
             value={canEdit ? workCompletedDate : (isItemOwner ? workCompletedDate : "")}
             onChange={setWorkCompletedDate}
           />
-          {/* For canEdit users (RCFA owner/admin), save work completed date independently */}
-          {canEdit && hasWorkCompletedDateChange && (
-            <div className="mt-1 flex gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (pendingRef.current) return;
-                  pendingRef.current = true;
-                  setLoading(true);
-                  setError(null);
-                  try {
-                    const res = await fetch(
-                      `/api/action-items/${actionItem.actionItemId}`,
-                      {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          workCompletedDate: workCompletedDate || null,
-                        }),
-                      }
-                    );
-                    if (!res.ok) {
-                      const data = await res.json().catch(() => ({}));
-                      throw new Error(
-                        data.error ?? "Failed to update work completed date"
-                      );
-                    }
-                    router.refresh();
-                  } catch (err) {
-                    setError(
-                      err instanceof Error
-                        ? err.message
-                        : "Failed to update work completed date"
-                    );
-                  } finally {
-                    pendingRef.current = false;
-                    setLoading(false);
-                  }
-                }}
-                disabled={loading}
-                className={btnPrimary}
-              >
-                {loading ? "Saving..." : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setWorkCompletedDate(actionItem.workCompletedDate ?? "")
-                }
-                className={btnSecondary}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
         </div>
       ) : (
         <DetailField label="Work Completed Date">
@@ -496,6 +432,27 @@ function ViewMode({
             {formatDateShort(actionItem.workCompletedDate) ?? "\u2014"}
           </span>
         </DetailField>
+      )}
+
+      {/* RCFA owner/admin: unified save/cancel bar for completion notes + work completed date */}
+      {canEdit && hasRcfaOwnerChanges && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSaveRcfaOwnerChanges}
+            disabled={loading}
+            className={btnPrimary}
+          >
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelRcfaOwnerChanges}
+            className={btnSecondary}
+          >
+            Cancel
+          </button>
+        </div>
       )}
 
       {/* Item-owner-only: combined save/cancel for status + notes + date changes */}
