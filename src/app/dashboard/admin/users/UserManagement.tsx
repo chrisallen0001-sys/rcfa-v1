@@ -30,6 +30,12 @@ export default function UserManagement({
   const [actionError, setActionError] = useState("");
   const [confirmDisable, setConfirmDisable] = useState<User | null>(null);
   const [confirmReject, setConfirmReject] = useState<User | null>(null);
+  const [tempPasswordUser, setTempPasswordUser] = useState<User | null>(null);
+  const [tempPassword, setTempPassword] = useState("");
+  const [tempPasswordConfirm, setTempPasswordConfirm] = useState("");
+  const [tempPasswordError, setTempPasswordError] = useState("");
+  const [tempPasswordSaving, setTempPasswordSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -204,6 +210,69 @@ export default function UserManagement({
     handleUpdateStatus(user, "disabled", "Failed to reject user");
   }
 
+  function openTempPasswordModal(user: User) {
+    setTempPasswordUser(user);
+    setTempPassword("");
+    setTempPasswordConfirm("");
+    setTempPasswordError("");
+  }
+
+  function closeTempPasswordModal() {
+    setTempPasswordUser(null);
+    setTempPassword("");
+    setTempPasswordConfirm("");
+    setTempPasswordError("");
+  }
+
+  async function handleSetTempPassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!tempPasswordUser) return;
+
+    setTempPasswordError("");
+
+    if (tempPassword.length < 8) {
+      setTempPasswordError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (tempPassword !== tempPasswordConfirm) {
+      setTempPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setTempPasswordSaving(true);
+
+    try {
+      const res = await fetch(`/api/admin/users/${tempPasswordUser.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ temporaryPassword: tempPassword }),
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === tempPasswordUser.id
+              ? { ...u, mustResetPassword: updated.mustResetPassword }
+              : u
+          )
+        );
+        closeTempPasswordModal();
+        setSuccessMessage(
+          "Temporary password set. The user will be required to change it at next login."
+        );
+      } else {
+        const body = await res.json();
+        setTempPasswordError(body.error || "Failed to set temporary password");
+      }
+    } catch {
+      setTempPasswordError("Something went wrong. Please try again.");
+    } finally {
+      setTempPasswordSaving(false);
+    }
+  }
+
   return (
     <>
       {actionError && (
@@ -212,6 +281,18 @@ export default function UserManagement({
           <button
             onClick={() => setActionError("")}
             className="ml-2 text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="mb-3 flex items-center justify-between rounded-md bg-green-50 px-3 py-2 dark:bg-green-900/20">
+          <p className="text-sm text-green-600 dark:text-green-400">{successMessage}</p>
+          <button
+            onClick={() => setSuccessMessage("")}
+            className="ml-2 text-sm text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
           >
             Dismiss
           </button>
@@ -292,6 +373,96 @@ export default function UserManagement({
                 Reject
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set temporary password modal */}
+      {tempPasswordUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="temp-password-modal-title"
+          onKeyDown={(e) => e.key === "Escape" && closeTempPasswordModal()}
+        >
+          <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h3
+              id="temp-password-modal-title"
+              className="text-lg font-medium text-zinc-900 dark:text-zinc-100"
+            >
+              Set Temporary Password
+            </h3>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Set a temporary password for{" "}
+              <span className="font-medium">{tempPasswordUser.displayName}</span>.
+            </p>
+
+            <form onSubmit={handleSetTempPassword} className="mt-4 space-y-4">
+              {tempPasswordError && (
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {tempPasswordError}
+                </p>
+              )}
+
+              <PasswordInput
+                id="tempPassword"
+                label="Temporary Password"
+                required
+                minLength={8}
+                value={tempPassword}
+                onChange={(e) => setTempPassword(e.target.value)}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+
+              <PasswordInput
+                id="tempPasswordConfirm"
+                label="Confirm Temporary Password"
+                required
+                minLength={8}
+                value={tempPasswordConfirm}
+                onChange={(e) => setTempPasswordConfirm(e.target.value)}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+
+              {/* Read-only force reset indicator */}
+              <div className="flex items-center gap-3 rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-900/20">
+                <span
+                  role="switch"
+                  aria-checked={true}
+                  aria-label="Force password reset (auto-enabled)"
+                  className="relative inline-flex h-5 w-9 shrink-0 cursor-default rounded-full border-2 border-transparent bg-amber-500 dark:bg-amber-600"
+                >
+                  <span
+                    className="pointer-events-none inline-block h-4 w-4 translate-x-4 rounded-full bg-white shadow"
+                  />
+                </span>
+                <span className="text-sm text-amber-800 dark:text-amber-300">
+                  Force password reset will be enabled automatically
+                </span>
+              </div>
+
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                This will require the user to reset their password at next login.
+              </p>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeTempPasswordModal}
+                  className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={tempPasswordSaving}
+                  className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  {tempPasswordSaving ? "Setting..." : "Set Password"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -457,21 +628,30 @@ export default function UserManagement({
                                 : "Promote"}
                           </button>
                           {!isCurrentUser && (
-                            <button
-                              onClick={() => handleDisableClick(user)}
-                              disabled={togglingId === user.id}
-                              className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
-                                isDisabled
-                                  ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                                  : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-                              }`}
-                            >
-                              {togglingId === user.id
-                                ? "Saving..."
-                                : isDisabled
-                                  ? "Enable"
-                                  : "Disable"}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => openTempPasswordModal(user)}
+                                disabled={togglingId === user.id}
+                                className="rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                              >
+                                Set Temp Password
+                              </button>
+                              <button
+                                onClick={() => handleDisableClick(user)}
+                                disabled={togglingId === user.id}
+                                className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                                  isDisabled
+                                    ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                                    : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                                }`}
+                              >
+                                {togglingId === user.id
+                                  ? "Saving..."
+                                  : isDisabled
+                                    ? "Enable"
+                                    : "Disable"}
+                              </button>
+                            </>
                           )}
                         </>
                       )}

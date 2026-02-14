@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import type { UserStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 
 const VALID_STATUSES: UserStatus[] = ["active", "disabled"];
+const SALT_ROUNDS = 10;
 
 export async function PATCH(
   request: NextRequest,
@@ -15,7 +17,7 @@ export async function PATCH(
 
     const { userId } = await params;
 
-    let body: { role?: string; status?: string; mustResetPassword?: boolean };
+    let body: { role?: string; status?: string; mustResetPassword?: boolean; temporaryPassword?: string };
     try {
       body = await request.json();
     } catch {
@@ -25,7 +27,7 @@ export async function PATCH(
       );
     }
 
-    const { role: newRole, status: newStatus, mustResetPassword } = body;
+    const { role: newRole, status: newStatus, mustResetPassword, temporaryPassword } = body;
 
     // Validate mustResetPassword type if provided
     if (mustResetPassword !== undefined && typeof mustResetPassword !== "boolean") {
@@ -36,9 +38,25 @@ export async function PATCH(
     }
 
     // Validate that at least one field is provided
-    if (!newRole && !newStatus && mustResetPassword === undefined) {
+    if (!newRole && !newStatus && mustResetPassword === undefined && !temporaryPassword) {
       return NextResponse.json(
-        { error: "At least one of role, status, or mustResetPassword is required" },
+        { error: "At least one of role, status, mustResetPassword, or temporaryPassword is required" },
+        { status: 400 }
+      );
+    }
+
+    // Prevent setting temporary password on own account
+    if (userId === currentUserId && temporaryPassword) {
+      return NextResponse.json(
+        { error: "Cannot set temporary password on your own account" },
+        { status: 400 }
+      );
+    }
+
+    // Validate temporary password length
+    if (temporaryPassword && temporaryPassword.length < 8) {
+      return NextResponse.json(
+        { error: "Temporary password must be at least 8 characters" },
         { status: 400 }
       );
     }
@@ -84,7 +102,7 @@ export async function PATCH(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const updateData: { role?: "admin" | "user"; status?: UserStatus; mustResetPassword?: boolean } = {};
+    const updateData: { role?: "admin" | "user"; status?: UserStatus; mustResetPassword?: boolean; passwordHash?: string } = {};
     if (newRole) {
       updateData.role = newRole as "admin" | "user";
     }
@@ -93,6 +111,10 @@ export async function PATCH(
     }
     if (mustResetPassword !== undefined) {
       updateData.mustResetPassword = mustResetPassword;
+    }
+    if (temporaryPassword) {
+      updateData.passwordHash = await bcrypt.hash(temporaryPassword, SALT_ROUNDS);
+      updateData.mustResetPassword = true;
     }
 
     const updated = await prisma.appUser.update({
