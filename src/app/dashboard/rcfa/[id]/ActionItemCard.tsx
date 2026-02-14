@@ -29,12 +29,18 @@ export default function ActionItemCard({
   ownerName,
   onClick,
 }: ActionItemCardProps) {
+  const isDraft = status === "draft";
+
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={`${formatActionItemNumber(actionItemNumber)}: ${actionText}`}
-      className="w-full cursor-pointer rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:focus-visible:ring-blue-400"
+      className={`w-full cursor-pointer rounded-lg border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 dark:focus-visible:ring-blue-400 ${
+        isDraft
+          ? "border-dashed border-zinc-300 bg-white opacity-75 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
+          : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+      }`}
     >
       {/* Row 1: AI number, owner, due date, badges */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

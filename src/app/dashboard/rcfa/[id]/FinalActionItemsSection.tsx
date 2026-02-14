@@ -53,9 +53,11 @@ export default function FinalActionItemsSection({
   const [selectedItemId, setSelectedItemId] = useState<string | null>(deepLinkTargetId);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(deepLinkTargetId ? "view" : "view");
 
-  // Progress tracking
-  const totalActionItems = actionItems.length;
-  const completedActionItems = actionItems.filter(
+  // Progress tracking — exclude draft items from both numerator and denominator
+  const nonDraftItems = actionItems.filter((a) => a.status !== "draft");
+  const draftItemCount = actionItems.length - nonDraftItems.length;
+  const totalActionItems = nonDraftItems.length;
+  const completedActionItems = nonDraftItems.filter(
     (a) => isActionItemComplete(a.status as ActionItemStatus)
   ).length;
 
@@ -148,6 +150,11 @@ export default function FinalActionItemsSection({
                   {completedActionItems} of {totalActionItems} complete
                 </span>
               </div>
+            )}
+            {draftItemCount > 0 && (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                {draftItemCount} draft {draftItemCount === 1 ? "item" : "items"} pending finalization
+              </span>
             )}
             {status && <SectionStatusIndicator status={status} />}
           </div>
