@@ -11,6 +11,8 @@ interface ChangePasswordModalProps {
   onSuccess?: () => void;
   /** Called when the user clicks "Sign out" in mandatory mode */
   onLogout?: () => void;
+  /** When true, the logout request is in flight (disables the Sign out button) */
+  loggingOut?: boolean;
 }
 
 export default function ChangePasswordModal({
@@ -19,6 +21,7 @@ export default function ChangePasswordModal({
   mandatory = false,
   onSuccess,
   onLogout,
+  loggingOut = false,
 }: ChangePasswordModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -242,10 +245,10 @@ export default function ChangePasswordModal({
                 <button
                   type="button"
                   onClick={onLogout}
-                  disabled={loading}
-                  className="font-medium text-zinc-700 hover:text-zinc-900 hover:underline disabled:opacity-50 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  disabled={loading || loggingOut}
+                  className="font-medium text-zinc-700 hover:text-zinc-900 hover:underline disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 dark:text-zinc-300 dark:hover:text-zinc-100"
                 >
-                  Sign out
+                  {loggingOut ? "Signing out\u2026" : "Sign out"}
                 </button>
               </p>
             )}

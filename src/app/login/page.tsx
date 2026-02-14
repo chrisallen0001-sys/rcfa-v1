@@ -17,13 +17,21 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // The ?reset=1 query parameter is set by the middleware in proxy.ts when an
+  // authenticated user with mustResetPassword attempts to navigate to a
+  // non-allowed path. If an unauthenticated user bookmarks this URL, the modal
+  // will appear but any password-change API call will fail with a 401, and the
+  // "Sign out" button will return them to the clean login form.
   const [showForceReset, setShowForceReset] = useState(reset === "1");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleResetSuccess = useCallback(() => {
     router.push("/dashboard");
   }, [router]);
 
   const handleLogout = useCallback(async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
@@ -31,8 +39,9 @@ function LoginForm() {
       // can attempt to sign in again.
     }
     setShowForceReset(false);
+    setLoggingOut(false);
     router.replace("/login");
-  }, [router]);
+  }, [router, loggingOut]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -173,6 +182,7 @@ function LoginForm() {
         mandatory
         onSuccess={handleResetSuccess}
         onLogout={handleLogout}
+        loggingOut={loggingOut}
       />
     </div>
   );
