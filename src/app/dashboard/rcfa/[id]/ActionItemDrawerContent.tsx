@@ -11,6 +11,7 @@ import {
   PRIORITY_COLORS,
   ACTION_STATUS_LABELS,
   ACTION_STATUS_COLORS,
+  USER_SELECTABLE_STATUSES,
 } from "@/lib/rcfa-utils";
 
 // ---------------------------------------------------------------------------
@@ -504,8 +505,8 @@ function EditMode({
           onChange={(e) => setEditStatus(e.target.value)}
           className={inputClass}
         >
-          {(Object.entries(ACTION_STATUS_LABELS) as [ActionItemStatus, string][]).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
+          {USER_SELECTABLE_STATUSES.map((value) => (
+            <option key={value} value={value}>{ACTION_STATUS_LABELS[value]}</option>
           ))}
         </select>
       </div>

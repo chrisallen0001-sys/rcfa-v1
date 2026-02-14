@@ -99,7 +99,7 @@ export async function POST(
           dueDate: candidate.suggestedDueDate,
           selectedFromCandidateId: candidateId,
           createdByUserId: userId,
-          status: "open",
+          status: "draft",
         },
       });
 
@@ -114,6 +114,7 @@ export async function POST(
             actionItemNumber,
             actionText: candidate.actionText,
             actionDescription: candidate.rationaleText,
+            status: created.status,
           },
         },
       });

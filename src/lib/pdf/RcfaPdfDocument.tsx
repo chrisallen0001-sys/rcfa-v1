@@ -60,6 +60,7 @@ const PRIORITY_BADGE_COLORS: Record<Priority, { bg: string; text: string }> = {
 };
 
 const ACTION_STATUS_BADGE_COLORS: Record<ActionItemStatus, { bg: string; text: string }> = {
+  draft: { bg: "#f4f4f5", text: "#a1a1aa" },
   open: { bg: "#dbeafe", text: "#1d4ed8" },
   in_progress: { bg: "#fef3c7", text: "#b45309" },
   blocked: { bg: "#fee2e2", text: "#b91c1c" },

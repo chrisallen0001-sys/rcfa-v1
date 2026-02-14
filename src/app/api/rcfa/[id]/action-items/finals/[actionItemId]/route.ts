@@ -63,7 +63,7 @@ export async function PATCH(
       !VALID_STATUSES.includes(body.status as ActionItemStatus)
     ) {
       return NextResponse.json(
-        { error: "status must be open, in_progress, blocked, done, or canceled" },
+        { error: `status must be one of: ${VALID_STATUSES.join(", ")}` },
         { status: 400 }
       );
     }
@@ -77,6 +77,30 @@ export async function PATCH(
         ? null
         : typeof body.actionDescription === "string"
           ? body.actionDescription.trim() || null
+          : undefined;
+
+    // workCompletedDate: YYYY-MM-DD string, null to clear, or undefined to skip
+    if (
+      body.workCompletedDate !== undefined &&
+      body.workCompletedDate !== null
+    ) {
+      if (
+        typeof body.workCompletedDate !== "string" ||
+        !ISO_DATE_RE.test(body.workCompletedDate) ||
+        isNaN(new Date(body.workCompletedDate + "T00:00:00Z").getTime())
+      ) {
+        return NextResponse.json(
+          { error: "workCompletedDate must be YYYY-MM-DD or null" },
+          { status: 400 }
+        );
+      }
+    }
+    const workCompletedDate =
+      typeof body.workCompletedDate === "string" &&
+      ISO_DATE_RE.test(body.workCompletedDate)
+        ? new Date(body.workCompletedDate + "T00:00:00Z")
+        : body.workCompletedDate === null
+          ? null
           : undefined;
 
     if (!actionText) {
@@ -128,6 +152,7 @@ export async function PATCH(
           ...(ownerUserId !== undefined && { ownerUserId }),
           ...(status !== undefined && { status }),
           ...(actionDescription !== undefined && { actionDescription }),
+          ...(workCompletedDate !== undefined && { workCompletedDate }),
           updatedByUserId: userId,
         },
       });
@@ -145,12 +170,14 @@ export async function PATCH(
             previousDueDate: existing.dueDate,
             previousOwnerUserId: existing.ownerUserId,
             previousStatus: existing.status,
+            previousWorkCompletedDate: existing.workCompletedDate,
             actionText,
             actionDescription,
             priority,
             dueDate,
             ownerUserId,
             status,
+            workCompletedDate,
           },
         },
       });

@@ -52,6 +52,9 @@ export async function POST(
         throw new Error("RCFA_NO_ROOT_CAUSES");
       }
 
+      // notIn: ["done","canceled"] intentionally catches draft items too.
+      // Draft items should never exist at close time (finalize converts them
+      // to open), but this serves as a safety net if any slip through.
       const incompleteActionCount = await tx.rcfaActionItem.count({
         where: {
           rcfaId: id,

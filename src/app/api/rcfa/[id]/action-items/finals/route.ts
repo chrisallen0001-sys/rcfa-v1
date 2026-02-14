@@ -91,7 +91,7 @@ export async function POST(
           ownerUserId,
           selectedFromCandidateId: null,
           createdByUserId: userId,
-          status: "open",
+          status: locked.status === "investigation" ? "draft" : "open",
         },
       });
 
@@ -108,6 +108,7 @@ export async function POST(
             priority,
             dueDate,
             ownerUserId,
+            status: record.status,
           },
         },
       });
