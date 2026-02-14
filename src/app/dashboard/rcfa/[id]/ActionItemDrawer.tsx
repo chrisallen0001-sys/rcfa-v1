@@ -63,7 +63,13 @@ export default function ActionItemDrawer({
           aria-describedby={undefined}
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
-            if (target.closest("[data-date-picker-portal]")) {
+            if (target.closest?.("[data-date-picker-portal]")) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest?.("[data-date-picker-portal]")) {
               e.preventDefault();
             }
           }}
