@@ -43,14 +43,21 @@ export async function PATCH(
       );
     }
 
-    // Verify the new owner exists (outside transaction since it won't change)
+    // Verify the new owner exists and is active (outside transaction since it won't change)
     const newOwner = await prisma.appUser.findUnique({
       where: { id: newOwnerUserId },
-      select: { id: true, displayName: true },
+      select: { id: true, displayName: true, status: true },
     });
 
     if (!newOwner) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (newOwner.status !== "active") {
+      return NextResponse.json(
+        { error: "Cannot assign to a non-active user" },
+        { status: 400 }
+      );
     }
 
     // Use interactive transaction to ensure consistent reads and writes

@@ -222,11 +222,17 @@ export async function PATCH(
       if (body.ownerUserId) {
         const newOwner = await prisma.appUser.findUnique({
           where: { id: body.ownerUserId },
-          select: { displayName: true },
+          select: { displayName: true, status: true },
         });
         if (!newOwner) {
           return NextResponse.json(
             { error: "Owner user not found" },
+            { status: 400 }
+          );
+        }
+        if (newOwner.status !== "active") {
+          return NextResponse.json(
+            { error: "Cannot assign to a non-active user" },
             { status: 400 }
           );
         }

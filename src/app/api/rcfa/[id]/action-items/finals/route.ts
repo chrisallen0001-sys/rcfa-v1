@@ -68,6 +68,26 @@ export async function POST(
       );
     }
 
+    // Validate assigned owner is an active user
+    if (ownerUserId) {
+      const owner = await prisma.appUser.findUnique({
+        where: { id: ownerUserId },
+        select: { status: true },
+      });
+      if (!owner) {
+        return NextResponse.json(
+          { error: "Owner user not found" },
+          { status: 400 }
+        );
+      }
+      if (owner.status !== "active") {
+        return NextResponse.json(
+          { error: "Cannot assign to a non-active user" },
+          { status: 400 }
+        );
+      }
+    }
+
     const created = await prisma.$transaction(async (tx) => {
       const locked = await tx.rcfa.findUniqueOrThrow({ where: { id } });
       if (locked.status !== "investigation" && locked.status !== "actions_open") {

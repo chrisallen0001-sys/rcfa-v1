@@ -465,6 +465,9 @@ export async function POST(request: NextRequest) {
     const rcfaNumber = Number(nextval);
     const isQuickCreate = !hasRequiredFields;
 
+    // Owner is auto-assigned to the authenticated user. No active-status check
+    // is needed here because disabled/pending_approval users cannot log in, so
+    // they will never reach this code path.
     const rcfa = await prisma.$transaction(async (tx) => {
       const created = await tx.rcfa.create({
         data: {

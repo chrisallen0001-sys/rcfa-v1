@@ -12,7 +12,8 @@ let usersCache: User[] | null = null;
 let usersFetchPromise: Promise<User[]> | null = null;
 
 /**
- * Hook to fetch and cache the users list for owner dropdowns.
+ * Hook to fetch and cache the users list for table filter dropdowns.
+ * Passes ?status=all so historically-assigned inactive users still appear in filters.
  * Uses module-level caching to avoid refetching across component instances.
  */
 export function useUsers(): User[] {
@@ -24,7 +25,7 @@ export function useUsers(): User[] {
     if (usersCache) return;
 
     if (!usersFetchPromise) {
-      usersFetchPromise = fetch("/api/users")
+      usersFetchPromise = fetch("/api/users?status=all")
         .then((res) => res.json())
         .then((data: User[]) => {
           usersCache = data;
