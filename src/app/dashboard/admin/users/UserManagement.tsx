@@ -469,28 +469,28 @@ export default function UserManagement({
 
       {/* User table */}
       <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-        <table className="w-full text-left text-sm">
+        <table className="w-full min-w-[1000px] text-left text-sm">
           <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
             <tr>
-              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+              <th className="whitespace-nowrap px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Email
               </th>
-              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+              <th className="whitespace-nowrap px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Display Name
               </th>
-              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+              <th className="whitespace-nowrap px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Role
               </th>
-              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+              <th className="whitespace-nowrap px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Status
               </th>
-              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+              <th className="whitespace-nowrap px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Force Reset
               </th>
-              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+              <th className="whitespace-nowrap px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
                 Created
               </th>
-              <th className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-300">
+              <th className="whitespace-nowrap px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-300">
                 Actions
               </th>
             </tr>
@@ -595,8 +595,8 @@ export default function UserManagement({
                   >
                     {user.createdAt}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex flex-nowrap justify-end gap-2">
                       {isPending ? (
                         <>
                           <button
@@ -627,31 +627,31 @@ export default function UserManagement({
                                 ? "Demote"
                                 : "Promote"}
                           </button>
+                          {!isCurrentUser && !isDisabled && (
+                            <button
+                              onClick={() => openTempPasswordModal(user)}
+                              disabled={togglingId === user.id}
+                              className="rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                            >
+                              Set Temp Password
+                            </button>
+                          )}
                           {!isCurrentUser && (
-                            <>
-                              <button
-                                onClick={() => openTempPasswordModal(user)}
-                                disabled={togglingId === user.id}
-                                className="rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
-                              >
-                                Set Temp Password
-                              </button>
-                              <button
-                                onClick={() => handleDisableClick(user)}
-                                disabled={togglingId === user.id}
-                                className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
-                                  isDisabled
-                                    ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                                    : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-                                }`}
-                              >
-                                {togglingId === user.id
-                                  ? "Saving..."
-                                  : isDisabled
-                                    ? "Enable"
-                                    : "Disable"}
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handleDisableClick(user)}
+                              disabled={togglingId === user.id}
+                              className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                                isDisabled
+                                  ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                                  : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                              }`}
+                            >
+                              {togglingId === user.id
+                                ? "Saving..."
+                                : isDisabled
+                                  ? "Enable"
+                                  : "Disable"}
+                            </button>
                           )}
                         </>
                       )}
