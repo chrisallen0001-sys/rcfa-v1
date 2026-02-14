@@ -95,11 +95,19 @@ export async function PATCH(
 
     const existing = await prisma.appUser.findUnique({
       where: { id: userId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Prevent setting temporary password on non-active users
+    if (temporaryPassword && existing.status !== "active") {
+      return NextResponse.json(
+        { error: "Cannot set temporary password for a non-active user" },
+        { status: 400 }
+      );
     }
 
     const updateData: { role?: "admin" | "user"; status?: UserStatus; mustResetPassword?: boolean; passwordHash?: string } = {};
