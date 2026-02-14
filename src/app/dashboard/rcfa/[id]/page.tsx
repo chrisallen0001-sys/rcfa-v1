@@ -355,11 +355,12 @@ export default async function RcfaDetailPage({
     }
   }
 
-  // Action items progress tracking
-  const completedActionItems = rcfa.actionItems.filter(
+  // Action items progress tracking — exclude draft items from completion metrics
+  const nonDraftActionItems = rcfa.actionItems.filter((a) => a.status !== "draft");
+  const completedActionItems = nonDraftActionItems.filter(
     (a) => isActionItemComplete(a.status)
   ).length;
-  const totalActionItems = rcfa.actionItems.length;
+  const totalActionItems = nonDraftActionItems.length;
   const allActionItemsComplete = totalActionItems > 0 && completedActionItems === totalActionItems;
 
   // Helper for statuses that allow action item editing

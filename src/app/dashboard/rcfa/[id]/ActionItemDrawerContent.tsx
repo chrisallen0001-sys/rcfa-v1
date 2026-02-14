@@ -570,6 +570,9 @@ function EditMode({
   const [ownerUserId, setOwnerUserId] = useState(
     actionItem.ownerUserId ?? ""
   );
+  const [workCompletedDate, setWorkCompletedDate] = useState(
+    actionItem.workCompletedDate ?? ""
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -595,6 +598,7 @@ function EditMode({
             ...(isActionsOpen && { status: editStatus }),
             dueDate: dueDate || null,
             ownerUserId: ownerUserId || null,
+            workCompletedDate: workCompletedDate || null,
           }),
         }
       );
@@ -717,6 +721,13 @@ function EditMode({
 
       {/* Due Date */}
       <DateInput label="Due Date" value={dueDate} onChange={setDueDate} minToday />
+
+      {/* Work Completed Date */}
+      <DateInput
+        label="Work Completed Date"
+        value={workCompletedDate}
+        onChange={setWorkCompletedDate}
+      />
 
       {/* Error */}
       {error && (
