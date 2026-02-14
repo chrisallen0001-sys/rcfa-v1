@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDisabledHint } from "./useDisabledHint";
-import { formatActionItemNumber, truncateTitle } from "@/lib/rcfa-utils";
+import { formatActionItemNumber } from "@/lib/rcfa-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -11,7 +11,6 @@ import { formatActionItemNumber, truncateTitle } from "@/lib/rcfa-utils";
 
 interface IncompleteItem {
   actionItemNumber: number;
-  actionText: string;
   missingFields: string[];
 }
 
@@ -193,7 +192,8 @@ export default function FinalizeInvestigationButton({
 // ---------------------------------------------------------------------------
 
 function IncompleteItemsBanner({ items, onDismiss }: { items: IncompleteItem[]; onDismiss: () => void }) {
-  const displayed = items.slice(0, MAX_DISPLAYED_ITEMS);
+  const sorted = [...items].sort((a, b) => a.actionItemNumber - b.actionItemNumber);
+  const displayed = sorted.slice(0, MAX_DISPLAYED_ITEMS);
   const remaining = items.length - displayed.length;
 
   return (
@@ -220,9 +220,6 @@ function IncompleteItemsBanner({ items, onDismiss }: { items: IncompleteItem[]; 
           <li key={item.actionItemNumber}>
             <span className="font-semibold">
               {formatActionItemNumber(item.actionItemNumber)}
-            </span>{" "}
-            <span className="text-amber-600 dark:text-amber-500">
-              &ldquo;{truncateTitle(item.actionText, 60)}&rdquo;
             </span>
             : Missing{" "}
             <span className="font-medium">
