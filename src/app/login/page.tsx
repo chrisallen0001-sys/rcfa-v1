@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback, FormEvent } from "react";
+import { Suspense, useState, useCallback, useRef, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AletheiaLogo from "@/components/AletheiaLogo";
@@ -24,13 +24,15 @@ function LoginForm() {
   // "Sign out" button will return them to the clean login form.
   const [showForceReset, setShowForceReset] = useState(reset === "1");
   const [loggingOut, setLoggingOut] = useState(false);
+  const loggingOutRef = useRef(false);
 
   const handleResetSuccess = useCallback(() => {
     router.push("/dashboard");
   }, [router]);
 
   const handleLogout = useCallback(async () => {
-    if (loggingOut) return;
+    if (loggingOutRef.current) return;
+    loggingOutRef.current = true;
     setLoggingOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -39,9 +41,10 @@ function LoginForm() {
       // can attempt to sign in again.
     }
     setShowForceReset(false);
+    loggingOutRef.current = false;
     setLoggingOut(false);
     router.replace("/login");
-  }, [router, loggingOut]);
+  }, [router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
