@@ -67,6 +67,15 @@ export async function PATCH(
         { status: 400 }
       );
     }
+
+    // Block setting status to "draft" for all roles — draft is system-controlled
+    if (body.status === "draft") {
+      return NextResponse.json(
+        { error: "Cannot manually set status to draft" },
+        { status: 403 }
+      );
+    }
+
     const status: ActionItemStatus | undefined =
       typeof body.status === "string" &&
       VALID_STATUSES.includes(body.status as ActionItemStatus)

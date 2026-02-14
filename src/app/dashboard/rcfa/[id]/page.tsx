@@ -379,6 +379,7 @@ export default async function RcfaDetailPage({
     ownerName: a.owner?.displayName ?? null,
     createdByEmail: a.createdBy.email,
     createdAt: a.createdAt.toISOString().slice(0, 10),
+    workCompletedDate: a.workCompletedDate?.toISOString().slice(0, 10) ?? null,
   }));
 
   // Resolve expandItem deep-link to a concrete action item UUID
@@ -730,6 +731,7 @@ export default async function RcfaDetailPage({
                   canEdit={canEditActionItems}
                   status={sectionStatuses?.trackedActions}
                   initialOpenItemId={resolvedExpandItemId}
+                  currentUserId={userId}
                 />
               )}
 
@@ -936,6 +938,7 @@ export default async function RcfaDetailPage({
             actionItems={serializedActionItems}
             canEdit={false}
             initialOpenItemId={resolvedExpandItemId}
+            currentUserId={userId}
           />
         )}
 

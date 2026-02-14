@@ -137,6 +137,43 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Block setting status to "draft" for all roles — draft is system-controlled
+    if (body.status === "draft") {
+      return NextResponse.json(
+        { error: "Cannot manually set status to draft" },
+        { status: 403 }
+      );
+    }
+
+    // Determine the user's role relative to this action item
+    const isAdmin = role === "admin";
+    const isRcfaOwner = existing.rcfa.ownerUserId === userId;
+    const isItemOwnerOnly =
+      existing.ownerUserId === userId && !isRcfaOwner && !isAdmin;
+
+    // Item-owner-only users can only update status, completionNotes, and workCompletedDate
+    if (isItemOwnerOnly) {
+      const restrictedFields = [
+        "actionText",
+        "actionDescription",
+        "ownerUserId",
+        "dueDate",
+        "priority",
+      ];
+      const attemptedRestrictedFields = restrictedFields.filter(
+        (f) => body[f] !== undefined
+      );
+      if (attemptedRestrictedFields.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Action item owners can only update status, action taken, and work completed date",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Fetch owner names for audit trail (if owner is changing)
     let previousOwnerName: string | null = null;
     let newOwnerName: string | null = null;
